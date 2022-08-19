@@ -7,17 +7,16 @@ from mmseg.utils import get_device, setup_multi_processes
 import torch
 import torch.nn.functional as F
 import numpy as np
-from research.block_relu.consts import BLOCK_SIZES
 from mmseg.datasets import build_dataset
 
 
 class BlockRelu(Module):
 
-    def __init__(self, block_size_indices):
+    def __init__(self, block_size_indices, block_sizes):
         super(BlockRelu, self).__init__()
         self.block_size_indices = block_size_indices
         self.active_block_indices = np.unique(self.block_size_indices)
-
+        self.block_sizes = block_sizes
     def forward(self, activation):
 
         with torch.no_grad():
@@ -33,11 +32,11 @@ class BlockRelu(Module):
                     cur_input = activation[:, channels]
 
                     avg_pool = torch.nn.AvgPool2d(
-                        kernel_size=BLOCK_SIZES[block_size_index],
-                        stride=BLOCK_SIZES[block_size_index], ceil_mode=True)
+                        kernel_size=self.block_sizes[block_size_index],
+                        stride=self.block_sizes[block_size_index], ceil_mode=True)
 
                     cur_relu_map = avg_pool(cur_input).sign_().add_(1).div_(2)
-                    o = F.interpolate(input=cur_relu_map, scale_factor=BLOCK_SIZES[block_size_index])
+                    o = F.interpolate(input=cur_relu_map, scale_factor=self.block_sizes[block_size_index])
                     relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
 
                     torch.cuda.empty_cache()
@@ -267,9 +266,9 @@ def set_layer(model, layer_name, block_relu):
         setattr(res_block, f"secure_relu_{relu_name}", block_relu)
 
 
-def set_bReLU_layers(model, layer_name_to_block_size_indices):
-    layer_name_to_layers = {layer_name: BlockRelu(block_size_indices=block_size_indices) for
-                            layer_name, block_size_indices in layer_name_to_block_size_indices.items()}
+def set_bReLU_layers(model, layer_name_to_block_size_indices_and_block_sizes):
+    layer_name_to_layers = {layer_name: BlockRelu(block_size_indices=block_size_indices, block_sizes=block_sizes) for
+                            layer_name, (block_size_indices,block_sizes) in layer_name_to_block_size_indices_and_block_sizes.items()}
     set_layers(model, layer_name_to_layers)
 
 
