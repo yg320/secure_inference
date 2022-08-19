@@ -7,7 +7,7 @@ from mmseg.utils import get_device, setup_multi_processes
 import torch
 import torch.nn.functional as F
 import numpy as np
-from research.block_deformation.consts import BLOCK_SIZES
+from research.block_relu.consts import BLOCK_SIZES
 from mmseg.datasets import build_dataset
 
 
