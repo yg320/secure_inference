@@ -32,8 +32,7 @@ def main():
     batch_index = args.batch_index
     batch_size = args.batch_size
     gpu_id = args.gpu_id
-    resnet_block_start = 0
-    resnet_block_end = 18
+    num_blocks = 18
     im_size = 512
     device = f"cuda:{gpu_id}"
     model = get_model(
@@ -48,7 +47,7 @@ def main():
         batch_indices = range(batch_index * batch_size, (batch_index + 1) * batch_size)
         batch = torch.stack([center_crop(dataset[sample_id]['img'][0], im_size) for sample_id in batch_indices]).to(device)
         activations = [batch]
-        for block_index in range(resnet_block_start, resnet_block_end):
+        for block_index in range(num_blocks):
             activations.append(run_model_block(model, activations[block_index], BLOCK_NAMES[block_index]))
 
         resnet_block_name_to_activation = dict(zip(BLOCK_NAMES, activations))
@@ -62,6 +61,7 @@ def main():
             next_block_index = np.argwhere(np.array(BLOCK_NAMES) == next_block_name)[0, 0]
 
             layer_block_sizes = LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+            assert layer_block_sizes[0][0] == 1 and layer_block_sizes[0][1] == 1
             cur_tensor = resnet_block_name_to_activation[cur_block_name]
             next_tensor = resnet_block_name_to_activation[next_block_name]
             noise_f_name = os.path.join(deformation_path, f"noise_{layer_name}_batch_{batch_index}_{batch_size}.npy")
@@ -75,6 +75,8 @@ def main():
             t0 = time.time()
             for channel in tqdm(range(channels), desc=f"Batch={batch_index} Layer={layer_index}"):
                 for block_size_index in range(len(layer_block_sizes)):
+                    if block_size_index == 0:
+                        continue
                     out = cur_tensor
                     block_size_indices = np.zeros(shape=channels, dtype=np.int32)
                     block_size_indices[channel] = block_size_index
