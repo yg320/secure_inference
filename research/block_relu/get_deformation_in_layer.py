@@ -1,13 +1,11 @@
 import argparse
 import os
-import time
 from tqdm import tqdm
 import torch
 import numpy as np
 
 from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
-    LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, BY_CHANNEL_BY_BLOCK_SIZE_DEFORMATION_PROXY_SPEC, TARGET_REDUCTIONS, \
-    NUM_OF_IN_LAYER_GROUPS
+    LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, TARGET_REDUCTIONS, NUM_OF_IN_LAYER_GROUPS, HIERARCHY_LAYER_PROXY_SPEC
 from research.block_relu.utils import get_model, get_data, run_model_block, get_layer, set_bReLU_layers, set_layers,\
     center_crop
 
@@ -17,15 +15,17 @@ def main():
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--gpu_id', type=int, default=0)
+    parser.add_argument('--hierarchy_index', type=int, default=0)
+    args = parser.parse_args()
 
-    input_dir = "/home/yakir/Data2/assets_v2/deformation_grouping_in_layer_step_0"
-    output_path = "/home/yakir/Data2/assets_v2/in_layer_deformation_step_0"
+    hierarchy_index = args.hierarchy_index
+    input_dir = f"/home/yakir/Data2/assets_v2/deformation_grouping_in_layer_step_{hierarchy_index}"
+    output_path = f"/home/yakir/Data2/assets_v2/in_layer_deformation_step_{hierarchy_index}"
 
     config = "/home/yakir/PycharmProjects/mmsegmentation/configs/secure_semantic_segmentation/baseline_40k_finetune_tmp.py"
     checkpoint = "/home/yakir/PycharmProjects/mmsegmentation/work_dirs/baseline_40k/latest.pth"
     os.makedirs(output_path, exist_ok=True)
 
-    args = parser.parse_args()
     batch_index = args.batch_index
     batch_size = args.batch_size
     gpu_id = args.gpu_id
@@ -39,7 +39,7 @@ def main():
     )
 
     dataset = get_data(config)
-
+    num_of_groups = NUM_OF_IN_LAYER_GROUPS[hierarchy_index]
     with torch.no_grad():
         batch_indices = range(batch_index * batch_size, (batch_index + 1) * batch_size)
         batch = torch.stack([center_crop(dataset[sample_id]['img'].data, im_size) for sample_id in batch_indices]).to(device)
@@ -51,11 +51,15 @@ def main():
         resnet_block_name_to_activation = dict(zip(BLOCK_NAMES, activations))
 
         for layer_index, layer_name in enumerate(LAYER_NAMES):
-            redundancy_arr = np.load(os.path.join(input_dir, f"redundancy_arr_{layer_name}.npy"))
+            redundancy_arr_f_name = os.path.join(input_dir, f"redundancy_arr_{layer_name}.npy")
+            if os.path.exists(redundancy_arr_f_name):
+                redundancy_arr = np.load(redundancy_arr_f_name)
+            else:
+                redundancy_arr = None
             reduction_to_block_sizes = np.load(os.path.join(input_dir, f"reduction_to_block_sizes_{layer_name}.npy"))
             torch.cuda.empty_cache()
             cur_block_name = LAYER_NAME_TO_BLOCK_NAME[layer_name]
-            next_block_name = BY_CHANNEL_BY_BLOCK_SIZE_DEFORMATION_PROXY_SPEC[layer_name]
+            next_block_name = HIERARCHY_LAYER_PROXY_SPEC[hierarchy_index][layer_name]
 
             cur_block_index = np.argwhere(np.array(BLOCK_NAMES) == cur_block_name)[0, 0]
             next_block_index = np.argwhere(np.array(BLOCK_NAMES) == next_block_name)[0, 0]
@@ -70,16 +74,16 @@ def main():
             if os.path.exists(noise_f_name):
                 continue
             channels = LAYER_NAME_TO_CHANNELS[layer_name]
-            noise = np.zeros((TARGET_REDUCTIONS.shape[0], NUM_OF_IN_LAYER_GROUPS))
-            signal = np.zeros((TARGET_REDUCTIONS.shape[0], NUM_OF_IN_LAYER_GROUPS))
-            loss_deform = np.zeros((TARGET_REDUCTIONS.shape[0], NUM_OF_IN_LAYER_GROUPS))
+            noise = np.zeros((TARGET_REDUCTIONS.shape[0], num_of_groups))
+            signal = np.zeros((TARGET_REDUCTIONS.shape[0], num_of_groups))
+            loss_deform = np.zeros((TARGET_REDUCTIONS.shape[0], num_of_groups))
 
-            group_size = channels // NUM_OF_IN_LAYER_GROUPS
-            assert group_size * NUM_OF_IN_LAYER_GROUPS == channels
+            group_size = channels // num_of_groups
+            assert group_size * num_of_groups == channels
 
-            for channel_group in tqdm(range(NUM_OF_IN_LAYER_GROUPS), desc=f"Batch={batch_index} Layer={layer_index}"):
+            for channel_group in tqdm(range(num_of_groups), desc=f"Batch={batch_index} Layer={layer_index}"):
                 for reduction_index, reduction in enumerate(TARGET_REDUCTIONS):
-                    if redundancy_arr[reduction_index] != reduction_index:
+                    if (redundancy_arr is not None) and (redundancy_arr[reduction_index] != reduction_index):
                         assert redundancy_arr[reduction_index] < reduction_index
                         noise[reduction_index, channel_group] = noise[redundancy_arr[reduction_index], channel_group]
                         signal[reduction_index, channel_group] = signal[redundancy_arr[reduction_index], channel_group]

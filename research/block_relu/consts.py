@@ -2,7 +2,7 @@ import numpy as np
 
 TARGET_DEFORMATIONS = np.arange(0, 0.01, 0.000002)
 TARGET_REDUCTIONS = np.arange(0, 1.001, 0.001)
-NUM_OF_IN_LAYER_GROUPS = 16
+NUM_OF_IN_LAYER_GROUPS = [16, 1]
 
 BLOCK_SIZES_MINI = [
     [1, 1],
@@ -537,6 +537,162 @@ BY_CHANNEL_BY_BLOCK_SIZE_DEFORMATION_PROXY_SPEC = \
         "decode_4": None,
         "decode_5": None,
     }
+
+HIERARCHY_LAYER_PROXY_SPEC = \
+    [
+        {
+            "stem_2": "layer1_1",
+            "stem_5": "layer1_1",
+            "stem_8": "layer1_1",
+
+            "layer1_0_1": "layer1_2",
+            "layer1_0_2": "layer1_2",
+            "layer1_0_3": "layer1_2",
+
+            "layer1_1_1": "layer2_0",
+            "layer1_1_2": "layer2_0",
+            "layer1_1_3": "layer2_0",
+
+            "layer1_2_1": "layer2_1",
+            "layer1_2_2": "layer2_1",
+            "layer1_2_3": "layer2_1",
+
+            "layer2_0_1": "layer2_2",
+            "layer2_0_2": "layer2_2",
+            "layer2_0_3": "layer2_2",
+
+            "layer2_1_1": "layer2_3",
+            "layer2_1_2": "layer2_3",
+            "layer2_1_3": "layer2_3",
+
+            "layer2_2_1": "layer3_0",
+            "layer2_2_2": "layer3_0",
+            "layer2_2_3": "layer3_0",
+
+            "layer2_3_1": "layer3_1",
+            "layer2_3_2": "layer3_1",
+            "layer2_3_3": "layer3_1",
+
+            "layer3_0_1": "layer3_2",
+            "layer3_0_2": "layer3_2",
+            "layer3_0_3": "layer3_2",
+
+            "layer3_1_1": "layer3_3",
+            "layer3_1_2": "layer3_3",
+            "layer3_1_3": "layer3_3",
+
+            "layer3_2_1": "layer3_4",
+            "layer3_2_2": "layer3_4",
+            "layer3_2_3": "layer3_4",
+
+            "layer3_3_1": "layer3_5",
+            "layer3_3_2": "layer3_5",
+            "layer3_3_3": "layer3_5",
+
+            "layer3_4_1": "layer4_0",
+            "layer3_4_2": "layer4_0",
+            "layer3_4_3": "layer4_0",
+
+            "layer3_5_1": "layer4_1",
+            "layer3_5_2": "layer4_1",
+            "layer3_5_3": "layer4_1",
+
+            "layer4_0_1": "layer4_2",
+            "layer4_0_2": "layer4_2",
+            "layer4_0_3": "layer4_2",
+
+            "layer4_1_1": "decode",
+            "layer4_1_2": "decode",
+            "layer4_1_3": "decode",
+
+            "layer4_2_1": "decode",
+            "layer4_2_2": "decode",
+            "layer4_2_3": "decode",
+
+            "decode_0": None,
+            "decode_1": None,
+            "decode_2": None,
+            "decode_3": None,
+            "decode_4": None,
+            "decode_5": None,
+        },
+        {
+            "stem_2": None,
+            "stem_5": None,
+            "stem_8": None,
+
+            "layer1_0_1": None,
+            "layer1_0_2": None,
+            "layer1_0_3": None,
+
+            "layer1_1_1": None,
+            "layer1_1_2": None,
+            "layer1_1_3": None,
+
+            "layer1_2_1": None,
+            "layer1_2_2": None,
+            "layer1_2_3": None,
+
+            "layer2_0_1": None,
+            "layer2_0_2": None,
+            "layer2_0_3": None,
+
+            "layer2_1_1": None,
+            "layer2_1_2": None,
+            "layer2_1_3": None,
+
+            "layer2_2_1": None,
+            "layer2_2_2": None,
+            "layer2_2_3": None,
+
+            "layer2_3_1": None,
+            "layer2_3_2": None,
+            "layer2_3_3": None,
+
+            "layer3_0_1": None,
+            "layer3_0_2": None,
+            "layer3_0_3": None,
+
+            "layer3_1_1": None,
+            "layer3_1_2": None,
+            "layer3_1_3": None,
+
+            "layer3_2_1": None,
+            "layer3_2_2": None,
+            "layer3_2_3": None,
+
+            "layer3_3_1": None,
+            "layer3_3_2": None,
+            "layer3_3_3": None,
+
+            "layer3_4_1": None,
+            "layer3_4_2": None,
+            "layer3_4_3": None,
+
+            "layer3_5_1": None,
+            "layer3_5_2": None,
+            "layer3_5_3": None,
+
+            "layer4_0_1": None,
+            "layer4_0_2": None,
+            "layer4_0_3": None,
+
+            "layer4_1_1": None,
+            "layer4_1_2": None,
+            "layer4_1_3": None,
+
+            "layer4_2_1": None,
+            "layer4_2_2": None,
+            "layer4_2_3": None,
+
+            "decode_0": None,
+            "decode_1": None,
+            "decode_2": None,
+            "decode_3": None,
+            "decode_4": None,
+            "decode_5": None,
+        }
+    ]
 
 LAYER_NAME_TO_BLOCK_SIZES = \
     {
