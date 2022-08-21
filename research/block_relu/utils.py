@@ -17,6 +17,7 @@ class BlockRelu(Module):
         self.block_size_indices = block_size_indices
         self.active_block_indices = np.unique(self.block_size_indices)
         self.block_sizes = block_sizes
+
     def forward(self, activation):
 
         with torch.no_grad():
@@ -81,8 +82,25 @@ def get_model(config, gpu_id, checkpoint_path):
 
 def get_data(config):
     cfg = mmcv.Config.fromfile(config)
-    cfg.data.test.test_mode = True
+    # cfg.data.test.test_mode = True
+    # dataset = build_dataset(cfg.data.test)
+    cfg.data.test = {'type': 'COCOStuffDataset',
+                     'data_root': 'data/coco_stuff10k',
+                     'reduce_zero_label': True,
+                     'img_dir': 'images/test2014',
+                     'ann_dir': 'annotations/test2014',
+                     'pipeline': [
+                         {'type': 'LoadImageFromFile'},
+                         {'type': 'LoadAnnotations', 'reduce_zero_label': True},
+                         {'type': 'Resize', 'img_scale': (2048, 512), 'keep_ratio': True},
+                         {'type': 'RandomFlip', 'prob': 0.0},
+                         {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+                         {'type': 'DefaultFormatBundle'},
+                         {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
+                     }
+
     dataset = build_dataset(cfg.data.test)
+
     return dataset
 
 
@@ -268,10 +286,17 @@ def set_layer(model, layer_name, block_relu):
 
 def set_bReLU_layers(model, layer_name_to_block_size_indices_and_block_sizes):
     layer_name_to_layers = {layer_name: BlockRelu(block_size_indices=block_size_indices, block_sizes=block_sizes) for
-                            layer_name, (block_size_indices,block_sizes) in layer_name_to_block_size_indices_and_block_sizes.items()}
+                            layer_name, (block_size_indices, block_sizes) in
+                            layer_name_to_block_size_indices_and_block_sizes.items()}
     set_layers(model, layer_name_to_layers)
 
 
 def set_layers(model, layer_names_to_layers):
     for layer_name, layer in layer_names_to_layers.items():
         set_layer(model, layer_name, layer)
+
+
+def center_crop(tensor, size):
+    h = (tensor.shape[1] - size) // 2
+    w = (tensor.shape[2] - size) // 2
+    return tensor[:, h:h + size, w:w + size]

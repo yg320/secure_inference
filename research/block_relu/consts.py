@@ -1,3 +1,9 @@
+import numpy as np
+
+TARGET_DEFORMATIONS = np.arange(0, 0.01, 0.000002)
+TARGET_REDUCTIONS = np.arange(0, 1.001, 0.001)
+NUM_OF_IN_LAYER_GROUPS = 16
+
 BLOCK_SIZES_MINI = [
     [1, 1],
     [1, 2],
