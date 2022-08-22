@@ -5,8 +5,9 @@ from tqdm import tqdm
 import time
 from research.block_relu.consts import LAYER_NAMES, TARGET_DEFORMATIONS, TARGET_REDUCTIONS, LAYER_NAME_TO_BLOCK_SIZES
 
-input_path = "/home/yakir/Data2/assets_v2/in_layer_deformation_step_0/"
-output_path = "/home/yakir/Data2/assets_v2/deformation_grouping_in_layer_step_1/"
+step = 0
+input_path = f"/home/yakir/Data2/assets_v2/in_layer_deformation_step_{step}/"
+output_path = f"/home/yakir/Data2/assets_v2/deformation_grouping_in_layer_step_{step+1}/"
 
 
 os.makedirs(output_path, exist_ok=True)
@@ -18,7 +19,7 @@ layers_deformation_to_reduction = []
 for layer_index, layer_name in tqdm(enumerate(LAYER_NAMES)):
 
     files = glob.glob(os.path.join(input_path, f"signal_{layer_name}_batch_*.npy"))
-    reduction_to_block_size = np.load(os.path.join("/home/yakir/Data2/assets_v2/deformation_grouping_in_layer_step_0/", f"reduction_to_block_sizes_{layer_name}.npy"))
+    reduction_to_block_size = np.load(os.path.join(f"/home/yakir/Data2/assets_v2/deformation_grouping_in_layer_step_{step}/", f"reduction_to_block_sizes_{layer_name}.npy"))
     signal = np.stack([np.load(f) for f in files])
     noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
     noise = noise.mean(axis=0)
