@@ -1,22 +1,14 @@
-# import matplotlib
-# matplotlib.use("TkAgg")
-# from matplotlib import pyplot as plt
 import argparse
-# import time
 import os
 from tqdm import tqdm
 import torch
 import numpy as np
-import time
+
 from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
     LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, BY_CHANNEL_BY_BLOCK_SIZE_DEFORMATION_PROXY_SPEC
-from research.block_relu.utils import get_model, get_data, run_model_block, get_layer, set_bReLU_layers, set_layers
+from research.block_relu.utils import get_model, get_data, run_model_block, get_layer, set_bReLU_layers, set_layers, center_crop
 
 
-def center_crop(tensor, size):
-    h = (tensor.shape[1] - size) // 2
-    w = (tensor.shape[2] - size) // 2
-    return tensor[:, h:h + size, w:w + size]
 def main():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--batch_index', type=int, default=0)
@@ -51,7 +43,7 @@ def main():
             activations.append(run_model_block(model, activations[block_index], BLOCK_NAMES[block_index]))
 
         resnet_block_name_to_activation = dict(zip(BLOCK_NAMES, activations))
-        # expected_time = 0
+
         for layer_index, layer_name in enumerate(LAYER_NAMES):
             torch.cuda.empty_cache()
             cur_block_name = LAYER_NAME_TO_BLOCK_NAME[layer_name]
@@ -72,7 +64,6 @@ def main():
             noise = np.zeros((len(layer_block_sizes), channels))
             signal = np.zeros((len(layer_block_sizes), channels))
 
-            t0 = time.time()
             for channel in tqdm(range(channels), desc=f"Batch={batch_index} Layer={layer_index}"):
                 for block_size_index in range(len(layer_block_sizes)):
                     if block_size_index == 0:
@@ -91,10 +82,6 @@ def main():
 
                     noise[block_size_index, channel] = float(((out - next_tensor) ** 2).mean())
                     signal[block_size_index, channel] = float((next_tensor ** 2).mean())
-            # t1 = time.time() - t0
-            # extra = (t1 * channels)
-            # expected_time += extra
-            # print(layer_index, extra, expected_time)
 
             np.save(file=noise_f_name, arr=noise)
             np.save(file=signal_f_name, arr=signal)
