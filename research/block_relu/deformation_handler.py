@@ -34,7 +34,42 @@ class DeformationHandler:
         )
         self.dataset = get_data(self.config)
 
-    def _get_files(self, output_path, layer_name):
+        self.resnet_block_name_to_activation, self.ground_truth, self.loss_ce = self.get_activations()
+
+    def _get_deformation(self, block_size_spec, input_block_name, output_block_name):
+
+        input_block_index = np.argwhere(np.array(BLOCK_NAMES) == input_block_name)[0, 0]
+        output_block_index = np.argwhere(np.array(BLOCK_NAMES) == output_block_name)[0, 0]
+
+        input_tensor = self.resnet_block_name_to_activation[input_block_name]
+        next_tensor = self.resnet_block_name_to_activation[output_block_name]
+
+        layer_name_to_orig_layer = {}
+        for layer_name, block_size_indices in block_size_spec.items():
+            orig_layer = get_layer(self.model, layer_name)
+            layer_name_to_orig_layer[layer_name] = orig_layer
+
+            set_bReLU_layers(self.model, {layer_name: (block_size_indices,
+                                                       LAYER_NAME_TO_BLOCK_SIZES[layer_name])})
+        out = input_tensor
+        for block_index in range(input_block_index, output_block_index):
+            out = run_model_block(self.model, out, BLOCK_NAMES[block_index])
+
+        if output_block_name is None:
+            cur_loss_ce = self.model.decode_head.losses(out, self.ground_truth)['loss_ce']
+            loss_deform = (cur_loss_ce - self.loss_ce) / self.loss_ce
+        else:
+            loss_deform = None
+
+        for layer_name_, orig_layer in layer_name_to_orig_layer.items():
+            set_layers(self.model, {layer_name_: orig_layer})
+
+        noise = float(((out - next_tensor) ** 2).mean())
+        signal = float((next_tensor ** 2).mean())
+
+        return noise, signal, loss_deform
+
+    def _get_files_and_matrices(self, output_path, layer_name, h, w):
 
         noise_f_name = os.path.join(output_path,
                                     f"noise_{layer_name}_batch_{self.batch_index}_{self.batch_size}.npy")
@@ -43,81 +78,66 @@ class DeformationHandler:
         loss_deform_f_name = os.path.join(output_path,
                                           f"loss_deform_{layer_name}_batch_{self.batch_index}_{self.batch_size}.npy")
 
-        return noise_f_name, signal_f_name, loss_deform_f_name
+        return noise_f_name, signal_f_name, loss_deform_f_name, np.zeros((h, w)), np.zeros((h, w)), np.zeros((h, w))
 
     def get_activations(self):
-        batch_indices = range(self.batch_index * self.batch_size, (self.batch_index + 1) * self.batch_size)
-        batch = torch.stack(
-            [center_crop(self.dataset[sample_id]['img'].data, self.im_size) for sample_id in batch_indices]).to(
-            self.device)
-        ground_truth = torch.stack(
-            [center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.im_size) for sample_id in
-             batch_indices]).to(self.device)
-        activations = [batch]
-        for block_index in range(self.num_blocks):
-            activations.append(run_model_block(self.model, activations[block_index], BLOCK_NAMES[block_index]))
-        loss_ce = self.model.decode_head.losses(activations[-1], ground_truth)['loss_ce']
-        resnet_block_name_to_activation = dict(zip(BLOCK_NAMES, activations))
-
-        return resnet_block_name_to_activation, ground_truth, loss_ce
-
-    def extract_deformation_by_block(self):
-        output_path = os.path.join(self.deformation_base_path, "block")
         with torch.no_grad():
-            resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations()
+            batch_indices = range(self.batch_index * self.batch_size, (self.batch_index + 1) * self.batch_size)
+            batch = torch.stack(
+                [center_crop(self.dataset[sample_id]['img'].data, self.im_size) for sample_id in batch_indices]).to(
+                self.device)
+            ground_truth = torch.stack(
+                [center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.im_size) for sample_id in
+                 batch_indices]).to(self.device)
+            activations = [batch]
+            for block_index in range(self.num_blocks):
+                activations.append(run_model_block(self.model, activations[block_index], BLOCK_NAMES[block_index]))
+            loss_ce = self.model.decode_head.losses(activations[-1], ground_truth)['loss_ce']
+            resnet_block_name_to_activation = dict(zip(BLOCK_NAMES, activations))
+
+            return resnet_block_name_to_activation, ground_truth, loss_ce
+
+    def extract_deformation_by_blocks(self):
+        output_path = os.path.join(self.deformation_base_path, "block")
+        os.makedirs(output_path, exist_ok=True)
+        with torch.no_grad():
 
             for layer_index, layer_name in enumerate(LAYER_NAMES):
                 torch.cuda.empty_cache()
 
                 layer_block_sizes = LAYER_NAME_TO_BLOCK_SIZES[layer_name]
-                assert layer_block_sizes[0][0] == 1 and layer_block_sizes[0][1] == 1
+                layer_num_channels = LAYER_NAME_TO_CHANNELS[layer_name]
 
+                assert layer_block_sizes[0][0] == 1 and layer_block_sizes[0][1] == 1
 
                 cur_block_name = LAYER_NAME_TO_BLOCK_NAME[layer_name]
                 next_block_name = IN_LAYER_PROXY_SPEC[layer_name]
 
-                cur_block_index = np.argwhere(np.array(BLOCK_NAMES) == cur_block_name)[0, 0]
-                next_block_index = np.argwhere(np.array(BLOCK_NAMES) == next_block_name)[0, 0]
+                noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
+                    self._get_files_and_matrices(output_path, layer_name, len(layer_block_sizes), layer_num_channels)
 
-                cur_tensor = resnet_block_name_to_activation[cur_block_name]
-                next_tensor = resnet_block_name_to_activation[next_block_name]
-
-                noise_f_name, signal_f_name, loss_deform_f_name = self._get_files(output_path, layer_name)
-
-                channels = LAYER_NAME_TO_CHANNELS[layer_name]
-                noise = np.zeros((len(layer_block_sizes), channels))
-                signal = np.zeros((len(layer_block_sizes), channels))
-                loss_deform = np.zeros((len(layer_block_sizes), channels))
-
-                for channel in tqdm(range(channels), desc=f"Batch={self.batch_index} Layer={layer_index}"):
+                for channel in tqdm(range(layer_num_channels), desc=f"Batch={self.batch_index} Layer={layer_index}"):
                     for block_size_index in range(len(layer_block_sizes)):
                         if block_size_index == 0:
                             continue
-                        out = cur_tensor
-                        block_size_indices = np.zeros(shape=channels, dtype=np.int32)
+
+                        block_size_indices = np.zeros(shape=layer_num_channels, dtype=np.int32)
                         block_size_indices[channel] = block_size_index
 
-                        orig_layer = get_layer(self.model, layer_name)
-                        set_bReLU_layers(self.model, {layer_name: (block_size_indices, layer_block_sizes)})
+                        noise_val, signal_val, loss_deform_val = \
+                            self._get_deformation(block_size_spec={layer_name: block_size_indices},
+                                                  input_block_name=cur_block_name,
+                                                  output_block_name=next_block_name)
 
-                        for block_index in range(cur_block_index, next_block_index):
-                            out = run_model_block(self.model, out, BLOCK_NAMES[block_index])
-
-                        if next_block_name is None:
-                            cur_loss_ce = self.model.decode_head.losses(out, ground_truth)['loss_ce']
-                            loss_deform[block_size_index, channel] = (cur_loss_ce - loss_ce) / loss_ce
-
-                        set_layers(self.model, {layer_name: orig_layer})
-
-                        noise[block_size_index, channel] = float(((out - next_tensor) ** 2).mean())
-                        signal[block_size_index, channel] = float((next_tensor ** 2).mean())
+                        noise[block_size_index, channel] = noise_val
+                        signal[block_size_index, channel] = signal_val
+                        loss_deform[block_size_index, channel] = loss_deform_val
 
                 np.save(file=noise_f_name, arr=noise)
                 np.save(file=signal_f_name, arr=signal)
-                if next_block_name is None:
-                    np.save(file=loss_deform_f_name, arr=loss_deform)
+                np.save(file=loss_deform_f_name, arr=loss_deform)
 
-    def collect_deformation_by_block(self):
+    def collect_deformation_by_blocks(self):
         target_deformation = TARGET_DEFORMATIONS_SPEC["block"]
 
         input_dir = os.path.join(self.deformation_base_path, "block")
@@ -187,7 +207,6 @@ class DeformationHandler:
         output_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_out")
 
         with torch.no_grad():
-            resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations()
 
             for layer_index, layer_name in enumerate(LAYER_NAMES):
                 torch.cuda.empty_cache()
@@ -271,7 +290,6 @@ class DeformationHandler:
         output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
 
         with torch.no_grad():
-            resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations()
 
             for layer_group in LAYER_HIERARCHY_SPEC[self.hierarchy_level]:
                 torch.cuda.empty_cache()
@@ -335,10 +353,12 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=int, default=0)
     parser.add_argument('--hierarchy_level', type=int, default=0)
     parser.add_argument('--hierarchy_type', type=str, default="blocks")
+    parser.add_argument('--operation', type=str, default="extract")
     args = parser.parse_args()
 
-    DeformationHandler(batch_index=args.batch_index,
-                      batch_size=args.batch_size,
-                      gpu_id=args.gpu_id,
-                      hierarchy_level=args.hierarchy_level,
-                      hierarchy_type=args.hierarchy_typez)
+    dh = DeformationHandler(batch_index=args.batch_index,
+                            batch_size=args.batch_size,
+                            gpu_id=args.gpu_id,
+                            hierarchy_level=args.hierarchy_level)
+
+    getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")()
