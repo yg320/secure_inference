@@ -53,6 +53,16 @@ for layer_index, layer_name in tqdm(enumerate(LAYER_NAMES)):
         index = np.argmin(np.abs(deformation_to_reduction - reduction))
         reduction_to_block_size_new.append(chosen_block_sizes[index])
     reduction_to_block_size_new = np.array(reduction_to_block_size_new)
+
+    redundancy_arr = [0]
+    for i in range(1, TARGET_REDUCTIONS.shape[0]):
+        if np.all(reduction_to_block_size_new[i] == reduction_to_block_size_new[i-1]):
+            redundancy_arr.append(redundancy_arr[-1])
+        else:
+            redundancy_arr.append(i)
+    redundancy_arr = np.array(redundancy_arr)
+
+    np.save(file=os.path.join(output_path, f"redundancy_arr_{layer_name}.npy"), arr=redundancy_arr)
     np.save(file=os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy"), arr=reduction_to_block_size_new)
 
     # print('Hey')
