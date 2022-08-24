@@ -1,8 +1,16 @@
 import numpy as np
 
+TARGET_DEFORMATIONS_SPEC = {
+    "block": np.arange(0, 0.03, 0.000001),
+    ("channels", 0): np.arange(0, 0.03, 0.000001),
+}
 TARGET_DEFORMATIONS = np.arange(0, 0.01, 0.000002)
+HIERARCHY_BASED_TARGET_DEFORMATION = [
+    np.arange(0, 0.01, 0.000002),
+    np.arange(0, 0.3, 0.00006)
+]
 TARGET_REDUCTIONS = np.arange(0, 1.001, 0.001)
-NUM_OF_IN_LAYER_GROUPS = [16, 1]
+HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [32, 16, 8, 4, 2, 1]
 
 BLOCK_SIZES_MINI = [
     [1, 1],
@@ -460,7 +468,7 @@ LAYER_NAME_TO_BLOCK_NAME = \
         "decode_5": "decode",
     }
 
-BY_CHANNEL_BY_BLOCK_SIZE_DEFORMATION_PROXY_SPEC = \
+IN_LAYER_PROXY_SPEC = \
     {
         "stem_2": "layer1_1",
         "stem_5": "layer1_1",
@@ -754,3 +762,51 @@ LAYER_NAME_TO_BLOCK_SIZES = \
         "decode_4": BLOCK_SIZES_MINI,
         "decode_5": BLOCK_SIZES_MINI,
     }
+
+LAYER_NAME_TO_RELU_COUNT = {'stem_2': 2097152, 'stem_5': 2097152, 'stem_8': 4194304, 'layer1_0_1': 1048576,
+                            'layer1_0_2': 1048576, 'layer1_0_3': 4194304, 'layer1_1_1': 1048576, 'layer1_1_2': 1048576,
+                            'layer1_1_3': 4194304, 'layer1_2_1': 1048576, 'layer1_2_2': 1048576, 'layer1_2_3': 4194304,
+                            'layer2_0_1': 2097152, 'layer2_0_2': 524288, 'layer2_0_3': 2097152, 'layer2_1_1': 524288,
+                            'layer2_1_2': 524288, 'layer2_1_3': 2097152, 'layer2_2_1': 524288, 'layer2_2_2': 524288,
+                            'layer2_2_3': 2097152, 'layer2_3_1': 524288, 'layer2_3_2': 524288, 'layer2_3_3': 2097152,
+                            'layer3_0_1': 1048576, 'layer3_0_2': 1048576, 'layer3_0_3': 4194304, 'layer3_1_1': 1048576,
+                            'layer3_1_2': 1048576, 'layer3_1_3': 4194304, 'layer3_2_1': 1048576, 'layer3_2_2': 1048576,
+                            'layer3_2_3': 4194304, 'layer3_3_1': 1048576, 'layer3_3_2': 1048576, 'layer3_3_3': 4194304,
+                            'layer3_4_1': 1048576, 'layer3_4_2': 1048576, 'layer3_4_3': 4194304, 'layer3_5_1': 1048576,
+                            'layer3_5_2': 1048576, 'layer3_5_3': 4194304, 'layer4_0_1': 2097152, 'layer4_0_2': 2097152,
+                            'layer4_0_3': 8388608, 'layer4_1_1': 2097152, 'layer4_1_2': 2097152, 'layer4_1_3': 8388608,
+                            'layer4_2_1': 2097152, 'layer4_2_2': 2097152, 'layer4_2_3': 8388608, 'decode_0': 512,
+                            'decode_1': 2097152, 'decode_2': 2097152, 'decode_3': 2097152, 'decode_4': 2097152,
+                            'decode_5': 2097152}
+
+LAYER_HIERARCHY_SPEC = \
+[
+    [
+        ["stem_2", "stem_5", "stem_8"],
+        ["layer1_0_1", "layer1_0_2", "layer1_0_3"],
+        ["layer1_1_1", "layer1_1_2", "layer1_1_3"],
+        ["layer1_2_1", "layer1_2_2", "layer1_2_3"],
+        ["layer2_0_1", "layer2_0_2", "layer2_0_3"],
+        ["layer2_1_1", "layer2_1_2", "layer2_1_3"],
+        ["layer2_2_1", "layer2_2_2", "layer2_2_3"],
+        ["layer2_3_1", "layer2_3_2", "layer2_3_3"],
+        ["layer3_0_1", "layer3_0_2", "layer3_0_3"],
+        ["layer3_1_1", "layer3_1_2", "layer3_1_3"],
+        ["layer3_2_1", "layer3_2_2", "layer3_2_3"],
+        ["layer3_3_1", "layer3_3_2", "layer3_3_3"],
+        ["layer3_4_1", "layer3_4_2", "layer3_4_3"],
+        ["layer3_5_1", "layer3_5_2", "layer3_5_3"],
+        ["layer4_0_1", "layer4_0_2", "layer4_0_3"],
+        ["layer4_1_1", "layer4_1_2", "layer4_1_3"],
+        ["layer4_2_1", "layer4_2_2", "layer4_2_3"],
+        ["decode_0", "decode_1", "decode_2", "decode_3", "decode_4", "decode_5"],
+    ],
+    [
+        ["stem_2", "stem_5", "stem_8"],
+        ["layer1_0_1", "layer1_0_2", "layer1_0_3", "layer1_1_1", "layer1_1_2", "layer1_1_3", "layer1_2_1", "layer1_2_2", "layer1_2_3"],
+        ["layer2_0_1", "layer2_0_2", "layer2_0_3", "layer2_1_1", "layer2_1_2", "layer2_1_3", "layer2_2_1", "layer2_2_2", "layer2_2_3", "layer2_3_1", "layer2_3_2", "layer2_3_3"],
+        ["layer3_0_1", "layer3_0_2", "layer3_0_3", "layer3_1_1", "layer3_1_2", "layer3_1_3", "layer3_2_1", "layer3_2_2", "layer3_2_3", "layer3_3_1", "layer3_3_2", "layer3_3_3", "layer3_4_1", "layer3_4_2", "layer3_4_3", "layer3_5_1", "layer3_5_2", "layer3_5_3"],
+        ["layer4_0_1", "layer4_0_2", "layer4_0_3", "layer4_1_1", "layer4_1_2", "layer4_1_3","layer4_2_1", "layer4_2_2", "layer4_2_3"],
+        ["decode_0", "decode_1", "decode_2", "decode_3", "decode_4", "decode_5"],
+    ]
+]
