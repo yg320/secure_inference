@@ -81,6 +81,24 @@ class DeformationHandler:
 
         return noise_f_name, signal_f_name, loss_deform_f_name, np.zeros((h, w)), np.zeros((h, w)), np.zeros((h, w))
 
+    def _get_redundancy_arr(self, reduction_to_block_sizes, num_groups, group_size):
+        redundancy_arr = np.zeros((TARGET_REDUCTIONS.shape[0], num_groups))
+
+        for reduction_index in range(1, TARGET_REDUCTIONS.shape[0]):
+            for group_id in range(num_groups):
+
+                start = group_id * group_size
+                end = (group_id + 1) * group_size
+                curr = reduction_to_block_sizes[reduction_index, start: end]
+                prev = reduction_to_block_sizes[reduction_index - 1, start: end]
+
+                if np.all(curr == prev):
+                    redundancy_arr[reduction_index, group_id] = redundancy_arr[reduction_index - 1, group_id]
+                else:
+                    redundancy_arr[reduction_index, group_id] = reduction_index
+
+        return redundancy_arr
+
     def get_activations(self):
         with torch.no_grad():
             batch_indices = range(self.batch_index * self.batch_size, (self.batch_index + 1) * self.batch_size)
@@ -190,30 +208,19 @@ class DeformationHandler:
                 reduction_to_block_sizes[target_reduction_index] = \
                     deformation_and_channel_to_block_size[indices, np.arange(0, channels)]
 
-            redundancy_arr = np.zeros((TARGET_REDUCTIONS.shape[0], num_groups))
-
-            for reduction_index in range(1, TARGET_REDUCTIONS.shape[0]):
-                for group_id in range(num_groups):
-
-                    start = group_id * group_size
-                    end = (group_id + 1) * group_size
-                    curr = reduction_to_block_sizes[reduction_index, start: end]
-                    prev = reduction_to_block_sizes[reduction_index - 1, start: end]
-
-                    if np.all(curr == prev):
-                        redundancy_arr[reduction_index, group_id] = redundancy_arr[reduction_index - 1, group_id]
-                    else:
-                        redundancy_arr[reduction_index, group_id] = reduction_index
+            redundancy_arr = self._get_redundancy_arr(reduction_to_block_sizes, num_groups, group_size)
 
             np.save(file=os.path.join(out_dir, f"redundancy_arr_{layer_name}.npy"), arr=redundancy_arr)
             np.save(file=os.path.join(out_dir, f"reduction_to_block_sizes_{layer_name}.npy"),
                     arr=reduction_to_block_sizes)
 
-    def extract_deformation_by_channels_group(self):
+    def extract_deformation_by_channels(self):
 
         num_of_groups = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
         input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_in")
         output_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_out")
+
+        os.makedirs(output_path, exist_ok=True)
 
         with torch.no_grad():
 
@@ -237,11 +244,14 @@ class DeformationHandler:
 
                 for channel_group in tqdm(range(num_of_groups), desc=f"Batch={self.batch_index} Layer={layer_index}"):
                     for reduction_index, reduction in enumerate(TARGET_REDUCTIONS):
-                        if redundancy_arr[reduction_index] != reduction_index:
-                            assert redundancy_arr[reduction_index] < reduction_index
-                            noise_val = noise[redundancy_arr[reduction_index], channel_group]
-                            signal_val = signal[redundancy_arr[reduction_index], channel_group]
-                            loss_deform_val = loss_deform[redundancy_arr[reduction_index], channel_group]
+
+                        red_arr_val = redundancy_arr[reduction_index, channel_group].astype(np.int32)
+
+                        if redundancy_arr[reduction_index, channel_group] != reduction_index:
+                            assert red_arr_val < reduction_index
+                            noise_val = noise[red_arr_val, channel_group]
+                            signal_val = signal[red_arr_val, channel_group]
+                            loss_deform_val = loss_deform[red_arr_val, channel_group]
 
                         else:
 
@@ -264,68 +274,66 @@ class DeformationHandler:
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
 
-    def collect_deformation_by_channel_group(self):
+    def collect_deformation_by_channels(self):
+        prev_input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_in")
         input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_out")
         output_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level + 1}_in")
-        assert False
+
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("channels", self.hierarchy_level)]
+
+        num_groups_prev = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
+        num_groups_curr = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level + 1]
+
         for layer_index, layer_name in tqdm(enumerate(LAYER_NAMES)):
 
             files = glob.glob(os.path.join(input_path, f"signal_{layer_name}_batch_*.npy"))
-            reduction_to_block_size = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
+            reduction_to_block_size = np.load(os.path.join(prev_input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
             signal = np.stack([np.load(f) for f in files])
             noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
             noise = noise.mean(axis=0)
             signal = signal.mean(axis=0)
             deformation = noise / signal
-            assert deformation.max() <= target_deformation[-1]
+            assert deformation.max() <= target_deformation[-1], deformation.max()
             assert not np.any(np.isnan(deformation))
 
-            num_groups = deformation.shape[1]
             channels = reduction_to_block_size.shape[1]
-            group_size = channels // num_groups
-            assert num_groups * group_size == channels
+            group_size_prev = channels // num_groups_prev
+            group_size_curr = channels // num_groups_curr
+
+            assert num_groups_prev * group_size_prev == channels
+            assert num_groups_curr * group_size_curr == channels
 
             deformation_index_to_reduction_index = []
             chosen_block_sizes = []
             for cur_target_deformation_index, cur_target_deformation in enumerate(target_deformation):
-                valid_block_sizes = deformation <= cur_target_deformation
+                valid_reductions = deformation <= cur_target_deformation
 
-                chosen_reduction_index = np.argmax((TARGET_REDUCTIONS / 2)[::-1][:, np.newaxis] + valid_block_sizes,
-                                                   axis=0)
-                chosen_block_sizes.append(
-                    reduction_to_block_size[np.repeat(chosen_reduction_index, group_size), range(channels)])
-                deformation_index_to_reduction_index.append(chosen_reduction_index)
+                channel_block_reduction_index = np.argmax((TARGET_REDUCTIONS / 2)[::-1][:, np.newaxis] + valid_reductions, axis=0)
+                channel_block_reduction_index = np.repeat(channel_block_reduction_index, group_size_prev)
+                block_sizes = reduction_to_block_size[channel_block_reduction_index, range(channels)]
+                chosen_block_sizes.append(block_sizes)
+                deformation_index_to_reduction_index.append(channel_block_reduction_index)
 
-            # assert time.time() <= 1661070082.368254 + 3600, "Is Deformation range good enough?"
-
-            deformation_index_to_reduction_index = np.array(deformation_index_to_reduction_index)
             chosen_block_sizes = np.array(chosen_block_sizes)
-            deformation_to_reduction = TARGET_REDUCTIONS[deformation_index_to_reduction_index.flatten()].reshape(
-                deformation_index_to_reduction_index.shape).mean(axis=1)
+            deformation_index_to_reduction_index = np.array(deformation_index_to_reduction_index)
 
-            reduction_to_block_size_new = []
-            for reduction in TARGET_REDUCTIONS:
-                index = np.argmin(np.abs(deformation_to_reduction - reduction))
-                reduction_to_block_size_new.append(chosen_block_sizes[index])
-            reduction_to_block_size_new = np.array(reduction_to_block_size_new)
+            deformation_index_to_reduction = TARGET_REDUCTIONS[deformation_index_to_reduction_index.flatten()]
+            deformation_index_to_reduction = deformation_index_to_reduction.reshape(deformation_index_to_reduction_index.shape)
+            deformation_index_to_reduction = deformation_index_to_reduction.reshape((target_deformation.shape[0], num_groups_curr, group_size_curr)).mean(axis=-1)
 
-            redundancy_arr = [0]
-            for i in range(1, TARGET_REDUCTIONS.shape[0]):
-                if np.all(reduction_to_block_size_new[i] == reduction_to_block_size_new[i - 1]):
-                    redundancy_arr.append(redundancy_arr[-1])
-                else:
-                    redundancy_arr.append(i)
-            redundancy_arr = np.array(redundancy_arr)
+            reduction_to_block_size_new = np.zeros((TARGET_REDUCTIONS.shape[0], channels))
+            for target_reduction_index, target_reduction in enumerate(TARGET_REDUCTIONS):
+                indices = np.repeat(np.argmin(np.abs(target_reduction - deformation_index_to_reduction), axis=0), group_size_curr)
+                reduction_to_block_size_new[target_reduction_index] = chosen_block_sizes[indices, np.arange(0, channels)]
+
+            redundancy_arr = self._get_redundancy_arr(reduction_to_block_size_new, num_groups_curr, group_size_curr)
 
             np.save(file=os.path.join(output_path, f"redundancy_arr_{layer_name}.npy"), arr=redundancy_arr)
-            np.save(file=os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy"),
-                    arr=reduction_to_block_size_new)
-            np.save(file=os.path.join(output_path, f"deformation_to_reduction_{layer_name}.npy"),
-                    arr=deformation_to_reduction)
+            np.save(file=os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy"), arr=reduction_to_block_size_new)
 
     def extract_deformation_by_layers_group(self):
+        assert False, "Use Loss"
         input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_in")
         output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
 
