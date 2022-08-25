@@ -12,9 +12,13 @@ from research.block_relu.utils import get_model, get_data, run_model_block, get_
     center_crop
 
 # TODO: add typing
+# TODO: pandas
+# TODO: docstring
+# TODO: multiprocess
+# TODO: in mobilnet some layers can be fused
 class DeformationHandler:
-    def __init__(self, batch_index, gpu_id, hierarchy_level, is_extraction):
-        self.batch_index = batch_index
+    def __init__(self, gpu_id, hierarchy_level, is_extraction):
+
         self.gpu_id = gpu_id
         self.hierarchy_level = hierarchy_level
         self.device = f"cuda:{gpu_id}"
@@ -35,15 +39,14 @@ class DeformationHandler:
             )
             self.dataset = get_data(self.config)
 
-            self.resnet_block_name_to_activation, self.ground_truth, self.loss_ce = self.get_activations()
 
-    def _get_deformation(self, block_size_spec, input_block_name, output_block_name):
+    def _get_deformation(self, resnet_block_name_to_activation, ground_truth, loss_ce, block_size_spec, input_block_name, output_block_name):
 
         input_block_index = np.argwhere(np.array(BLOCK_NAMES) == input_block_name)[0, 0]
         output_block_index = np.argwhere(np.array(BLOCK_NAMES) == output_block_name)[0, 0]
 
-        input_tensor = self.resnet_block_name_to_activation[input_block_name]
-        next_tensor = self.resnet_block_name_to_activation[output_block_name]
+        input_tensor = resnet_block_name_to_activation[input_block_name]
+        next_tensor = resnet_block_name_to_activation[output_block_name]
 
         layer_name_to_orig_layer = {}
         for layer_name, block_size_indices in block_size_spec.items():
@@ -57,8 +60,8 @@ class DeformationHandler:
             out = run_model_block(self.model, out, BLOCK_NAMES[block_index])
 
         if output_block_name is None:
-            cur_loss_ce = self.model.decode_head.losses(out, self.ground_truth)['loss_ce']
-            loss_deform = (cur_loss_ce - self.loss_ce) / self.loss_ce
+            cur_loss_ce = self.model.decode_head.losses(out, ground_truth)['loss_ce']
+            loss_deform = (cur_loss_ce - loss_ce) / loss_ce
         else:
             loss_deform = None
 
@@ -70,14 +73,14 @@ class DeformationHandler:
 
         return noise, signal, loss_deform
 
-    def _get_files_and_matrices(self, output_path, layer_name, h, w):
+    def _get_files_and_matrices(self, batch_index, output_path, layer_name, h, w):
 
         noise_f_name = os.path.join(output_path,
-                                    f"noise_{layer_name}_batch_{self.batch_index}_{self.batch_size}.npy")
+                                    f"noise_{layer_name}_batch_{batch_index}_{self.batch_size}.npy")
         signal_f_name = os.path.join(output_path,
-                                     f"signal_{layer_name}_batch_{self.batch_index}_{self.batch_size}.npy")
+                                     f"signal_{layer_name}_batch_{batch_index}_{self.batch_size}.npy")
         loss_deform_f_name = os.path.join(output_path,
-                                          f"loss_deform_{layer_name}_batch_{self.batch_index}_{self.batch_size}.npy")
+                                          f"loss_deform_{layer_name}_batch_{batch_index}_{self.batch_size}.npy")
 
         return noise_f_name, signal_f_name, loss_deform_f_name, np.zeros((h, w)), np.zeros((h, w)), np.zeros((h, w))
 
@@ -99,9 +102,9 @@ class DeformationHandler:
 
         return redundancy_arr
 
-    def get_activations(self):
+    def get_activations(self, batch_index):
         with torch.no_grad():
-            batch_indices = range(self.batch_index * self.batch_size, (self.batch_index + 1) * self.batch_size)
+            batch_indices = range(batch_index * self.batch_size, (batch_index + 1) * self.batch_size)
             batch = torch.stack(
                 [center_crop(self.dataset[sample_id]['img'].data, self.im_size) for sample_id in batch_indices]).to(
                 self.device)
@@ -116,7 +119,10 @@ class DeformationHandler:
 
             return resnet_block_name_to_activation, ground_truth, loss_ce
 
-    def extract_deformation_by_blocks(self):
+    def extract_deformation_by_blocks(self, batch_index):
+
+        resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+
         output_path = os.path.join(self.deformation_base_path, "block")
         os.makedirs(output_path, exist_ok=True)
         with torch.no_grad():
@@ -133,9 +139,9 @@ class DeformationHandler:
                 next_block_name = IN_LAYER_PROXY_SPEC[layer_name]
 
                 noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
-                    self._get_files_and_matrices(output_path, layer_name, len(layer_block_sizes), layer_num_channels)
+                    self._get_files_and_matrices(batch_index, output_path, layer_name, len(layer_block_sizes), layer_num_channels)
 
-                for channel in tqdm(range(layer_num_channels), desc=f"Batch={self.batch_index} Layer={layer_index}"):
+                for channel in tqdm(range(layer_num_channels), desc=f"Batch={batch_index} Layer={layer_index}"):
                     for block_size_index in range(len(layer_block_sizes)):
                         if block_size_index == 0:
                             continue
@@ -144,7 +150,10 @@ class DeformationHandler:
                         block_size_indices[channel] = block_size_index
 
                         noise_val, signal_val, loss_deform_val = \
-                            self._get_deformation(block_size_spec={layer_name: block_size_indices},
+                            self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                                  ground_truth=ground_truth,
+                                                  loss_ce=loss_ce,
+                                                  block_size_spec={layer_name: block_size_indices},
                                                   input_block_name=cur_block_name,
                                                   output_block_name=next_block_name)
 
@@ -214,7 +223,9 @@ class DeformationHandler:
             np.save(file=os.path.join(out_dir, f"reduction_to_block_sizes_{layer_name}.npy"),
                     arr=reduction_to_block_sizes)
 
-    def extract_deformation_by_channels(self):
+    def extract_deformation_by_channels(self, batch_index):
+
+        resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
         num_of_groups = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
         input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_in")
@@ -233,16 +244,21 @@ class DeformationHandler:
                 reduction_to_block_sizes = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
 
                 cur_block_name = LAYER_NAME_TO_BLOCK_NAME[layer_name]
-                next_block_name = IN_LAYER_PROXY_SPEC[layer_name]
+                if num_of_groups > 1:
+                    next_block_name = IN_LAYER_PROXY_SPEC[layer_name]
+                else:
+                    next_block_name = None
 
                 noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
-                    self._get_files_and_matrices(output_path, layer_name, TARGET_REDUCTIONS.shape[0], num_of_groups)
+                    self._get_files_and_matrices(batch_index, output_path, layer_name, TARGET_REDUCTIONS.shape[0], num_of_groups)
 
+                if os.path.exists(noise_f_name) and os.path.exists(signal_f_name) and os.path.exists(loss_deform_f_name):
+                    continue
                 channels = LAYER_NAME_TO_CHANNELS[layer_name]
                 group_size = channels // num_of_groups
                 assert group_size * num_of_groups == channels
 
-                for channel_group in tqdm(range(num_of_groups), desc=f"Batch={self.batch_index} Layer={layer_index}"):
+                for channel_group in tqdm(range(num_of_groups), desc=f"Batch={batch_index} Layer={layer_index}"):
                     for reduction_index, reduction in enumerate(TARGET_REDUCTIONS):
 
                         red_arr_val = redundancy_arr[reduction_index, channel_group].astype(np.int32)
@@ -262,7 +278,10 @@ class DeformationHandler:
                                 reduction_to_block_sizes[reduction_index, ind_start:ind_end]
 
                             noise_val, signal_val, loss_deform_val = \
-                                self._get_deformation(block_size_spec={layer_name: block_size_indices},
+                                self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                                      ground_truth=ground_truth,
+                                                      loss_ce=loss_ce,
+                                                      block_size_spec={layer_name: block_size_indices},
                                                       input_block_name=cur_block_name,
                                                       output_block_name=next_block_name)
 
@@ -287,6 +306,10 @@ class DeformationHandler:
 
         for layer_index, layer_name in tqdm(enumerate(LAYER_NAMES)):
 
+            redundancy_arr_path = os.path.join(output_path, f"redundancy_arr_{layer_name}.npy")
+            reduction_to_block_size_new_path = os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy")
+            # if os.path.exists(reduction_to_block_size_new_path) and os.path.exists(redundancy_arr_path):
+            #     continue
             files = glob.glob(os.path.join(input_path, f"signal_{layer_name}_batch_*.npy"))
             reduction_to_block_size = np.load(os.path.join(prev_input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
             signal = np.stack([np.load(f) for f in files])
@@ -329,10 +352,13 @@ class DeformationHandler:
 
             redundancy_arr = self._get_redundancy_arr(reduction_to_block_size_new, num_groups_curr, group_size_curr)
 
-            np.save(file=os.path.join(output_path, f"redundancy_arr_{layer_name}.npy"), arr=redundancy_arr)
-            np.save(file=os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy"), arr=reduction_to_block_size_new)
+            np.save(file=redundancy_arr_path, arr=redundancy_arr)
+            np.save(file=reduction_to_block_size_new_path, arr=reduction_to_block_size_new)
 
-    def extract_deformation_by_layers_group(self):
+    def extract_deformation_by_layers_group(self, batch_index):
+
+        resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+
         assert False, "Use Loss"
         input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_in")
         output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
@@ -352,11 +378,11 @@ class DeformationHandler:
                 next_tensor = resnet_block_name_to_activation[next_block_name]
 
                 noise_f_name = os.path.join(output_path,
-                                            f"noise_{layer_name_of_first_layer_in_group}_batch_{self.batch_index}_{self.batch_size}.npy")
+                                            f"noise_{layer_name_of_first_layer_in_group}_batch_{batch_index}_{self.batch_size}.npy")
                 signal_f_name = os.path.join(output_path,
-                                             f"signal_{layer_name_of_first_layer_in_group}_batch_{self.batch_index}_{self.batch_size}.npy")
+                                             f"signal_{layer_name_of_first_layer_in_group}_batch_{batch_index}_{self.batch_size}.npy")
                 loss_deform_f_name = os.path.join(output_path,
-                                                  f"loss_deform_{layer_name_of_first_layer_in_group}_batch_{self.batch_index}_{self.batch_size}.npy")
+                                                  f"loss_deform_{layer_name_of_first_layer_in_group}_batch_{batch_index}_{self.batch_size}.npy")
 
                 noise = np.zeros((TARGET_REDUCTIONS.shape[0],))
                 signal = np.zeros((TARGET_REDUCTIONS.shape[0],))
@@ -396,16 +422,20 @@ class DeformationHandler:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('--batch_index', type=int, default=None)
+    parser.add_argument('--batch_index', type=str, default=None)
     parser.add_argument('--gpu_id', type=int, default=None)
     parser.add_argument('--hierarchy_level', type=int, default=0)
     parser.add_argument('--hierarchy_type', type=str, default="blocks")
     parser.add_argument('--operation', type=str, default="extract")
     args = parser.parse_args()
 
-    dh = DeformationHandler(batch_index=args.batch_index,
-                            gpu_id=args.gpu_id,
+    dh = DeformationHandler(gpu_id=args.gpu_id,
                             hierarchy_level=args.hierarchy_level,
                             is_extraction=args.operation == "extract")
 
-    getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")()
+    if args.operation == "extract":
+        indices = [int(x) for x in args.batch_index.split(",")]
+        for batch_index in indices:
+            getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")(batch_index)
+    else:
+        getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")()
