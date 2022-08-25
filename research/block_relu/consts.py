@@ -2,7 +2,11 @@ import numpy as np
 
 TARGET_DEFORMATIONS_SPEC = {
     "block": np.arange(0, 0.03, 0.000001),
-    ("channels", 0): np.arange(0, 0.03, 0.000001),
+    ("channels", 0): np.arange(0, 0.05, 0.000001),
+    ("channels", 1): np.arange(0, 0.1, 0.000001),
+    ("channels", 2): np.arange(0, 0.2, 0.000001),
+    ("channels", 3): np.arange(0, 0.3, 0.000001),
+    ("channels", 4): np.arange(0, 0.5, 0.000002),
 }
 TARGET_DEFORMATIONS = np.arange(0, 0.01, 0.000002)
 HIERARCHY_BASED_TARGET_DEFORMATION = [
