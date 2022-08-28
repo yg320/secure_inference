@@ -5,6 +5,7 @@ import os
 import os.path as osp
 import time
 import warnings
+import pickle
 
 import mmcv
 import torch
@@ -20,6 +21,7 @@ from mmseg.models import build_segmentor
 from mmseg.utils import (collect_env, get_device, get_root_logger,
                          setup_multi_processes)
 
+from research.block_relu.utils import ArchUtils
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a segmentor')
@@ -200,6 +202,11 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
+
+    if cfg.relu_spec_file is not None:
+        layer_name_to_block_size_indices = pickle.load(open(cfg.relu_spec_file, 'rb'))
+        assert False
+        ArchUtils().set_bReLU_layers(model, layer_name_to_block_size_indices)
 
     # SyncBN is not support for DP
     if not distributed:

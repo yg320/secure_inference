@@ -7,6 +7,7 @@ TARGET_DEFORMATIONS_SPEC = {
     ("channels", 2): np.arange(0, 0.2, 0.000001),
     ("channels", 3): np.arange(0, 0.3, 0.000001),
     ("channels", 4): np.arange(0, 0.5, 0.000002),
+    ("channels", 5): np.arange(0, 3.0, 0.00001), # TODO: consider using less than 0
 }
 TARGET_DEFORMATIONS = np.arange(0, 0.01, 0.000002)
 HIERARCHY_BASED_TARGET_DEFORMATION = [
@@ -14,7 +15,7 @@ HIERARCHY_BASED_TARGET_DEFORMATION = [
     np.arange(0, 0.3, 0.00006)
 ]
 TARGET_REDUCTIONS = np.arange(0, 1.001, 0.001)
-HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [32, 16, 8, 4, 2, 1]
+HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [32, 16, 8, 4, 2, 1, 1]
 
 BLOCK_SIZES_MINI = [
     [1, 1],

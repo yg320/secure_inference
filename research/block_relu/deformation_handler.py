@@ -5,31 +5,37 @@ import torch
 import numpy as np
 import glob
 import pickle
-
-from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
-    LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, IN_LAYER_PROXY_SPEC, TARGET_REDUCTIONS, HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, \
-    LAYER_HIERARCHY_SPEC, TARGET_DEFORMATIONS_SPEC, LAYER_NAME_TO_RELU_COUNT
-from research.block_relu.utils import get_model, get_data, run_model_block, get_layer, set_bReLU_layers, set_layers, \
-    center_crop
-
+import time
+# from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
+#     LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, IN_LAYER_PROXY_SPEC, TARGET_REDUCTIONS, HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, \
+#     LAYER_HIERARCHY_SPEC, TARGET_DEFORMATIONS_SPEC, LAYER_NAME_TO_RELU_COUNT
+from research.block_relu.consts import TARGET_REDUCTIONS
+from research.block_relu.utils import get_model, get_data, center_crop, MobileNetUtils, ResNetUtils
+from research.block_relu.params import MobileNetV2Params, ResNetParams
 # TODO: add typing
 # TODO: pandas
 # TODO: docstring
 # TODO: multiprocess
 # TODO: in mobilnet some layers can be fused
 class DeformationHandler:
-    def __init__(self, gpu_id, hierarchy_level, is_extraction):
+    def __init__(self, dataset, backbone, gpu_id, hierarchy_level, is_extraction):
 
         self.gpu_id = gpu_id
         self.hierarchy_level = hierarchy_level
         self.device = f"cuda:{gpu_id}"
 
-        self.deformation_base_path = "/home/yakir/Data2/assets_v2/deformations"
-        self.config = "/home/yakir/PycharmProjects/mmsegmentation/configs/secure_semantic_segmentation/baseline_40k_finetune_tmp.py"
-        self.checkpoint = "/home/yakir/PycharmProjects/mmsegmentation/work_dirs/baseline_40k/latest.pth"
+        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v2/deformations", dataset, backbone)
+        self.config = os.path.join("/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs", f"{backbone}_{dataset}_baseline.py")
+        if backbone == "mobilenet_v2":
+            self.checkpoint = "/home/yakir/Downloads/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth"
+            self.arch_utils = MobileNetUtils()
+            self.params = MobileNetV2Params()
+        else:
+            self.checkpoint = "/home/yakir/PycharmProjects/mmsegmentation/work_dirs/baseline_40k/latest.pth"
+            self.arch_utils = ResNetUtils()
+            self.params = ResNetParams()
 
         self.batch_size = 8
-        self.num_blocks = 18
         self.im_size = 512
 
         if is_extraction:
@@ -38,27 +44,26 @@ class DeformationHandler:
                 gpu_id=self.gpu_id,
                 checkpoint_path=self.checkpoint
             )
-            self.dataset = get_data(self.config)
-
+            self.dataset = get_data(dataset)
 
     def _get_deformation(self, resnet_block_name_to_activation, ground_truth, loss_ce, block_size_spec, input_block_name, output_block_name):
 
-        input_block_index = np.argwhere(np.array(BLOCK_NAMES) == input_block_name)[0, 0]
-        output_block_index = np.argwhere(np.array(BLOCK_NAMES) == output_block_name)[0, 0]
+        input_block_index = np.argwhere(np.array(self.params.BLOCK_NAMES) == input_block_name)[0, 0]
+        output_block_index = np.argwhere(np.array(self.params.BLOCK_NAMES) == output_block_name)[0, 0]
 
         input_tensor = resnet_block_name_to_activation[input_block_name]
         next_tensor = resnet_block_name_to_activation[output_block_name]
 
         layer_name_to_orig_layer = {}
         for layer_name, block_size_indices in block_size_spec.items():
-            orig_layer = get_layer(self.model, layer_name)
+            orig_layer = self.arch_utils.get_layer(self.model, layer_name)
             layer_name_to_orig_layer[layer_name] = orig_layer
 
-            set_bReLU_layers(self.model, {layer_name: (block_size_indices,
-                                                       LAYER_NAME_TO_BLOCK_SIZES[layer_name])})
+            self.arch_utils.set_bReLU_layers(self.model, {layer_name: (block_size_indices,
+                                                                       self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])})
         out = input_tensor
         for block_index in range(input_block_index, output_block_index):
-            out = run_model_block(self.model, out, BLOCK_NAMES[block_index])
+            out = self.arch_utils.run_model_block(self.model, out, self.params.BLOCK_NAMES[block_index])
 
         if output_block_name is None:
             cur_loss_ce = self.model.decode_head.losses(out, ground_truth)['loss_ce']
@@ -67,7 +72,7 @@ class DeformationHandler:
             loss_deform = None
 
         for layer_name_, orig_layer in layer_name_to_orig_layer.items():
-            set_layers(self.model, {layer_name_: orig_layer})
+            self.arch_utils.set_layers(self.model, {layer_name_: orig_layer})
 
         noise = float(((out - next_tensor) ** 2).mean())
         signal = float((next_tensor ** 2).mean())
@@ -104,6 +109,9 @@ class DeformationHandler:
         return redundancy_arr
 
     def get_activations(self, batch_index):
+
+        num_blocks = len(self.params.BLOCK_NAMES) - 1
+
         with torch.no_grad():
             batch_indices = range(batch_index * self.batch_size, (batch_index + 1) * self.batch_size)
             batch = torch.stack(
@@ -113,10 +121,10 @@ class DeformationHandler:
                 [center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.im_size) for sample_id in
                  batch_indices]).to(self.device)
             activations = [batch]
-            for block_index in range(self.num_blocks):
-                activations.append(run_model_block(self.model, activations[block_index], BLOCK_NAMES[block_index]))
+            for block_index in range(num_blocks):
+                activations.append(self.arch_utils.run_model_block(self.model, activations[block_index], self.params.BLOCK_NAMES[block_index]))
             loss_ce = self.model.decode_head.losses(activations[-1], ground_truth)['loss_ce']
-            resnet_block_name_to_activation = dict(zip(BLOCK_NAMES, activations))
+            resnet_block_name_to_activation = dict(zip(self.params.BLOCK_NAMES, activations))
 
             return resnet_block_name_to_activation, ground_truth, loss_ce
 
@@ -126,23 +134,27 @@ class DeformationHandler:
 
         output_path = os.path.join(self.deformation_base_path, "block")
         os.makedirs(output_path, exist_ok=True)
+
+        # agg = 0
         with torch.no_grad():
 
-            for layer_index, layer_name in enumerate(LAYER_NAMES):
+            for layer_index, layer_name in enumerate(self.params.LAYER_NAMES):
                 torch.cuda.empty_cache()
 
-                layer_block_sizes = LAYER_NAME_TO_BLOCK_SIZES[layer_name]
-                layer_num_channels = LAYER_NAME_TO_CHANNELS[layer_name]
+                layer_block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+                layer_num_channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
 
                 assert layer_block_sizes[0][0] == 1 and layer_block_sizes[0][1] == 1
 
-                cur_block_name = LAYER_NAME_TO_BLOCK_NAME[layer_name]
-                next_block_name = IN_LAYER_PROXY_SPEC[layer_name]
+                cur_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
+                next_block_name = self.params.IN_LAYER_PROXY_SPEC[layer_name]
 
                 noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
                     self._get_files_and_matrices(batch_index, output_path, layer_name, len(layer_block_sizes), layer_num_channels)
 
+                # t0 = time.time()
                 for channel in tqdm(range(layer_num_channels), desc=f"Batch={batch_index} Layer={layer_index}"):
+                # for channel in range(2):
                     for block_size_index in range(len(layer_block_sizes)):
                         if block_size_index == 0:
                             continue
@@ -161,7 +173,10 @@ class DeformationHandler:
                         noise[block_size_index, channel] = noise_val
                         signal[block_size_index, channel] = signal_val
                         loss_deform[block_size_index, channel] = loss_deform_val
-
+                # t1 = time.time()
+                # cur = (t1 - t0) * (layer_num_channels / 2)
+                # agg += cur
+                # print(layer_index, cur, agg)
                 np.save(file=noise_f_name, arr=noise)
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
@@ -538,14 +553,18 @@ if __name__ == '__main__':
     parser.add_argument('--hierarchy_level', type=int, default=0)
     parser.add_argument('--hierarchy_type', type=str, default="blocks")
     parser.add_argument('--operation', type=str, default="extract")
+    parser.add_argument('--dataset', type=str, default="ade_20k")
+    parser.add_argument('--backbone', type=str, default="mobilenet_v2")
     args = parser.parse_args()
 
-    dh = DeformationHandler(gpu_id=args.gpu_id,
+    dh = DeformationHandler(dataset=args.dataset,
+                            backbone=args.backbone,
+                            gpu_id=args.gpu_id,
                             hierarchy_level=args.hierarchy_level,
                             is_extraction=args.operation == "extract")
 
-    dh.get_block_spec()
-    assert False
+    # dh.get_block_spec()
+    # assert False
     if args.operation == "extract":
         indices = [int(x) for x in args.batch_index.split(",")]
         for batch_index in indices:
