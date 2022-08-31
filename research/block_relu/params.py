@@ -488,47 +488,16 @@ class MobileNetV2Params:
                 'decode_5': None
             }
 
-        layer_size = [256,
-                      256,
-                      256,
-                      128,
-                      128,
-                      128,
-                      128,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      1,
-                      64,
-                      64,
-                      64,
-                      64,
-                      64,
-                      ]
+        self.LAYER_NAME_TO_LAYER_SIZE = {'conv1': 256, 'layer1_0_0': 256, 'layer2_0_0': 256, 'layer2_0_1': 128,
+                                         'layer2_1_0': 128, 'layer2_1_1': 128, 'layer3_0_0': 128, 'layer3_0_1': 64,
+                                         'layer3_1_0': 64, 'layer3_1_1': 64, 'layer3_2_0': 64, 'layer3_2_1': 64,
+                                         'layer4_0_0': 64, 'layer4_0_1': 64, 'layer4_1_0': 64, 'layer4_1_1': 64,
+                                         'layer4_2_0': 64, 'layer4_2_1': 64, 'layer4_3_0': 64, 'layer4_3_1': 64,
+                                         'layer5_0_0': 64, 'layer5_0_1': 64, 'layer5_1_0': 64, 'layer5_1_1': 64,
+                                         'layer5_2_0': 64, 'layer5_2_1': 64, 'layer6_0_0': 64, 'layer6_0_1': 64,
+                                         'layer6_1_0': 64, 'layer6_1_1': 64, 'layer6_2_0': 64, 'layer6_2_1': 64,
+                                         'layer7_0_0': 64, 'layer7_0_1': 64, 'decode_0': 1, 'decode_1': 64,
+                                         'decode_2': 64, 'decode_3': 64, 'decode_4': 64, 'decode_5': 64}
 
         self.LAYER_NAME_TO_CHANNELS = \
             {'conv1': 32, 'layer1_0_0': 32, 'layer2_0_0': 96, 'layer2_0_1': 96, 'layer2_1_0': 144, 'layer2_1_1': 144,
@@ -542,7 +511,7 @@ class MobileNetV2Params:
 
         self.LAYER_NAME_TO_BLOCK_SIZES = \
             {
-                'conv1':      BLOCK_SIZES_FULL,
+                'conv1': BLOCK_SIZES_FULL,
                 'layer1_0_0': BLOCK_SIZES_FULL,
                 'layer2_0_0': BLOCK_SIZES_FULL,
                 'layer2_0_1': BLOCK_SIZES_FULL,
@@ -583,6 +552,25 @@ class MobileNetV2Params:
                 'decode_4': BLOCK_SIZES_MINI,
                 'decode_5': BLOCK_SIZES_MINI
             }
+
+        self.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [1]
+
+        self.LAYER_NAME_TO_RELU_COUNT = {'conv1': 2097152, 'layer1_0_0': 2097152, 'layer2_0_0': 6291456,
+                                         'layer2_0_1': 1572864, 'layer2_1_0': 2359296, 'layer2_1_1': 2359296,
+                                         'layer3_0_0': 2359296, 'layer3_0_1': 589824, 'layer3_1_0': 786432,
+                                         'layer3_1_1': 786432, 'layer3_2_0': 786432, 'layer3_2_1': 786432,
+                                         'layer4_0_0': 786432, 'layer4_0_1': 786432, 'layer4_1_0': 1572864,
+                                         'layer4_1_1': 1572864, 'layer4_2_0': 1572864, 'layer4_2_1': 1572864,
+                                         'layer4_3_0': 1572864, 'layer4_3_1': 1572864, 'layer5_0_0': 1572864,
+                                         'layer5_0_1': 1572864, 'layer5_1_0': 2359296, 'layer5_1_1': 2359296,
+                                         'layer5_2_0': 2359296, 'layer5_2_1': 2359296, 'layer6_0_0': 2359296,
+                                         'layer6_0_1': 2359296, 'layer6_1_0': 3932160, 'layer6_1_1': 3932160,
+                                         'layer6_2_0': 3932160, 'layer6_2_1': 3932160, 'layer7_0_0': 3932160,
+                                         'layer7_0_1': 3932160, 'decode_0': 512, 'decode_1': 2097152,
+                                         'decode_2': 2097152, 'decode_3': 2097152, 'decode_4': 2097152,
+                                         'decode_5': 2097152}
+
+
 class ResNetParams:
     def __init__(self):
         self.BLOCK_NAMES = [
@@ -882,3 +870,49 @@ class ResNetParams:
                 "decode_4": BLOCK_SIZES_MINI,
                 "decode_5": BLOCK_SIZES_MINI,
             }
+
+        self.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [32, 16, 8, 4, 2, 1, 1]
+
+        self.LAYER_NAME_TO_LAYER_DIM = {'stem_2': 256, 'stem_5': 256, 'stem_8': 256, 'layer1_0_1': 128,
+                                        'layer1_0_2': 128, 'layer1_0_3': 128, 'layer1_1_1': 128, 'layer1_1_2': 128,
+                                        'layer1_1_3': 128, 'layer1_2_1': 128, 'layer1_2_2': 128, 'layer1_2_3': 128,
+                                        'layer2_0_1': 128, 'layer2_0_2': 64, 'layer2_0_3': 64, 'layer2_1_1': 64,
+                                        'layer2_1_2': 64, 'layer2_1_3': 64, 'layer2_2_1': 64, 'layer2_2_2': 64,
+                                        'layer2_2_3': 64, 'layer2_3_1': 64, 'layer2_3_2': 64, 'layer2_3_3': 64,
+                                        'layer3_0_1': 64, 'layer3_0_2': 64, 'layer3_0_3': 64, 'layer3_1_1': 64,
+                                        'layer3_1_2': 64, 'layer3_1_3': 64, 'layer3_2_1': 64, 'layer3_2_2': 64,
+                                        'layer3_2_3': 64, 'layer3_3_1': 64, 'layer3_3_2': 64, 'layer3_3_3': 64,
+                                        'layer3_4_1': 64, 'layer3_4_2': 64, 'layer3_4_3': 64, 'layer3_5_1': 64,
+                                        'layer3_5_2': 64, 'layer3_5_3': 64, 'layer4_0_1': 64, 'layer4_0_2': 64,
+                                        'layer4_0_3': 64, 'layer4_1_1': 64, 'layer4_1_2': 64, 'layer4_1_3': 64,
+                                        'layer4_2_1': 64, 'layer4_2_2': 64, 'layer4_2_3': 64, 'decode_0': 1,
+                                        'decode_1': 64, 'decode_2': 64, 'decode_3': 64, 'decode_4': 64, 'decode_5': 64}
+
+        self.LAYER_NAME_TO_RELU_COUNT = {'stem_2': 2097152, 'stem_5': 2097152, 'stem_8': 4194304, 'layer1_0_1': 1048576,
+                                         'layer1_0_2': 1048576, 'layer1_0_3': 4194304, 'layer1_1_1': 1048576,
+                                         'layer1_1_2': 1048576,
+                                         'layer1_1_3': 4194304, 'layer1_2_1': 1048576, 'layer1_2_2': 1048576,
+                                         'layer1_2_3': 4194304,
+                                         'layer2_0_1': 2097152, 'layer2_0_2': 524288, 'layer2_0_3': 2097152,
+                                         'layer2_1_1': 524288,
+                                         'layer2_1_2': 524288, 'layer2_1_3': 2097152, 'layer2_2_1': 524288,
+                                         'layer2_2_2': 524288,
+                                         'layer2_2_3': 2097152, 'layer2_3_1': 524288, 'layer2_3_2': 524288,
+                                         'layer2_3_3': 2097152,
+                                         'layer3_0_1': 1048576, 'layer3_0_2': 1048576, 'layer3_0_3': 4194304,
+                                         'layer3_1_1': 1048576,
+                                         'layer3_1_2': 1048576, 'layer3_1_3': 4194304, 'layer3_2_1': 1048576,
+                                         'layer3_2_2': 1048576,
+                                         'layer3_2_3': 4194304, 'layer3_3_1': 1048576, 'layer3_3_2': 1048576,
+                                         'layer3_3_3': 4194304,
+                                         'layer3_4_1': 1048576, 'layer3_4_2': 1048576, 'layer3_4_3': 4194304,
+                                         'layer3_5_1': 1048576,
+                                         'layer3_5_2': 1048576, 'layer3_5_3': 4194304, 'layer4_0_1': 2097152,
+                                         'layer4_0_2': 2097152,
+                                         'layer4_0_3': 8388608, 'layer4_1_1': 2097152, 'layer4_1_2': 2097152,
+                                         'layer4_1_3': 8388608,
+                                         'layer4_2_1': 2097152, 'layer4_2_2': 2097152, 'layer4_2_3': 8388608,
+                                         'decode_0': 512,
+                                         'decode_1': 2097152, 'decode_2': 2097152, 'decode_3': 2097152,
+                                         'decode_4': 2097152,
+                                         'decode_5': 2097152}

@@ -9,7 +9,7 @@ import time
 # from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
 #     LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, IN_LAYER_PROXY_SPEC, TARGET_REDUCTIONS, HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, \
 #     LAYER_HIERARCHY_SPEC, TARGET_DEFORMATIONS_SPEC, LAYER_NAME_TO_RELU_COUNT
-from research.block_relu.consts import TARGET_REDUCTIONS
+from research.block_relu.consts import TARGET_REDUCTIONS, TARGET_DEFORMATIONS_SPEC
 from research.block_relu.utils import get_model, get_data, center_crop, MobileNetUtils, ResNetUtils
 from research.block_relu.params import MobileNetV2Params, ResNetParams
 # TODO: add typing
@@ -17,6 +17,21 @@ from research.block_relu.params import MobileNetV2Params, ResNetParams
 # TODO: docstring
 # TODO: multiprocess
 # TODO: in mobilnet some layers can be fused
+#
+# HOUR = 3600
+# am7_1 = 1661659248.5575001
+# am7_2 = am7_1 + 24 * HOUR
+# am7_3 = am7_1 + 48 * HOUR
+#
+# pm9_1 = am7_1 + 14 * HOUR
+# pm9_2 = pm9_1 + 24 * HOUR
+#
+#
+# def is_night(cur_time):
+#     is_1_night = (pm9_1 <= cur_time <= am7_2)
+#     is_2_night = (pm9_2 <= cur_time <= am7_3)
+#     return is_1_night or is_2_night
+
 class DeformationHandler:
     def __init__(self, dataset, backbone, gpu_id, hierarchy_level, is_extraction):
 
@@ -27,7 +42,7 @@ class DeformationHandler:
         self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v2/deformations", dataset, backbone)
         self.config = os.path.join("/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs", f"{backbone}_{dataset}_baseline.py")
         if backbone == "mobilenet_v2":
-            self.checkpoint = "/home/yakir/Downloads/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth"
+            self.checkpoint = "/home/yakir/Data2/experiments/mobilenet_v2_ade_20k_baseline/latest.pth"
             self.arch_utils = MobileNetUtils()
             self.params = MobileNetV2Params()
         else:
@@ -135,7 +150,6 @@ class DeformationHandler:
         output_path = os.path.join(self.deformation_base_path, "block")
         os.makedirs(output_path, exist_ok=True)
 
-        # agg = 0
         with torch.no_grad():
 
             for layer_index, layer_name in enumerate(self.params.LAYER_NAMES):
@@ -151,10 +165,10 @@ class DeformationHandler:
 
                 noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
                     self._get_files_and_matrices(batch_index, output_path, layer_name, len(layer_block_sizes), layer_num_channels)
+                if os.path.exists(noise_f_name):
+                    continue
 
-                # t0 = time.time()
                 for channel in tqdm(range(layer_num_channels), desc=f"Batch={batch_index} Layer={layer_index}"):
-                # for channel in range(2):
                     for block_size_index in range(len(layer_block_sizes)):
                         if block_size_index == 0:
                             continue
@@ -173,23 +187,20 @@ class DeformationHandler:
                         noise[block_size_index, channel] = noise_val
                         signal[block_size_index, channel] = signal_val
                         loss_deform[block_size_index, channel] = loss_deform_val
-                # t1 = time.time()
-                # cur = (t1 - t0) * (layer_num_channels / 2)
-                # agg += cur
-                # print(layer_index, cur, agg)
+
                 np.save(file=noise_f_name, arr=noise)
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
 
     def collect_deformation_by_blocks(self):
         target_deformation = TARGET_DEFORMATIONS_SPEC["block"]
-        num_groups = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[0]
+        num_groups = self.params.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[0]
         input_dir = os.path.join(self.deformation_base_path, "block")
         out_dir = os.path.join(self.deformation_base_path, f"channels_0_in")
 
         os.makedirs(out_dir, exist_ok=True)
 
-        for layer_index, layer_name in tqdm(enumerate(LAYER_NAMES)):
+        for layer_index, layer_name in tqdm(enumerate(self.params.LAYER_NAMES)):
 
             files = glob.glob(os.path.join(input_dir, f"signal_{layer_name}_batch_*.npy"))
 
@@ -201,7 +212,7 @@ class DeformationHandler:
             deformation[0] = 0
             assert not np.any(np.isnan(deformation))
             assert deformation.max() <= target_deformation[-1]
-            block_sizes = LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+            block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
             activation_reduction = np.array([1 / x[0] / x[1] for x in block_sizes])
             deformation_and_channel_to_block_size = []
             deformation_and_channel_to_reduction = []
@@ -266,7 +277,7 @@ class DeformationHandler:
 
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
-        num_of_groups = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
+        num_of_groups = self.params.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
         input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_in")
         output_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_out")
 
@@ -274,7 +285,7 @@ class DeformationHandler:
 
         with torch.no_grad():
 
-            for layer_index, layer_name in enumerate(LAYER_NAMES):
+            for layer_index, layer_name in enumerate(self.params.LAYER_NAMES):
                 torch.cuda.empty_cache()
 
                 redundancy_arr_f_name = os.path.join(input_path, f"redundancy_arr_{layer_name}.npy")
@@ -282,9 +293,9 @@ class DeformationHandler:
 
                 reduction_to_block_sizes = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
 
-                cur_block_name = LAYER_NAME_TO_BLOCK_NAME[layer_name]
+                cur_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
                 if num_of_groups > 1:
-                    next_block_name = IN_LAYER_PROXY_SPEC[layer_name]
+                    next_block_name = self.params.IN_LAYER_PROXY_SPEC[layer_name]
                 else:
                     next_block_name = None
 
@@ -293,7 +304,7 @@ class DeformationHandler:
 
                 if os.path.exists(noise_f_name) and os.path.exists(signal_f_name) and os.path.exists(loss_deform_f_name):
                     continue
-                channels = LAYER_NAME_TO_CHANNELS[layer_name]
+                channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
                 group_size = channels // num_of_groups
                 assert group_size * num_of_groups == channels
 
@@ -488,14 +499,14 @@ class DeformationHandler:
                     np.save(file=loss_deform_f_name, arr=loss_deform)
 
     def get_block_spec(self):
-        output_path = "/home/yakir/Data2/assets_v2/reduction_spec_test/"
-        layer_name_to_relu_count = np.array([LAYER_NAME_TO_RELU_COUNT[layer_name] for layer_name in LAYER_NAMES])
+        output_path = os.path.join(self.deformation_base_path, "reduction_specs")
+        layer_name_to_relu_count = np.array([self.params.LAYER_NAME_TO_RELU_COUNT[layer_name] for layer_name in self.params.LAYER_NAMES])
         input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level + 1}_in")
 
         all_reductions = []
 
-        for layer_name in tqdm(LAYER_NAMES):
-            reduction_ratio = 1 / np.prod(np.array(LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
+        for layer_name in tqdm(self.params.LAYER_NAMES):
+            reduction_ratio = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
             reduction_to_block_size_path = os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy")
             deformation_index_to_reduction_path = os.path.join(input_path, f"deformation_index_to_reduction_{layer_name}.npy")
 
@@ -519,7 +530,7 @@ class DeformationHandler:
             deformation_indices.append(deformation_index)
 
         block_sizes_to_use = []
-        for layer_name in tqdm(LAYER_NAMES):
+        for layer_name in tqdm(self.params.LAYER_NAMES):
             reduction_to_block_size_path = os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy")
             deformation_index_to_reduction_path = os.path.join(input_path, f"deformation_index_to_reduction_{layer_name}.npy")
 
@@ -536,8 +547,8 @@ class DeformationHandler:
         for target_reduction_index, target_reduction in enumerate(np.arange(0.05, 0.26, 0.01)):
 
             red_spec = {layer_name: (block_sizes_to_use[layer_index][target_reduction_index],
-                                     LAYER_NAME_TO_BLOCK_SIZES[layer_name]) for layer_index, layer_name in
-                        enumerate(LAYER_NAMES)}
+                                     self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) for layer_index, layer_name in
+                        enumerate(self.params.LAYER_NAMES)}
 
             reduction_spec_file = os.path.join(output_path, "layer_reduction_{:.2f}.pickle".format(target_reduction))
             with open(reduction_spec_file, 'wb') as f:
@@ -545,6 +556,7 @@ class DeformationHandler:
 
     def collect_deformation_by_layers(self):
         pass
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
