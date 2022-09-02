@@ -1,7 +1,7 @@
 import numpy as np
 
 TARGET_DEFORMATIONS_SPEC = {
-    "block": np.arange(0, 0.03, 0.000001),
+    "block": np.arange(0, 0.1, 0.000001),
     ("channels", 0): np.arange(0, 0.05, 0.000001),
     ("channels", 1): np.arange(0, 0.1, 0.000001),
     ("channels", 2): np.arange(0, 0.2, 0.000001),

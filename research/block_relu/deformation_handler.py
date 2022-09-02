@@ -211,7 +211,8 @@ class DeformationHandler:
             deformation = noise / signal
             deformation[0] = 0
             assert not np.any(np.isnan(deformation))
-            assert deformation.max() <= target_deformation[-1]
+            # assert deformation.max() <= target_deformation[-1]
+            print(layer_index,(deformation <= target_deformation[-1]).mean())
             block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
             activation_reduction = np.array([1 / x[0] / x[1] for x in block_sizes])
             deformation_and_channel_to_block_size = []
@@ -351,11 +352,11 @@ class DeformationHandler:
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("channels", self.hierarchy_level)]
 
-        num_groups_prev = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
-        num_groups_curr = HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level + 1]
+        num_groups_prev = self.params.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level]
+        num_groups_curr = self.params.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[self.hierarchy_level + 1]
 
-        for layer_index, layer_name in tqdm(enumerate(LAYER_NAMES)):
-            block_size_index_to_reduction = 1 / np.prod(np.array(LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
+        for layer_index, layer_name in tqdm(enumerate(self.params.LAYER_NAMES)):
+            block_size_index_to_reduction = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
             redundancy_arr_path = os.path.join(output_path, f"redundancy_arr_{layer_name}.npy")
             reduction_to_block_size_new_path = os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy")
             deformation_index_to_reduction_path = os.path.join(output_path, f"deformation_index_to_reduction_{layer_name}.npy")
@@ -412,15 +413,15 @@ class DeformationHandler:
             chosen_block_sizes = np.array(chosen_block_sizes)
             deformation_index_to_reduction_index = np.array(deformation_index_to_reduction_index)
 
-            assert False
-            if num_groups_prev == num_groups_curr:
-                deformation_index_to_reduction = block_size_index_to_reduction[chosen_block_sizes.flatten().astype(np.int32)]
-                deformation_index_to_reduction = deformation_index_to_reduction.reshape(chosen_block_sizes.shape)
-                deformation_index_to_reduction = deformation_index_to_reduction.reshape((target_deformation.shape[0], num_groups_curr, group_size_curr)).mean(axis=-1)
-            else:
-                deformation_index_to_reduction = TARGET_REDUCTIONS[deformation_index_to_reduction_index.flatten()]
-                deformation_index_to_reduction = deformation_index_to_reduction.reshape(deformation_index_to_reduction_index.shape)
-                deformation_index_to_reduction = deformation_index_to_reduction.reshape((target_deformation.shape[0], num_groups_curr, group_size_curr)).mean(axis=-1)
+            # assert False
+            # if num_groups_prev == num_groups_curr:
+            deformation_index_to_reduction = block_size_index_to_reduction[chosen_block_sizes.flatten().astype(np.int32)]
+            deformation_index_to_reduction = deformation_index_to_reduction.reshape(chosen_block_sizes.shape)
+            deformation_index_to_reduction = deformation_index_to_reduction.reshape((target_deformation.shape[0], num_groups_curr, group_size_curr)).mean(axis=-1)
+            # else:
+            #     deformation_index_to_reduction = TARGET_REDUCTIONS[deformation_index_to_reduction_index.flatten()]
+            #     deformation_index_to_reduction = deformation_index_to_reduction.reshape(deformation_index_to_reduction_index.shape)
+            #     deformation_index_to_reduction = deformation_index_to_reduction.reshape((target_deformation.shape[0], num_groups_curr, group_size_curr)).mean(axis=-1)
 
             reduction_to_block_size_new = np.zeros((TARGET_REDUCTIONS.shape[0], channels))
             for target_reduction_index, target_reduction in enumerate(TARGET_REDUCTIONS):

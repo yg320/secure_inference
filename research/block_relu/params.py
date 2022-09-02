@@ -553,7 +553,7 @@ class MobileNetV2Params:
                 'decode_5': BLOCK_SIZES_MINI
             }
 
-        self.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [1]
+        self.HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = [16, 8, 4, 2, 1, 1]
 
         self.LAYER_NAME_TO_RELU_COUNT = {'conv1': 2097152, 'layer1_0_0': 2097152, 'layer2_0_0': 6291456,
                                          'layer2_0_1': 1572864, 'layer2_1_0': 2359296, 'layer2_1_1': 2359296,
