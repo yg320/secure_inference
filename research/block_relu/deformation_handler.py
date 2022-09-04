@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import glob
 import pickle
+from functools import lru_cache
 import time
 # from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
 #     LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, IN_LAYER_PROXY_SPEC, TARGET_REDUCTIONS, HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, \
@@ -558,14 +559,39 @@ class DeformationHandler:
             v = 5
             prev_input_path = os.path.join(self.deformation_base_path, f"channels_{v}_in")
             input_path = os.path.join(self.deformation_base_path, f"channels_{v}_out")
+
+            prev_group_to_representative = {layer: layer for layer in self.params.LAYER_NAMES}
+
         else:
             prev_input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_in")
-            input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out_renamed")
+            input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
+            prev_group_to_representative = {layer: group[0] for group in self.params.LAYER_HIERARCHY_SPEC[self.hierarchy_level] for layer in group}
 
         output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level + 1}_in")
 
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("layers", self.hierarchy_level)]
+
+        # @lru_cache(maxsize=None)
+        # def foo(representative):
+        #     files = glob.glob(os.path.join(input_path, f"signal_{representative}_batch_*.npy"))
+        #     signal = np.stack([np.load(f) for f in files])
+        #     noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
+        #     noise = noise.mean(axis=0)
+        #     signal = signal.mean(axis=0)
+        #     deformation_ = noise / signal
+        #     assert not np.any(np.isnan(deformation_))
+        #
+        #     reduction_indices = []
+        #     for cur_target_deformation_ in target_deformation:
+        #         valid_reductions_ = deformation_ <= cur_target_deformation_
+        #
+        #         # TODO: happens many times..
+        #         channel_block_reduction_index_ = np.argmax(
+        #             (TARGET_REDUCTIONS / 2)[::-1][:, np.newaxis] + valid_reductions_, axis=0)
+        #         reduction_indices.append(channel_block_reduction_index_)
+        #     return reduction_indices
+
 
         for group_index, layers_in_group in tqdm(enumerate(self.params.LAYER_HIERARCHY_SPEC[self.hierarchy_level + 1])):
             deformation_index_to_reductions = []
@@ -578,7 +604,9 @@ class DeformationHandler:
 
                 reduction_to_block_size = np.load(os.path.join(prev_input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
 
-                files = glob.glob(os.path.join(input_path, f"signal_{layer_name}_batch_*.npy"))
+                representative = prev_group_to_representative[layer_name]
+                # TODO: it happens many times - put in a function
+                files = glob.glob(os.path.join(input_path, f"signal_{representative}_batch_*.npy"))
                 signal = np.stack([np.load(f) for f in files])
                 noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
                 noise = noise.mean(axis=0)
@@ -594,6 +622,7 @@ class DeformationHandler:
                 for cur_target_deformation_index, cur_target_deformation in enumerate(target_deformation):
                     valid_reductions = deformation <= cur_target_deformation
 
+                    # TODO: happens many times..
                     channel_block_reduction_index = np.argmax((TARGET_REDUCTIONS / 2)[::-1][:, np.newaxis] + valid_reductions, axis=0)
 
                     block_sizes = reduction_to_block_size[channel_block_reduction_index, range(channels)]
