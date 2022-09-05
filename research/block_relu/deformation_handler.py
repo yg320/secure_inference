@@ -495,91 +495,15 @@ class DeformationHandler:
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
 
-    def get_block_spec(self):
-        output_path = os.path.join(self.deformation_base_path, "reduction_specs")
-        layer_name_to_relu_count = np.array([self.params.LAYER_NAME_TO_RELU_COUNT[layer_name] for layer_name in self.params.LAYER_NAMES])
-        assert self.hierarchy_level == 5
-        input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level + 1}_in")
-
-        all_reductions = []
-
-        for layer_name in tqdm(self.params.LAYER_NAMES):
-            reduction_ratio = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
-            reduction_to_block_size_path = os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy")
-            deformation_index_to_reduction_path = os.path.join(input_path, f"deformation_index_to_reduction_{layer_name}.npy")
-
-            reduction_to_block_size = np.load(file=reduction_to_block_size_path)
-            deformation_index_to_reduction = np.load(file=deformation_index_to_reduction_path)
-
-            assert TARGET_REDUCTIONS.shape[0] == 1001
-            assert TARGET_REDUCTIONS[0] == 0
-            assert TARGET_REDUCTIONS[-1] == 1.0
-
-            deformation_index_to_block_sizes = reduction_to_block_size[(deformation_index_to_reduction[..., 0] * 1000).round().astype(np.int32)].astype(np.int32)
-            reduction = reduction_ratio[deformation_index_to_block_sizes.flatten()].reshape(deformation_index_to_block_sizes.shape).mean(axis=1)
-            all_reductions.append(reduction)
-
-        all_reductions = np.array(all_reductions)
-        final_reduction = (all_reductions * layer_name_to_relu_count[:, np.newaxis]).sum( axis=0) / layer_name_to_relu_count.sum()
-
-        deformation_indices = []
-        for target_reduction in np.arange(0.05, 0.26, 0.01):
-            deformation_index = np.argmin(np.abs(final_reduction - target_reduction))
-            deformation_indices.append(deformation_index)
-
-        block_sizes_to_use = []
-        for layer_name in tqdm(self.params.LAYER_NAMES):
-            reduction_to_block_size_path = os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy")
-            deformation_index_to_reduction_path = os.path.join(input_path, f"deformation_index_to_reduction_{layer_name}.npy")
-
-            reduction_to_block_size = np.load(file=reduction_to_block_size_path)
-            deformation_index_to_reduction = np.load(file=deformation_index_to_reduction_path)
-
-            assert TARGET_REDUCTIONS.shape[0] == 1001
-            assert TARGET_REDUCTIONS[0] == 0
-            assert TARGET_REDUCTIONS[-1] == 1.0
-
-            deformation_index_to_block_sizes = reduction_to_block_size[(deformation_index_to_reduction[..., 0] * 1000).round().astype(np.int32)].astype(np.int32)
-            block_sizes_to_use.append(deformation_index_to_block_sizes[deformation_indices])
-
-        for target_reduction_index, target_reduction in enumerate(np.arange(0.05, 0.26, 0.01)):
-
-            red_spec = {layer_name: (block_sizes_to_use[layer_index][target_reduction_index],
-                                     self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) for layer_index, layer_name in
-                        enumerate(self.params.LAYER_NAMES)}
-
-            reduction_spec_file = os.path.join(output_path, "layer_reduction_{:.2f}.pickle".format(target_reduction))
-            with open(reduction_spec_file, 'wb') as f:
-                pickle.dump(obj=red_spec, file=f)
-
     def get_block_spec_v2(self):
-        output_path = os.path.join(self.deformation_base_path, "reduction_specs_by_layers")
-        input_path = os.path.join(self.deformation_base_path, "layers_2_in")
-        #
-        # deformation_indices = []
-        # for target_reduction in np.arange(0.05, 0.26, 0.01):
-        #     deformation_index = np.argmin(np.abs(final_reduction - target_reduction))
-        #     deformation_indices.append(deformation_index)
-        #
-        # block_sizes_to_use = []
-        # for layer_name in tqdm(self.params.LAYER_NAMES):
-        #     reduction_to_block_size_path = os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy")
-        #     deformation_index_to_reduction_path = os.path.join(input_path, f"deformation_index_to_reduction_{layer_name}.npy")
-        #
-        #     reduction_to_block_size = np.load(file=reduction_to_block_size_path)
-        #     deformation_index_to_reduction = np.load(file=deformation_index_to_reduction_path)
-        #
-        #     assert TARGET_REDUCTIONS.shape[0] == 1001
-        #     assert TARGET_REDUCTIONS[0] == 0
-        #     assert TARGET_REDUCTIONS[-1] == 1.0
-        #
-        #     deformation_index_to_block_sizes = reduction_to_block_size[(deformation_index_to_reduction[..., 0] * 1000).round().astype(np.int32)].astype(np.int32)
-        #     block_sizes_to_use.append(deformation_index_to_block_sizes[deformation_indices])
+        output_path = os.path.join(self.deformation_base_path, "reduction_specs_by_layers_test")
+        input_path = os.path.join(self.deformation_base_path, "layers_0_in_test")
+
         reductions = [0.1]
         for target_reduction_index, target_reduction in enumerate(reductions):
             red_spec = {}
             for layer_name in self.params.LAYER_NAMES:
-                reduction_index = np.argwhere(TARGET_REDUCTIONS == 0.1)[0, 0]
+                reduction_index = np.argwhere(TARGET_REDUCTIONS == target_reduction)[0, 0]
                 block_sizes_to_use = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))[reduction_index].astype(np.int32)
                 red_spec[layer_name] = (block_sizes_to_use, self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
             # red_spec = {layer_name: (block_sizes_to_use[layer_index][target_reduction_index],
@@ -617,7 +541,7 @@ class DeformationHandler:
             input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
             prev_group_to_representative = {layer: group[0] for group in self.params.LAYER_HIERARCHY_SPEC[self.hierarchy_level] for layer in group}
 
-        output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level + 1}_in")
+        output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level + 1}_in_test")
 
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("layers", self.hierarchy_level)]
