@@ -3,7 +3,7 @@ model = dict(
     type='EncoderDecoder',
     pretrained='open-mmlab://resnet50_v1c',
     backbone=dict(
-        type='ResNetV1c',
+        type='SecureResNet',
         depth=50,
         num_stages=4,
         out_indices=(0, 1, 2, 3),
@@ -24,8 +24,7 @@ model = dict(
         norm_cfg=dict(type='SyncBN', requires_grad=True),
         align_corners=False,
         loss_decode=dict(
-            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
-        act_cfg=dict(type='SecureReLU')),
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
     auxiliary_head=dict(
         type='FCNHead',
         in_channels=1024,
@@ -38,8 +37,7 @@ model = dict(
         norm_cfg=dict(type='SyncBN', requires_grad=True),
         align_corners=False,
         loss_decode=dict(
-            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.4),
-        act_cfg=dict(type='SecureReLU')),
+            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=0.4)),
     train_cfg=dict(),
     test_cfg=dict(mode='whole'))
 dataset_type = 'COCOStuffDataset'
@@ -168,6 +166,7 @@ lr_config = dict(policy='poly', power=0.9, min_lr=0.0001, by_epoch=False)
 runner = dict(type='IterBasedRunner', max_iters=40000)
 checkpoint_config = dict(by_epoch=False, interval=4000)
 evaluation = dict(interval=4000, metric='mIoU', pre_eval=True)
-work_dir = './work_dirs/deeplabv3_r50-d8_512x512_4x4_40k_coco-stuff10k'
+work_dir = '/home/yakir/Data2/experiments/resnet_cocostuff_10k/baseline_avg_pool'
 gpu_ids = range(0, 2)
 auto_resume = False
+relu_spec_file = None
