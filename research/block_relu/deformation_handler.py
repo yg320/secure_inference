@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import glob
 import pickle
+import shutil
 from functools import lru_cache
 import time
 # from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
@@ -551,7 +552,56 @@ class DeformationHandler:
             with open(reduction_spec_file, 'wb') as f:
                 pickle.dump(obj=red_spec, file=f)
 
+    def get_block_spec_v2(self):
+        output_path = os.path.join(self.deformation_base_path, "reduction_specs_by_layers")
+        input_path = os.path.join(self.deformation_base_path, "layers_2_in")
+        #
+        # deformation_indices = []
+        # for target_reduction in np.arange(0.05, 0.26, 0.01):
+        #     deformation_index = np.argmin(np.abs(final_reduction - target_reduction))
+        #     deformation_indices.append(deformation_index)
+        #
+        # block_sizes_to_use = []
+        # for layer_name in tqdm(self.params.LAYER_NAMES):
+        #     reduction_to_block_size_path = os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy")
+        #     deformation_index_to_reduction_path = os.path.join(input_path, f"deformation_index_to_reduction_{layer_name}.npy")
+        #
+        #     reduction_to_block_size = np.load(file=reduction_to_block_size_path)
+        #     deformation_index_to_reduction = np.load(file=deformation_index_to_reduction_path)
+        #
+        #     assert TARGET_REDUCTIONS.shape[0] == 1001
+        #     assert TARGET_REDUCTIONS[0] == 0
+        #     assert TARGET_REDUCTIONS[-1] == 1.0
+        #
+        #     deformation_index_to_block_sizes = reduction_to_block_size[(deformation_index_to_reduction[..., 0] * 1000).round().astype(np.int32)].astype(np.int32)
+        #     block_sizes_to_use.append(deformation_index_to_block_sizes[deformation_indices])
+        reductions = [0.1]
+        for target_reduction_index, target_reduction in enumerate(reductions):
+            red_spec = {}
+            for layer_name in self.params.LAYER_NAMES:
+                reduction_index = np.argwhere(TARGET_REDUCTIONS == 0.1)[0, 0]
+                block_sizes_to_use = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))[reduction_index].astype(np.int32)
+                red_spec[layer_name] = (block_sizes_to_use, self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
+            # red_spec = {layer_name: (block_sizes_to_use[layer_index][target_reduction_index],
+            #                          self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) for layer_index, layer_name in
+            #             enumerate(self.params.LAYER_NAMES)}
+            relu_tot = sum(self.params.LAYER_NAME_TO_RELU_COUNT.values())
+            count = 0
+            for layer_name in self.params.LAYER_NAMES:
+                block_size_index_to_reduction = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
+                count += block_size_index_to_reduction[red_spec[layer_name][0]].mean() * self.params.LAYER_NAME_TO_RELU_COUNT[layer_name]
+            count /= relu_tot
+            print(target_reduction, count)
+            reduction_spec_file = os.path.join(output_path, "layer_reduction_{:.2f}.pickle".format(target_reduction))
+            with open(reduction_spec_file, 'wb') as f:
+                pickle.dump(obj=red_spec, file=f)
+
     def collect_deformation_by_layers(self):
+
+        cache_dir = "/home/yakir/Data2/cache"
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+        os.makedirs(cache_dir)
 
         if self.hierarchy_level == -1:
             unique_hier_len = list(set(map(len, self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS.values())))
@@ -572,40 +622,18 @@ class DeformationHandler:
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("layers", self.hierarchy_level)]
 
-        # @lru_cache(maxsize=None)
-        # def foo(representative):
-        #     files = glob.glob(os.path.join(input_path, f"signal_{representative}_batch_*.npy"))
-        #     signal = np.stack([np.load(f) for f in files])
-        #     noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
-        #     noise = noise.mean(axis=0)
-        #     signal = signal.mean(axis=0)
-        #     deformation_ = noise / signal
-        #     assert not np.any(np.isnan(deformation_))
-        #
-        #     reduction_indices = []
-        #     for cur_target_deformation_ in target_deformation:
-        #         valid_reductions_ = deformation_ <= cur_target_deformation_
-        #
-        #         # TODO: happens many times..
-        #         channel_block_reduction_index_ = np.argmax(
-        #             (TARGET_REDUCTIONS / 2)[::-1][:, np.newaxis] + valid_reductions_, axis=0)
-        #         reduction_indices.append(channel_block_reduction_index_)
-        #     return reduction_indices
-
-
         for group_index, layers_in_group in tqdm(enumerate(self.params.LAYER_HIERARCHY_SPEC[self.hierarchy_level + 1])):
             deformation_index_to_reductions = []
             relu_counts = []
-            all_chosen_block_sizes = []
 
-            for layer_index, layer_name in enumerate(layers_in_group):
+            for layer_index, layer_name in tqdm(enumerate(layers_in_group)):
 
                 block_size_index_to_reduction = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
 
                 reduction_to_block_size = np.load(os.path.join(prev_input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
 
                 representative = prev_group_to_representative[layer_name]
-                # TODO: it happens many times - put in a function
+                # # TODO: it happens many times - put in a function
                 files = glob.glob(os.path.join(input_path, f"signal_{representative}_batch_*.npy"))
                 signal = np.stack([np.load(f) for f in files])
                 noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
@@ -638,7 +666,7 @@ class DeformationHandler:
 
                 deformation_index_to_reductions.append(deformation_index_to_reduction)
                 relu_counts.append(self.params.LAYER_NAME_TO_RELU_COUNT[layer_name])
-                all_chosen_block_sizes.append(chosen_block_sizes)
+                np.save(file=os.path.join(cache_dir, f"chosen_block_indices_{layer_name}.npy"), arr=chosen_block_sizes)
 
             deformation_index_to_reductions = np.array(deformation_index_to_reductions)
             relu_counts = np.array(relu_counts)[..., np.newaxis]
@@ -647,9 +675,9 @@ class DeformationHandler:
                 relu_counts)
 
             for layer_index, layer_name in enumerate(layers_in_group):
-                channels = all_chosen_block_sizes[layer_index].shape[1]
+                chosen_block_sizes = np.load(os.path.join(cache_dir, f"chosen_block_indices_{layer_name}.npy"))
+                channels = chosen_block_sizes.shape[1]
                 reduction_to_block_size_new = np.zeros((TARGET_REDUCTIONS.shape[0], channels))
-                chosen_block_sizes = all_chosen_block_sizes[layer_index]
                 for target_reduction_index, target_reduction in enumerate(TARGET_REDUCTIONS):
                     index = np.argmin(np.abs(target_reduction - deformation_index_to_reduction), axis=0)
                     reduction_to_block_size_new[target_reduction_index] = chosen_block_sizes[index]
@@ -660,6 +688,7 @@ class DeformationHandler:
                 np.save(file=reduction_to_block_size_new_path, arr=reduction_to_block_size_new)
                 np.save(file=deformation_index_to_reduction_path, arr=deformation_index_to_reduction)
 
+        shutil.rmtree(cache_dir)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
@@ -679,6 +708,7 @@ if __name__ == '__main__':
                             is_extraction=args.operation == "extract")
     # dh.collect_deformation_by_layers()
     # dh.get_block_spec()
+    # dh.get_block_spec_v2()
     # assert False
     if args.operation == "extract":
         indices = [int(x) for x in args.batch_index.split(",")]

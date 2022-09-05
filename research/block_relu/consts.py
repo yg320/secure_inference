@@ -1,13 +1,16 @@
 import numpy as np
 
 TARGET_DEFORMATIONS_SPEC = {
-    "block": np.arange(0, 0.1, 0.000001),
-    ("channels", 0): np.arange(0, 0.05, 0.000001),
+    "block":         np.arange(0, 0.1, 0.000001),
+    ("channels", 0): np.arange(0, 0.1, 0.000001),
     ("channels", 1): np.arange(0, 0.1, 0.000001),
     ("channels", 2): np.arange(0, 0.2, 0.000001),
     ("channels", 3): np.arange(0, 0.3, 0.000001),
     ("channels", 4): np.arange(0, 0.5, 0.000002),
     ("channels", 5): np.arange(0, 3.0, 0.00001), # TODO: consider using less than 0
+    ("layers", -1): np.arange(0, 3.0, 0.00001), # TODO: consider using less than 0
+    ("layers", 0): np.arange(0, 3.0, 0.00001), # TODO: consider using less than 0
+    ("layers", 1): np.arange(0, 3.0, 0.00001), # TODO: consider using less than 0
 }
 TARGET_DEFORMATIONS = np.arange(0, 0.01, 0.000002)
 HIERARCHY_BASED_TARGET_DEFORMATION = [
