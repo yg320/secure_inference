@@ -12,8 +12,10 @@ import time
 #     LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, IN_LAYER_PROXY_SPEC, TARGET_REDUCTIONS, HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, \
 #     LAYER_HIERARCHY_SPEC, TARGET_DEFORMATIONS_SPEC, LAYER_NAME_TO_RELU_COUNT
 from research.block_relu.consts import TARGET_REDUCTIONS, TARGET_DEFORMATIONS_SPEC
-from research.block_relu.utils import get_model, get_data, center_crop, MobileNetUtils, ResNetUtils
+from research.block_relu.utils import get_model, get_data, center_crop, ArchUtilsFactory
 from research.block_relu.params import MobileNetV2Params, ResNetParams
+
+from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find better way to init
 # TODO: add typing
 # TODO: pandas
 # TODO: docstring
@@ -41,17 +43,20 @@ class DeformationHandler:
         self.hierarchy_level = hierarchy_level
         self.device = f"cuda:{gpu_id}"
 
-        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v2/deformations", dataset, backbone)
-        self.config = os.path.join("/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs", f"{backbone}_{dataset}_baseline.py")
+        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3/deformations", dataset, backbone)
+
+        self.arch_utils = ArchUtilsFactory()(backbone)
         if backbone == "mobilenet_v2":
+            assert False
             self.checkpoint = "/home/yakir/Data2/experiments/mobilenet_v2_ade_20k_baseline/latest.pth"
-            self.arch_utils = MobileNetUtils()
             self.params = MobileNetV2Params()
-        else:
-            self.checkpoint = "/home/yakir/PycharmProjects/mmsegmentation/work_dirs/baseline_40k/latest.pth"
-            self.arch_utils = ResNetUtils()
+        elif backbone == "ResNetV1c":
+            self.config = os.path.join("/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/my_resnet_coco-stuff_164k.py")
+            self.checkpoint = "/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_r50-d8_512x512_4x4_80k_coco-stuff164k/iter_80000.pth"
             self.params = ResNetParams()
 
+        else:
+            assert False
         self.batch_size = 8
         self.im_size = 512
 
@@ -62,6 +67,7 @@ class DeformationHandler:
                 checkpoint_path=self.checkpoint
             )
             self.dataset = get_data(dataset)
+
 
     def _get_deformation(self, resnet_block_name_to_activation, ground_truth, loss_ce, block_size_spec, input_block_name, output_block_name):
 
@@ -83,8 +89,7 @@ class DeformationHandler:
             out = self.arch_utils.run_model_block(self.model, out, self.params.BLOCK_NAMES[block_index])
 
         if output_block_name is None:
-            cur_loss_ce = self.model.decode_head.losses(out, ground_truth)['loss_ce']
-            loss_deform = (cur_loss_ce - loss_ce) / loss_ce
+            loss_deform = self.model.decode_head.losses(out, ground_truth)['loss_ce']
         else:
             loss_deform = None
 
@@ -104,8 +109,11 @@ class DeformationHandler:
                                      f"signal_{layer_name}_batch_{batch_index}_{self.batch_size}.npy")
         loss_deform_f_name = os.path.join(output_path,
                                           f"loss_deform_{layer_name}_batch_{batch_index}_{self.batch_size}.npy")
+        loss_baseline_f_name = os.path.join(output_path,
+                                            f"loss_baseline_{layer_name}_batch_{batch_index}_{self.batch_size}.npy")
 
-        return noise_f_name, signal_f_name, loss_deform_f_name, np.zeros((h, w)), np.zeros((h, w)), np.zeros((h, w))
+        return noise_f_name, signal_f_name, loss_deform_f_name, loss_baseline_f_name, \
+               np.zeros((h, w)), np.zeros((h, w)), np.zeros((h, w))
 
     def _get_redundancy_arr(self, reduction_to_block_sizes, num_groups, group_size):
         redundancy_arr = np.zeros((TARGET_REDUCTIONS.shape[0], num_groups))
@@ -140,7 +148,7 @@ class DeformationHandler:
             activations = [batch]
             for block_index in range(num_blocks):
                 activations.append(self.arch_utils.run_model_block(self.model, activations[block_index], self.params.BLOCK_NAMES[block_index]))
-            loss_ce = self.model.decode_head.losses(activations[-1], ground_truth)['loss_ce']
+            loss_ce = self.model.decode_head.losses(activations[-1], ground_truth)['loss_ce'].cpu()
             resnet_block_name_to_activation = dict(zip(self.params.BLOCK_NAMES, activations))
 
             return resnet_block_name_to_activation, ground_truth, loss_ce
@@ -165,9 +173,9 @@ class DeformationHandler:
                 cur_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
                 next_block_name = self.params.IN_LAYER_PROXY_SPEC[layer_name]
 
-                noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
+                noise_f_name, signal_f_name, loss_deform_f_name, loss_baseline_f_name, noise, signal, loss_deform = \
                     self._get_files_and_matrices(batch_index, output_path, layer_name, len(layer_block_sizes), layer_num_channels)
-                if os.path.exists(noise_f_name):
+                if os.path.exists(noise_f_name) and os.path.exists(signal_f_name):
                     continue
 
                 for channel in tqdm(range(layer_num_channels), desc=f"Batch={batch_index} Layer={layer_index}"):
@@ -193,6 +201,7 @@ class DeformationHandler:
                 np.save(file=noise_f_name, arr=noise)
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
+                np.save(file=loss_baseline_f_name, arr=np.array([loss_ce]))
 
     def collect_deformation_by_blocks(self):
         target_deformation = TARGET_DEFORMATIONS_SPEC["block"]

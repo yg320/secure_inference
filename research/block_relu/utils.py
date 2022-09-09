@@ -81,7 +81,25 @@ def get_model(config, gpu_id, checkpoint_path):
 
 
 def get_data(dataset):
-    if dataset == "coco_stuff10k":
+
+    if dataset == "coco_stuff164k":
+        cfg = {
+            'type': 'COCOStuffDataset',
+            'data_root': 'data/coco_stuff164k',
+            'img_dir': 'images/train2017',
+            'ann_dir': 'annotations/train2017',
+            'pipeline': [
+                {'type': 'LoadImageFromFile'},
+                {'type': 'LoadAnnotations'},
+                {'type': 'Resize', 'img_scale': (2048, 512), 'keep_ratio': True},
+                {'type': 'RandomFlip', 'prob': 0.0},
+                {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375],
+                 'to_rgb': True},
+                {'type': 'DefaultFormatBundle'},
+                {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
+        }
+    elif dataset == "coco_stuff10k":
+        assert False
         cfg = {'type': 'COCOStuffDataset',
                'data_root': 'data/coco_stuff10k',
                'reduce_zero_label': True,
@@ -236,7 +254,7 @@ class ResNetUtils(ArchUtils):
 
             layer = getattr(model.backbone, res_layer_name)
             res_block = layer._modules[block_name]
-            return getattr(res_block, f"secure_relu_{relu_name}")
+            return getattr(res_block, f"relu_{relu_name}")
 
         # stem_2
         # stem_5
@@ -379,4 +397,11 @@ class ResNetUtils(ArchUtils):
 
             layer = getattr(model.backbone, res_layer_name)
             res_block = layer._modules[block_name]
-            setattr(res_block, f"secure_relu_{relu_name}", block_relu)
+            setattr(res_block, f"relu_{relu_name}", block_relu)
+
+class ArchUtilsFactory:
+    def __call__(self, arch_name):
+        if arch_name == "ResNetV1c":
+            return ResNetUtils()
+        elif arch_name == "MobileNetV2":
+            return MobileNetUtils()

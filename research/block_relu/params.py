@@ -295,6 +295,7 @@ BLOCK_SIZES_MINI = [
     [64, 64]
 ]
 
+BLOCK_SIZE_COMPLETE = [[i,j] for i in range(1,65) for j in range(1,65)]
 
 class MobileNetV2Params:
     def __init__(self):
