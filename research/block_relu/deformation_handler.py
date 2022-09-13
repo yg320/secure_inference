@@ -13,7 +13,7 @@ import time
 #     LAYER_HIERARCHY_SPEC, TARGET_DEFORMATIONS_SPEC, LAYER_NAME_TO_RELU_COUNT
 from research.block_relu.consts import TARGET_REDUCTIONS, TARGET_DEFORMATIONS_SPEC
 from research.block_relu.utils import get_model, get_data, center_crop, ArchUtilsFactory
-from research.block_relu.params import MobileNetV2Params, ResNetParams
+from research.block_relu.params import MobileNetV2Params, ResNetParams, ParamsFactory
 
 from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find better way to init
 # TODO: add typing
@@ -37,36 +37,26 @@ from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find bett
 #     return is_1_night or is_2_night
 
 class DeformationHandler:
-    def __init__(self, dataset, backbone, gpu_id, hierarchy_level, is_extraction):
+    def __init__(self, gpu_id, hierarchy_level, is_extraction, param_json_file):
 
         self.gpu_id = gpu_id
         self.hierarchy_level = hierarchy_level
         self.device = f"cuda:{gpu_id}"
 
-        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3/deformations", dataset, backbone)
+        self.params = ParamsFactory()(param_json_file)
+        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3/deformations", self.params.DATASET, self.params.BACKBONE)
+        self.arch_utils = ArchUtilsFactory()(self.params.BACKBONE)
 
-        self.arch_utils = ArchUtilsFactory()(backbone)
-        if backbone == "mobilenet_v2":
-            assert False
-            self.checkpoint = "/home/yakir/Data2/experiments/mobilenet_v2_ade_20k_baseline/latest.pth"
-            self.params = MobileNetV2Params()
-        elif backbone == "ResNetV1c":
-            self.config = os.path.join("/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/my_resnet_coco-stuff_164k.py")
-            self.checkpoint = "/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_r50-d8_512x512_4x4_80k_coco-stuff164k/iter_80000.pth"
-            self.params = ResNetParams()
-
-        else:
-            assert False
         self.batch_size = 8
         self.im_size = 512
 
         if is_extraction:
             self.model = get_model(
-                config=self.config,
+                config=self.params.CONFIG,
                 gpu_id=self.gpu_id,
-                checkpoint_path=self.checkpoint
+                checkpoint_path=self.params.CHECKPOINT
             )
-            self.dataset = get_data(dataset)
+            self.dataset = get_data(self.params.DATASET)
 
 
     def _get_deformation(self, resnet_block_name_to_activation, ground_truth, loss_ce, block_size_spec, input_block_name, output_block_name):
@@ -207,7 +197,7 @@ class DeformationHandler:
         target_deformation = TARGET_DEFORMATIONS_SPEC["block"]
 
         input_dir = os.path.join(self.deformation_base_path, "block")
-        out_dir = os.path.join(self.deformation_base_path, f"channels_0_in")
+        out_dir = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, f"channels_0_in")
 
         os.makedirs(out_dir, exist_ok=True)
 
@@ -295,8 +285,8 @@ class DeformationHandler:
 
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
-        input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_in")
-        output_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_out")
+        input_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level}_in")
+        output_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level}_out")
 
         os.makedirs(output_path, exist_ok=True)
 
@@ -318,7 +308,7 @@ class DeformationHandler:
                 else:
                     next_block_name = None
 
-                noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
+                noise_f_name, signal_f_name, loss_deform_f_name, loss_baseline_f_name, noise, signal, loss_deform = \
                     self._get_files_and_matrices(batch_index, output_path, layer_name, TARGET_REDUCTIONS.shape[0], num_of_groups)
 
                 if os.path.exists(noise_f_name) and os.path.exists(signal_f_name) and os.path.exists(loss_deform_f_name):
@@ -361,11 +351,11 @@ class DeformationHandler:
                 np.save(file=noise_f_name, arr=noise)
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
-
+                np.save(file=loss_baseline_f_name, arr=np.array([loss_ce]))
     def collect_deformation_by_channels(self):
-        prev_input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_in")
-        input_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level}_out")
-        output_path = os.path.join(self.deformation_base_path, f"channels_{self.hierarchy_level + 1}_in")
+        prev_input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level}_in")
+        input_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME,f"channels_{self.hierarchy_level}_out")
+        output_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level + 1}_in")
 
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("channels", self.hierarchy_level)]
@@ -458,8 +448,8 @@ class DeformationHandler:
 
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
-        input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_in")
-        output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
+        input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"layers_{self.hierarchy_level}_in")
+        output_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"layers_{self.hierarchy_level}_out")
         red_format = os.path.join(input_path, "reduction_to_block_sizes_{}.npy")
         os.makedirs(output_path, exist_ok=True)
 
@@ -504,20 +494,18 @@ class DeformationHandler:
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
 
-    def get_block_spec_v2(self):
-        output_path = os.path.join(self.deformation_base_path, "reduction_specs_by_layers_test")
-        input_path = os.path.join(self.deformation_base_path, "layers_0_in_test")
-
-        reductions = [0.1]
+    def get_block_spec(self):
+        output_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, "reduction_specs")
+        input_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME,f"layers_{self.hierarchy_level}")
+        os.makedirs(output_path, exist_ok=True)
+        reductions = [0.02, 0.05, 0.1, 0.01]
         for target_reduction_index, target_reduction in enumerate(reductions):
             red_spec = {}
             for layer_name in self.params.LAYER_NAMES:
                 reduction_index = np.argwhere(TARGET_REDUCTIONS == target_reduction)[0, 0]
                 block_sizes_to_use = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))[reduction_index].astype(np.int32)
                 red_spec[layer_name] = (block_sizes_to_use, self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
-            # red_spec = {layer_name: (block_sizes_to_use[layer_index][target_reduction_index],
-            #                          self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) for layer_index, layer_name in
-            #             enumerate(self.params.LAYER_NAMES)}
+
             relu_tot = sum(self.params.LAYER_NAME_TO_RELU_COUNT.values())
             count = 0
             for layer_name in self.params.LAYER_NAMES:
@@ -539,18 +527,18 @@ class DeformationHandler:
         if self.hierarchy_level == -1:
             unique_hier_len = list(set(map(len, self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS.values())))
             assert len(unique_hier_len) == 1
-            v = 5
-            prev_input_path = os.path.join(self.deformation_base_path, f"channels_{v}_in")
-            input_path = os.path.join(self.deformation_base_path, f"channels_{v}_out")
+            v = unique_hier_len[0] - 1
+            prev_input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"channels_{v}_in")
+            input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"channels_{v}_out")
 
             prev_group_to_representative = {layer: layer for layer in self.params.LAYER_NAMES}
 
         else:
-            prev_input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_in")
-            input_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level}_out")
+            prev_input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"layers_{self.hierarchy_level}_in")
+            input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"layers_{self.hierarchy_level}_out")
             prev_group_to_representative = {layer: group[0] for group in self.params.LAYER_HIERARCHY_SPEC[self.hierarchy_level] for layer in group}
 
-        output_path = os.path.join(self.deformation_base_path, f"layers_{self.hierarchy_level + 1}_in_test")
+        output_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"layers_{self.hierarchy_level + 1}")
 
         os.makedirs(output_path, exist_ok=True)
         target_deformation = TARGET_DEFORMATIONS_SPEC[("layers", self.hierarchy_level)]
@@ -630,15 +618,13 @@ if __name__ == '__main__':
     parser.add_argument('--hierarchy_level', type=int, default=0)
     parser.add_argument('--hierarchy_type', type=str, default="blocks")
     parser.add_argument('--operation', type=str, default="extract")
-    parser.add_argument('--dataset', type=str, default="ade_20k")
-    parser.add_argument('--backbone', type=str, default="mobilenet_v2")
+    parser.add_argument('--param_json_file', type=str)
     args = parser.parse_args()
 
-    dh = DeformationHandler(dataset=args.dataset,
-                            backbone=args.backbone,
-                            gpu_id=args.gpu_id,
+    dh = DeformationHandler(gpu_id=args.gpu_id,
                             hierarchy_level=args.hierarchy_level,
-                            is_extraction=args.operation == "extract")
+                            is_extraction=args.operation == "extract",
+                            param_json_file=args.param_json_file)
     # dh.collect_deformation_by_layers()
     # dh.get_block_spec()
     # dh.get_block_spec_v2()
@@ -647,5 +633,7 @@ if __name__ == '__main__':
         indices = [int(x) for x in args.batch_index.split(",")]
         for batch_index in indices:
             getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")(batch_index)
-    else:
+    elif args.operation == "collect":
         getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")()
+    elif args.operation == "get_reduction_spec":
+        dh.get_block_spec()
