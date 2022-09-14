@@ -1,3 +1,5 @@
+import json
+
 BLOCK_SIZES_FULL = \
     [[1, 1],
      [1, 2],
@@ -295,7 +297,24 @@ BLOCK_SIZES_MINI = [
     [64, 64]
 ]
 
-BLOCK_SIZE_COMPLETE = [[i,j] for i in range(1,65) for j in range(1,65)]
+BLOCK_SIZE_COMPLETE = [[i, j] for i in range(1, 65) for j in range(1, 65)]
+
+
+class Params:
+    def __init__(self, BLOCK_NAMES, LAYER_NAME_TO_BLOCK_NAME, LAYER_NAMES, IN_LAYER_PROXY_SPEC, LAYER_NAME_TO_CHANNELS,
+                 LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS,
+                 LAYER_NAME_TO_LAYER_DIM, LAYER_NAME_TO_RELU_COUNT, LAYER_HIERARCHY_SPEC):
+        self.BLOCK_NAMES = BLOCK_NAMES
+        self.LAYER_NAME_TO_BLOCK_NAME = LAYER_NAME_TO_BLOCK_NAME
+        self.LAYER_NAMES = LAYER_NAMES
+        self.IN_LAYER_PROXY_SPEC = IN_LAYER_PROXY_SPEC
+        self.LAYER_NAME_TO_CHANNELS = LAYER_NAME_TO_CHANNELS
+        self.LAYER_NAME_TO_BLOCK_SIZES = LAYER_NAME_TO_BLOCK_SIZES
+        self.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS
+        self.LAYER_NAME_TO_LAYER_DIM = LAYER_NAME_TO_LAYER_DIM
+        self.LAYER_NAME_TO_RELU_COUNT = LAYER_NAME_TO_RELU_COUNT
+        self.LAYER_HIERARCHY_SPEC = LAYER_HIERARCHY_SPEC
+
 
 class MobileNetV2Params:
     def __init__(self):
@@ -555,7 +574,7 @@ class MobileNetV2Params:
             }
 
         self.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = {
-            'conv1':      [32, 16, 8, 4, 2, 1],
+            'conv1': [32, 16, 8, 4, 2, 1],
             'layer1_0_0': [32, 16, 8, 4, 2, 1],
             'layer2_0_0': [48, 16, 8, 4, 2, 1],
             'layer2_0_1': [48, 16, 8, 4, 2, 1],
@@ -660,7 +679,12 @@ class MobileNetV2Params:
 
 
 class ResNetParams:
-    def __init__(self):
+    def __init__(self, HIERARCHY_NAME, LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, LAYER_HIERARCHY_SPEC, DATASET, CONFIG, CHECKPOINT):
+        self.BACKBONE = "ResNetV1c"
+        self.DATASET = DATASET
+        self.CONFIG = CONFIG
+        self.CHECKPOINT = CHECKPOINT
+
         self.BLOCK_NAMES = [
             'stem',
             'layer1_0',
@@ -959,64 +983,7 @@ class ResNetParams:
                 "decode_5": BLOCK_SIZES_MINI,
             }
 
-        self.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = \
-            {'stem_2': [32, 16, 8, 4, 2, 1],
-             'stem_5': [32, 16, 8, 4, 2, 1],
-             'stem_8': [32, 16, 8, 4, 2, 1],
-             'layer1_0_1': [32, 16, 8, 4, 2, 1],
-             'layer1_0_2': [32, 16, 8, 4, 2, 1],
-             'layer1_0_3': [32, 16, 8, 4, 2, 1],
-             'layer1_1_1': [32, 16, 8, 4, 2, 1],
-             'layer1_1_2': [32, 16, 8, 4, 2, 1],
-             'layer1_1_3': [32, 16, 8, 4, 2, 1],
-             'layer1_2_1': [32, 16, 8, 4, 2, 1],
-             'layer1_2_2': [32, 16, 8, 4, 2, 1],
-             'layer1_2_3': [32, 16, 8, 4, 2, 1],
-             'layer2_0_1': [32, 16, 8, 4, 2, 1],
-             'layer2_0_2': [32, 16, 8, 4, 2, 1],
-             'layer2_0_3': [32, 16, 8, 4, 2, 1],
-             'layer2_1_1': [32, 16, 8, 4, 2, 1],
-             'layer2_1_2': [32, 16, 8, 4, 2, 1],
-             'layer2_1_3': [32, 16, 8, 4, 2, 1],
-             'layer2_2_1': [32, 16, 8, 4, 2, 1],
-             'layer2_2_2': [32, 16, 8, 4, 2, 1],
-             'layer2_2_3': [32, 16, 8, 4, 2, 1],
-             'layer2_3_1': [32, 16, 8, 4, 2, 1],
-             'layer2_3_2': [32, 16, 8, 4, 2, 1],
-             'layer2_3_3': [32, 16, 8, 4, 2, 1],
-             'layer3_0_1': [32, 16, 8, 4, 2, 1],
-             'layer3_0_2': [32, 16, 8, 4, 2, 1],
-             'layer3_0_3': [32, 16, 8, 4, 2, 1],
-             'layer3_1_1': [32, 16, 8, 4, 2, 1],
-             'layer3_1_2': [32, 16, 8, 4, 2, 1],
-             'layer3_1_3': [32, 16, 8, 4, 2, 1],
-             'layer3_2_1': [32, 16, 8, 4, 2, 1],
-             'layer3_2_2': [32, 16, 8, 4, 2, 1],
-             'layer3_2_3': [32, 16, 8, 4, 2, 1],
-             'layer3_3_1': [32, 16, 8, 4, 2, 1],
-             'layer3_3_2': [32, 16, 8, 4, 2, 1],
-             'layer3_3_3': [32, 16, 8, 4, 2, 1],
-             'layer3_4_1': [32, 16, 8, 4, 2, 1],
-             'layer3_4_2': [32, 16, 8, 4, 2, 1],
-             'layer3_4_3': [32, 16, 8, 4, 2, 1],
-             'layer3_5_1': [32, 16, 8, 4, 2, 1],
-             'layer3_5_2': [32, 16, 8, 4, 2, 1],
-             'layer3_5_3': [32, 16, 8, 4, 2, 1],
-             'layer4_0_1': [32, 16, 8, 4, 2, 1],
-             'layer4_0_2': [32, 16, 8, 4, 2, 1],
-             'layer4_0_3': [32, 16, 8, 4, 2, 1],
-             'layer4_1_1': [32, 16, 8, 4, 2, 1],
-             'layer4_1_2': [32, 16, 8, 4, 2, 1],
-             'layer4_1_3': [32, 16, 8, 4, 2, 1],
-             'layer4_2_1': [32, 16, 8, 4, 2, 1],
-             'layer4_2_2': [32, 16, 8, 4, 2, 1],
-             'layer4_2_3': [32, 16, 8, 4, 2, 1],
-             'decode_0': [32, 16, 8, 4, 2, 1],
-             'decode_1': [32, 16, 8, 4, 2, 1],
-             'decode_2': [32, 16, 8, 4, 2, 1],
-             'decode_3': [32, 16, 8, 4, 2, 1],
-             'decode_4': [32, 16, 8, 4, 2, 1],
-             'decode_5': [32, 16, 8, 4, 2, 1]}
+        self.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS
 
         self.LAYER_NAME_TO_LAYER_DIM = {'stem_2': 256, 'stem_5': 256, 'stem_8': 256, 'layer1_0_1': 128,
                                         'layer1_0_2': 128, 'layer1_0_3': 128, 'layer1_1_1': 128, 'layer1_1_2': 128,
@@ -1062,39 +1029,26 @@ class ResNetParams:
                                          'decode_4': 2097152,
                                          'decode_5': 2097152}
 
-        self.LAYER_HIERARCHY_SPEC = \
-            [
-                [
-                    ["stem_2", "stem_5", "stem_8"],
-                    ["layer1_0_1", "layer1_0_2", "layer1_0_3"],
-                    ["layer1_1_1", "layer1_1_2", "layer1_1_3"],
-                    ["layer1_2_1", "layer1_2_2", "layer1_2_3"],
-                    ["layer2_0_1", "layer2_0_2", "layer2_0_3"],
-                    ["layer2_1_1", "layer2_1_2", "layer2_1_3"],
-                    ["layer2_2_1", "layer2_2_2", "layer2_2_3"],
-                    ["layer2_3_1", "layer2_3_2", "layer2_3_3"],
-                    ["layer3_0_1", "layer3_0_2", "layer3_0_3"],
-                    ["layer3_1_1", "layer3_1_2", "layer3_1_3"],
-                    ["layer3_2_1", "layer3_2_2", "layer3_2_3"],
-                    ["layer3_3_1", "layer3_3_2", "layer3_3_3"],
-                    ["layer3_4_1", "layer3_4_2", "layer3_4_3"],
-                    ["layer3_5_1", "layer3_5_2", "layer3_5_3"],
-                    ["layer4_0_1", "layer4_0_2", "layer4_0_3"],
-                    ["layer4_1_1", "layer4_1_2", "layer4_1_3"],
-                    ["layer4_2_1", "layer4_2_2", "layer4_2_3"],
-                    ["decode_0", "decode_1", "decode_2", "decode_3", "decode_4", "decode_5"],
-                ],
-                [
-                    ["stem_2", "stem_5", "stem_8"],
-                    ["layer1_0_1", "layer1_0_2", "layer1_0_3", "layer1_1_1", "layer1_1_2", "layer1_1_3", "layer1_2_1",
-                     "layer1_2_2", "layer1_2_3"],
-                    ["layer2_0_1", "layer2_0_2", "layer2_0_3", "layer2_1_1", "layer2_1_2", "layer2_1_3", "layer2_2_1",
-                     "layer2_2_2", "layer2_2_3", "layer2_3_1", "layer2_3_2", "layer2_3_3"],
-                    ["layer3_0_1", "layer3_0_2", "layer3_0_3", "layer3_1_1", "layer3_1_2", "layer3_1_3", "layer3_2_1",
-                     "layer3_2_2", "layer3_2_3", "layer3_3_1", "layer3_3_2", "layer3_3_3", "layer3_4_1", "layer3_4_2",
-                     "layer3_4_3", "layer3_5_1", "layer3_5_2", "layer3_5_3"],
-                    ["layer4_0_1", "layer4_0_2", "layer4_0_3", "layer4_1_1", "layer4_1_2", "layer4_1_3", "layer4_2_1",
-                     "layer4_2_2", "layer4_2_3"],
-                    ["decode_0", "decode_1", "decode_2", "decode_3", "decode_4", "decode_5"],
-                ]
-            ]
+        self.LAYER_HIERARCHY_SPEC = LAYER_HIERARCHY_SPEC
+
+        self.HIERARCHY_NAME = HIERARCHY_NAME
+
+
+class ParamsFactory:
+    def __init__(self):
+
+        self.classes = {
+            "ResNetParams": ResNetParams,
+            "MobileNetV2Params": MobileNetV2Params,
+        }
+
+    def __call__(self, json_file_name):
+        with open(json_file_name, 'rb') as f:
+            content = json.load(f)
+        type = content['type']
+        del content['type']
+        return self.classes[type](**content)
+
+# params = ParamsFactory()("/home/yakir/PycharmProjects/secure_inference/research/block_relu/distortion_handler_configs/resnet_COCO_164K_2_hierarchies.json")
+#
+# params.HIERARCHY_NAME
