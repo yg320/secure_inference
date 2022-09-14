@@ -21,8 +21,8 @@ from mmseg.models import build_segmentor
 from mmseg.utils import (collect_env, get_device, get_root_logger,
                          setup_multi_processes)
 
-from research.block_relu.utils import ArchUtils
-
+from research.block_relu.utils import ArchUtilsFactory
+from research.pipeline.backbones.secure_resnet import SecureResNet
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a segmentor')
     parser.add_argument('config', help='train config file path')
@@ -205,8 +205,8 @@ def main():
 
     if cfg.relu_spec_file is not None:
         layer_name_to_block_size_indices = pickle.load(open(cfg.relu_spec_file, 'rb'))
-        assert False
-        ArchUtils().set_bReLU_layers(model, layer_name_to_block_size_indices)
+        arch_utils = ArchUtilsFactory()(cfg.model.backbone.type)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_size_indices)
 
     # SyncBN is not support for DP
     if not distributed:

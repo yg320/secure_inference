@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-
+import numpy as np
 
 def plot_curve(log_dicts, args):
     if args.backend is not None:
@@ -39,31 +39,38 @@ def plot_curve(log_dicts, args):
                 epoch_logs = log_dict[epoch]
                 if metric not in epoch_logs.keys():
                     continue
-                if metric in ['mIoU', 'mAcc', 'aAcc']:
+                if metric in ['mAcc', 'aAcc']:
                     plot_epochs.append(epoch)
                     plot_values.append(epoch_logs[metric][0])
                 else:
                     for idx in range(len(epoch_logs[metric])):
+                        if metric == "mIoU":
+                            x = list(np.array(epoch_logs['iter'])[np.argwhere(np.array(epoch_logs['mode'])=='val')[:,0]-1])
+                        else:
+                            x = epoch_logs['iter']
                         if epoch_logs['mode'][idx] == 'train':
-                            plot_iters.append(epoch_logs['iter'][idx])
+                            plot_iters.append(x[idx])
                             plot_values.append(epoch_logs[metric][idx])
             ax = plt.gca()
             label = legend[i * num_metrics + j]
-            if metric in ['mIoU', 'mAcc', 'aAcc']:
+            if metric in ['mAcc', 'aAcc']:
                 ax.set_xticks(plot_epochs)
                 plt.xlabel('epoch')
-                print(sum(plot_values))
-                print(max(plot_values))
+                # print(sum(plot_values))
+                # print(max(plot_values))
                 plt.plot(plot_epochs, plot_values, label=label, marker='o')
             else:
                 plt.xlabel('iter')
 
-                import numpy as np
-                N = 20
-                plot_values = np.convolve(plot_values, np.ones(N)/N, mode='valid')
-                plot_iters = plot_iters[(N-1)//2:-(N-1)//2]
 
-                plt.plot(plot_iters, plot_values, label=label, linewidth=0.5)
+                # N = 20
+                # plot_values = np.convolve(plot_values, np.ones(N)/N, mode='valid')
+                # plot_iters = plot_iters[(N-1)//2:-(N-1)//2]
+                if len(plot_values) > 20:
+                    plt.plot(plot_iters, plot_values, label=label, linewidth=0.5)
+                else:
+                    plt.plot(plot_iters, plot_values, label=label, marker='o')
+
         plt.legend()
         if args.title is not None:
             plt.title(args.title)
