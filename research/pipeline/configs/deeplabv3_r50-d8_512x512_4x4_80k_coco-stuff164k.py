@@ -80,8 +80,8 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=4,
-    workers_per_gpu=4,
+    samples_per_gpu=3,
+    workers_per_gpu=3,
     train=dict(
         type='COCOStuffDataset',
         data_root='data/coco_stuff164k',
@@ -166,3 +166,4 @@ evaluation = dict(interval=8000, metric='mIoU', pre_eval=True)
 work_dir = './work_dirs/deeplabv3_r50-d8_512x512_4x4_80k_coco-stuff164k'
 gpu_ids = [0]
 auto_resume = False
+relu_spec_file = None
