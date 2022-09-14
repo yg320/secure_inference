@@ -401,7 +401,7 @@ class ResNetUtils(ArchUtils):
 
 class ArchUtilsFactory:
     def __call__(self, arch_name):
-        if arch_name == "ResNetV1c":
+        if arch_name in ["ResNetV1c", "SecureResNet", "MyResNet"]:
             return ResNetUtils()
         elif arch_name == "MobileNetV2":
             return MobileNetUtils()

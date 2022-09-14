@@ -59,7 +59,7 @@ class SecureBottleneck(Bottleneck):
 
 
 @BACKBONES.register_module()
-class SecureResNet(ResNetV1c):
+class MyResNet(ResNetV1c):
     arch_settings = {
         18: (BasicBlock, (2, 2, 2, 2)),
         34: (BasicBlock, (3, 4, 6, 3)),
@@ -67,6 +67,13 @@ class SecureResNet(ResNetV1c):
         101: (SecureBottleneck, (3, 4, 23, 3)),
         152: (SecureBottleneck, (3, 8, 36, 3))
     }
+
+    def __init__(self, **kwargs):
+        super(MyResNet, self).__init__(**kwargs)
+
+
+@BACKBONES.register_module()
+class SecureResNet(MyResNet):
 
     def __init__(self, **kwargs):
         super(SecureResNet, self).__init__(**kwargs)
