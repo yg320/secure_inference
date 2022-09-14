@@ -6,14 +6,10 @@ import numpy as np
 import glob
 import pickle
 import shutil
-from functools import lru_cache
-import time
-# from research.block_relu.consts import LAYER_NAME_TO_BLOCK_SIZES, LAYER_NAMES, LAYER_NAME_TO_CHANNELS, \
-#     LAYER_NAME_TO_BLOCK_NAME, BLOCK_NAMES, IN_LAYER_PROXY_SPEC, TARGET_REDUCTIONS, HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, \
-#     LAYER_HIERARCHY_SPEC, TARGET_DEFORMATIONS_SPEC, LAYER_NAME_TO_RELU_COUNT
-from research.block_relu.consts import TARGET_REDUCTIONS, TARGET_DEFORMATIONS_SPEC
+
+from research.block_relu.consts import TARGET_REDUCTIONS
 from research.block_relu.utils import get_model, get_data, center_crop, ArchUtilsFactory
-from research.block_relu.params import MobileNetV2Params, ResNetParams, ParamsFactory
+from research.block_relu.params import ParamsFactory
 
 from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find better way to init
 # TODO: add typing
@@ -194,16 +190,16 @@ class DeformationHandler:
                 np.save(file=loss_baseline_f_name, arr=np.array([loss_ce]))
 
     def collect_deformation_by_blocks(self):
-        target_deformation = TARGET_DEFORMATIONS_SPEC["block"]
 
         input_dir = os.path.join(self.deformation_base_path, "block")
-        out_dir = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, f"channels_0_in")
-
-        os.makedirs(out_dir, exist_ok=True)
+        out_dir_format = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, "channels", "{}", f"collect_0")
 
         for layer_index, layer_name in tqdm(enumerate(self.params.LAYER_NAMES)):
-            reduction_to_block_sizes_f_name = os.path.join(out_dir, f"reduction_to_block_sizes_{layer_name}.npy")
-            redundancy_arr_f_name = os.path.join(out_dir, f"redundancy_arr_{layer_name}.npy")
+            out_dir = out_dir_format.format(layer_name)
+            os.makedirs(out_dir, exist_ok=True)
+
+            reduction_to_block_sizes_f_name = os.path.join(out_dir, f"reduction_to_block_sizes.npy")
+            redundancy_arr_f_name = os.path.join(out_dir, f"redundancy_arr.npy")
 
             if os.path.exists(reduction_to_block_sizes_f_name) and os.path.exists(redundancy_arr_f_name):
                 continue
@@ -217,9 +213,10 @@ class DeformationHandler:
             signal = signal.mean(axis=0)
             deformation = noise / signal
             deformation[0] = 0
+            target_deformation = np.unique(deformation)
+
             assert not np.any(np.isnan(deformation))
-            # assert deformation.max() <= target_deformation[-1]
-            print(layer_index,(deformation <= target_deformation[-1]).mean())
+
             block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
             activation_reduction = np.array([1 / x[0] / x[1] for x in block_sizes])
             deformation_and_channel_to_block_size = []
@@ -285,22 +282,29 @@ class DeformationHandler:
 
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
-        input_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level}_in")
-        output_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level}_out")
+        input_path_format = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, "channels", "{}", f"collect_{self.hierarchy_level}")
+        output_path_format = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, "channels", "{}", f"extract_{self.hierarchy_level}")
 
-        os.makedirs(output_path, exist_ok=True)
 
         with torch.no_grad():
 
             for layer_index, layer_name in enumerate(self.params.LAYER_NAMES):
+                output_path = output_path_format.format(layer_name)
+                input_path = input_path_format.format(layer_name)
+
+                if len(self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name]) <= self.hierarchy_level:
+                    continue
+
+                os.makedirs(output_path, exist_ok=True)
+
                 torch.cuda.empty_cache()
 
                 num_of_groups = self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name][self.hierarchy_level]
 
-                redundancy_arr_f_name = os.path.join(input_path, f"redundancy_arr_{layer_name}.npy")
+                redundancy_arr_f_name = os.path.join(input_path, f"redundancy_arr.npy")
                 redundancy_arr = np.load(redundancy_arr_f_name)
 
-                reduction_to_block_sizes = np.load(os.path.join(input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
+                reduction_to_block_sizes = np.load(os.path.join(input_path, f"reduction_to_block_sizes.npy"))
 
                 cur_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
                 if num_of_groups > 1:
@@ -352,15 +356,24 @@ class DeformationHandler:
                 np.save(file=signal_f_name, arr=signal)
                 np.save(file=loss_deform_f_name, arr=loss_deform)
                 np.save(file=loss_baseline_f_name, arr=np.array([loss_ce]))
-    def collect_deformation_by_channels(self):
-        prev_input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level}_in")
-        input_path = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME,f"channels_{self.hierarchy_level}_out")
-        output_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"channels_{self.hierarchy_level + 1}_in")
 
-        os.makedirs(output_path, exist_ok=True)
-        target_deformation = TARGET_DEFORMATIONS_SPEC[("channels", self.hierarchy_level)]
+    def collect_deformation_by_channels(self):
+
+        prev_input_path_format = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, "channels", "{}", f"collect_{self.hierarchy_level}")
+        input_path_format = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, "channels", "{}", f"extract_{self.hierarchy_level}")
+        output_path_format = os.path.join(self.deformation_base_path, self.params.HIERARCHY_NAME, "channels", "{}", f"collect_{self.hierarchy_level + 1}")
 
         for layer_index, layer_name in tqdm(enumerate(self.params.LAYER_NAMES)):
+            prev_input_path = prev_input_path_format.format(layer_name)
+            input_path = input_path_format.format(layer_name)
+            output_path = output_path_format.format(layer_name)
+
+            if len(self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[
+                       layer_name]) <= self.hierarchy_level:
+                continue
+
+            os.makedirs(output_path, exist_ok=True)
+
             num_groups_prev = self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name][self.hierarchy_level]
             num_groups_curr = self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name][self.hierarchy_level + 1]
             block_size_index_to_reduction = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
@@ -372,23 +385,22 @@ class DeformationHandler:
             reduction_to_block_size = np.load(
                 os.path.join(prev_input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
 
-            if False: #num_groups_prev == num_groups_curr:
-                files = glob.glob(os.path.join(input_path, f"loss_deform_{layer_name}_batch_*.npy"))
-                deformation = np.stack([np.load(f) for f in files]).mean(axis=0)
-                assert deformation.max() <= target_deformation[-1], deformation.max()
+            # if False: #num_groups_prev == num_groups_curr:
+            #     files = glob.glob(os.path.join(input_path, f"loss_deform_{layer_name}_batch_*.npy"))
+            #     deformation = np.stack([np.load(f) for f in files]).mean(axis=0)
+            #     assert deformation.max() <= target_deformation[-1], deformation.max()
+            #
+            #     assert not np.any(np.isnan(deformation))
+            # else:
+            files = glob.glob(os.path.join(input_path, f"signal_{layer_name}_batch_*.npy"))
+            signal = np.stack([np.load(f) for f in files])
+            noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
+            noise = noise.mean(axis=0)
+            signal = signal.mean(axis=0)
+            deformation = noise / signal
+            target_deformation = np.unique(deformation)
 
-                assert not np.any(np.isnan(deformation))
-            else:
-                files = glob.glob(os.path.join(input_path, f"signal_{layer_name}_batch_*.npy"))
-                signal = np.stack([np.load(f) for f in files])
-                noise = np.stack([np.load(f.replace("signal", "noise")) for f in files])
-                noise = noise.mean(axis=0)
-                signal = signal.mean(axis=0)
-                deformation = noise / signal
-                print(layer_index, (deformation <= target_deformation[-1]).mean())
-
-                # assert deformation.max() <= target_deformation[-1], deformation.max()
-                assert not np.any(np.isnan(deformation))
+            assert not np.any(np.isnan(deformation))
 
             channels = reduction_to_block_size.shape[1]
             group_size_prev = channels // num_groups_prev
@@ -445,7 +457,7 @@ class DeformationHandler:
             np.save(file=deformation_index_to_reduction_path, arr=deformation_index_to_reduction)
 
     def extract_deformation_by_layers(self, batch_index):
-
+        assert False
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
         input_path = os.path.join(self.deformation_base_path,self.params.HIERARCHY_NAME, f"layers_{self.hierarchy_level}_in")
@@ -518,7 +530,7 @@ class DeformationHandler:
                 pickle.dump(obj=red_spec, file=f)
 
     def collect_deformation_by_layers(self):
-
+        assert False
         cache_dir = "/home/yakir/Data2/cache"
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
@@ -611,6 +623,95 @@ class DeformationHandler:
 
         shutil.rmtree(cache_dir)
 
+    def _get_deformation_v2(self, resnet_block_name_to_activation, ground_truth, block_size_spec, input_block_name, output_block_names):
+
+        input_block_index = np.argwhere(np.array(self.params.BLOCK_NAMES) == input_block_name)[0, 0]
+        output_block_indices = [np.argwhere(np.array(self.params.BLOCK_NAMES) == output_block_name)[0, 0] for output_block_name in output_block_names]
+
+        input_tensor = resnet_block_name_to_activation[input_block_name]
+        next_tensors = [resnet_block_name_to_activation[output_block_name] for output_block_name in output_block_names]
+
+        layer_name_to_orig_layer = {}
+        for layer_name, block_size_indices in block_size_spec.items():
+            orig_layer = self.arch_utils.get_layer(self.model, layer_name)
+            layer_name_to_orig_layer[layer_name] = orig_layer
+
+            self.arch_utils.set_bReLU_layers(self.model, {layer_name: (block_size_indices,
+                                                                       self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])})
+
+        cur_out = input_tensor
+        outs = []
+
+        for block_index in range(input_block_index, max(output_block_indices)):
+            cur_out = self.arch_utils.run_model_block(self.model, cur_out, self.params.BLOCK_NAMES[block_index])
+            outs.append(cur_out)
+
+        if output_block_names[-1] is None:
+            loss_deform = self.model.decode_head.losses(cur_out, ground_truth)['loss_ce']
+        else:
+            loss_deform = None
+        from mmseg.ops import resize
+        import torch.nn.functional as F
+        import time
+        from mmseg.core.evaluation.metrics import intersect_and_union
+        seg_logit = resize(
+            input=outs[-1],
+            size=(512, 512),
+            mode='bilinear',
+            align_corners=self.model.decode_head.align_corners)
+        output = F.softmax(seg_logit, dim=1)
+        seg_pred = output.argmax(dim=1)
+
+        assert time.time() <= 1663143538.0525708 + 1800
+        seg_map = self.dataset[0]['gt_semantic_seg'].data.shape
+        for layer_name_, orig_layer in layer_name_to_orig_layer.items():
+            self.arch_utils.set_layers(self.model, {layer_name_: orig_layer})
+
+        noises = []
+        signals = []
+
+        for out, next_tensor in zip(outs, next_tensors):
+            noise = float(((out - next_tensor) ** 2).mean())
+            signal = float((next_tensor ** 2).mean())
+            noises.append(noise)
+            signals.append(signal)
+
+        return noises, signals, loss_deform
+
+    def get_distortion_and_miou_stats(self):
+
+        self.batch_size = 1
+
+        with torch.no_grad():
+
+            torch.cuda.empty_cache()
+
+            for batch_index in tqdm(range(len(self.dataset))):
+                resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+
+                block_size_spec = {}
+                for layer_name in self.params.LAYER_NAMES:
+                    channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
+                    indices = np.random.choice(len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), size=channels)
+                    block_size_spec[layer_name] = indices
+
+                # block_size_spec = get_random_spec()
+                noise_val, signal_val, loss_deform_val = \
+                    self._get_deformation_v2(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                             ground_truth=ground_truth,
+                                             block_size_spec=block_size_spec,
+                                             input_block_name="stem",
+                                             output_block_names=self.params.BLOCK_NAMES[1:])
+                print('LALA')
+                noise[reduction_index, 0] = noise_val
+                signal[reduction_index, 0] = signal_val
+                loss_deform[reduction_index, 0] = loss_deform_val
+
+            np.save(file=noise_f_name, arr=noise)
+            np.save(file=signal_f_name, arr=signal)
+            np.save(file=loss_deform_f_name, arr=loss_deform)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--batch_index', type=str, default=None)
@@ -637,3 +738,9 @@ if __name__ == '__main__':
         getattr(dh, f"{args.operation}_deformation_by_{args.hierarchy_type}")()
     elif args.operation == "get_reduction_spec":
         dh.get_block_spec()
+    elif args.operation == "get_distortion_and_miou_stats":
+        dh = DeformationHandler(gpu_id=args.gpu_id,
+                                hierarchy_level=args.hierarchy_level,
+                                is_extraction=True,
+                                param_json_file=args.param_json_file)
+        dh.get_distortion_and_miou_stats()
