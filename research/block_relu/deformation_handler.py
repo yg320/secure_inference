@@ -17,7 +17,9 @@ from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find bett
 # TODO: docstring
 # TODO: multiprocess
 # TODO: in mobilnet some layers can be fused
-#
+# TODO: Ideally, channel and layer differentiation won't be part of the api. Mainly, the best thing to do is to divide the network log2(num_of_channels) and run with it. Keeping in mind that the proxy layer is the same. and to obviously acount for the different resolutions.
+# TODO: block_size_spec should be the same as reduction_spec
+
 # HOUR = 3600
 # am7_1 = 1661659248.5575001
 # am7_2 = am7_1 + 24 * HOUR
@@ -40,7 +42,9 @@ class DeformationHandler:
         self.device = f"cuda:{gpu_id}"
 
         self.params = ParamsFactory()(param_json_file)
-        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3/deformations", self.params.DATASET, self.params.BACKBONE)
+        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3_tmp/deformations", self.params.DATASET, self.params.BACKBONE)
+        import time
+        assert time.time() <= 1663565856.948121 + 1800
         self.arch_utils = ArchUtilsFactory()(self.params.BACKBONE)
 
         self.batch_size = 8
@@ -368,8 +372,7 @@ class DeformationHandler:
             input_path = input_path_format.format(layer_name)
             output_path = output_path_format.format(layer_name)
 
-            if len(self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[
-                       layer_name]) <= self.hierarchy_level:
+            if len(self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name]) <= self.hierarchy_level + 1:
                 continue
 
             os.makedirs(output_path, exist_ok=True)
@@ -377,13 +380,13 @@ class DeformationHandler:
             num_groups_prev = self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name][self.hierarchy_level]
             num_groups_curr = self.params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS[layer_name][self.hierarchy_level + 1]
             block_size_index_to_reduction = 1 / np.prod(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), axis=1)
-            redundancy_arr_path = os.path.join(output_path, f"redundancy_arr_{layer_name}.npy")
-            reduction_to_block_size_new_path = os.path.join(output_path, f"reduction_to_block_sizes_{layer_name}.npy")
-            deformation_index_to_reduction_path = os.path.join(output_path, f"deformation_index_to_reduction_{layer_name}.npy")
+            redundancy_arr_path = os.path.join(output_path, f"redundancy_arr.npy")
+            reduction_to_block_size_new_path = os.path.join(output_path, f"reduction_to_block_sizes.npy")
+            deformation_index_to_reduction_path = os.path.join(output_path, f"deformation_index_to_reduction.npy")
             # if os.path.exists(reduction_to_block_size_new_path) and os.path.exists(redundancy_arr_path):
             #     continue
             reduction_to_block_size = np.load(
-                os.path.join(prev_input_path, f"reduction_to_block_sizes_{layer_name}.npy"))
+                os.path.join(prev_input_path, f"reduction_to_block_sizes.npy"))
 
             # if False: #num_groups_prev == num_groups_curr:
             #     files = glob.glob(os.path.join(input_path, f"loss_deform_{layer_name}_batch_*.npy"))
@@ -711,6 +714,46 @@ class DeformationHandler:
             np.save(file=signal_f_name, arr=signal)
             np.save(file=loss_deform_f_name, arr=loss_deform)
 
+    def foo(self):
+        resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+
+        output_path = os.path.join(self.deformation_base_path, "block")
+        os.makedirs(output_path, exist_ok=True)
+
+        layer_name = "layer2_2_2"
+
+        with torch.no_grad():
+
+            torch.cuda.empty_cache()
+
+            layer_block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+            layer_num_channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
+
+            assert layer_block_sizes[0][0] == 1 and layer_block_sizes[0][1] == 1
+
+            cur_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
+            next_block_name = self.params.IN_LAYER_PROXY_SPEC[layer_name]
+
+            noise = np.zeros(shape=(len(layer_block_sizes), len(layer_block_sizes), len(layer_block_sizes)))
+
+            block_sizes = [(i, j, k) for i in range(len(layer_block_sizes)) for j in range(len(layer_block_sizes)) for k in range(len(layer_block_sizes))]
+
+            for block_size_index_channel_1, block_size_index_channel_2, block_size_index_channel_3 in tqdm(block_sizes):
+
+                block_size_indices = np.zeros(shape=layer_num_channels, dtype=np.int32)
+                block_size_indices[0] = block_size_index_channel_1
+                block_size_indices[1] = block_size_index_channel_2
+                block_size_indices[2] = block_size_index_channel_3
+
+                noise_val, _, _ = \
+                    self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                          ground_truth=ground_truth,
+                                          loss_ce=loss_ce,
+                                          block_size_spec={layer_name: block_size_indices},
+                                          input_block_name=cur_block_name,
+                                          output_block_name=next_block_name)
+
+                noise[block_size_index_channel_1, block_size_index_channel_2, block_size_index_channel_3] = noise_val
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
