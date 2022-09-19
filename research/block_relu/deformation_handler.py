@@ -865,7 +865,65 @@ class DeformationHandler:
                 np.save(file=os.path.join(self.deformation_base_path, "noise_vector_single.npy"), arr=noise_vector_single)
                 np.save(file=os.path.join(self.deformation_base_path, "noise_vector_agg.npy"), arr=noise_vector_agg)
 
+    def foo_3(self, batch_index):
+        resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
+        output_path = os.path.join(self.deformation_base_path, "block")
+        os.makedirs(output_path, exist_ok=True)
+
+        noise_vector_single = []
+        noise_vector_agg = []
+
+        channel_ord_to_layer_name = np.hstack([self.params.LAYER_NAME_TO_CHANNELS[layer_name] * [layer_name] for layer_name in self.params.LAYER_NAMES])
+        channel_ord_to_channel_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_CHANNELS[layer_name]) for layer_name in self.params.LAYER_NAMES])
+
+        layer_reduction_indices_spec = {
+            layer_name:
+                [np.argwhere(np.all(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) == [2, 2], axis=1))[
+                     0, 0],
+                 np.argwhere(np.all(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) == [3, 3], axis=1))[
+                     0, 0],
+                 np.argwhere(np.all(np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) == [4, 4], axis=1))[
+                     0, 0]]
+            for layer_name in self.params.LAYER_NAMES}
+
+        num_channels = len(channel_ord_to_layer_name)
+        num_channel_to_add_noise_to = np.random.randint(low=0, high=num_channels)
+
+
+        channel_sample = np.random.choice(num_channels, size=num_channel_to_add_noise_to, replace=False)
+        layer_and_channels = [(channel_ord_to_layer_name[x], channel_ord_to_channel_index[x]) for x in channel_sample]
+        block_size_pseudo_indices = np.random.choice(3, size=num_channel_to_add_noise_to, replace=True)
+        block_size_spec = {layer_name: np.zeros(shape=(self.params.LAYER_NAME_TO_CHANNELS[layer_name],)) for layer_name in self.params.LAYER_NAMES}
+
+        for (layer_name, channel), pseudo_index in zip(layer_and_channels, block_size_pseudo_indices):
+            block_size_spec[layer_name][channel] = layer_reduction_indices_spec[layer_name][pseudo_index]
+
+
+
+        with torch.no_grad():
+            noise_agg, _, _ = \
+                self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                      ground_truth=ground_truth,
+                                      loss_ce=loss_ce,
+                                      block_size_spec=block_size_spec,
+                                      input_block_name="stem",
+                                      output_block_name=None)
+
+            noise_agg = 0
+            for (layer_name, channel), pseudo_index in zip(layer_and_channels, block_size_pseudo_indices):
+                block_size_indices = np.zeros(shape=self.params.LAYER_NAME_TO_CHANNELS[layer_name], dtype=np.int32)
+                block_size_indices[channel] =  layer_reduction_indices_spec[layer_name][pseudo_index]
+
+                noise, _, _ = \
+                    self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                          ground_truth=ground_truth,
+                                          loss_ce=loss_ce,
+                                          block_size_spec={layer_name: block_size_indices},
+                                          input_block_name="stem",
+                                          output_block_name=None)
+
+                noise_agg += noise
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--batch_index', type=str, default=None)
