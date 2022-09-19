@@ -35,19 +35,20 @@ from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find bett
 #     return is_1_night or is_2_night
 
 class DeformationHandler:
-    def __init__(self, gpu_id, hierarchy_level, is_extraction, param_json_file):
+    def __init__(self, gpu_id, hierarchy_level, is_extraction, param_json_file, batch_size=8):
 
         self.gpu_id = gpu_id
         self.hierarchy_level = hierarchy_level
         self.device = f"cuda:{gpu_id}"
 
         self.params = ParamsFactory()(param_json_file)
-        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3_tmp/deformations", self.params.DATASET, self.params.BACKBONE)
-        import time
-        assert time.time() <= 1663565856.948121 + 1800
+        self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3/deformations", self.params.DATASET, self.params.BACKBONE)
+
+        # import time
+        # assert time.time() <= 1663565856.948121 + 3600 + 3600 + 3600 + 3600
         self.arch_utils = ArchUtilsFactory()(self.params.BACKBONE)
 
-        self.batch_size = 8
+        self.batch_size = batch_size
         self.im_size = 512
 
         if is_extraction:
@@ -714,7 +715,7 @@ class DeformationHandler:
             np.save(file=signal_f_name, arr=signal)
             np.save(file=loss_deform_f_name, arr=loss_deform)
 
-    def foo(self):
+    def foo(self, batch_index):
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
 
         output_path = os.path.join(self.deformation_base_path, "block")
@@ -734,16 +735,55 @@ class DeformationHandler:
             cur_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
             next_block_name = self.params.IN_LAYER_PROXY_SPEC[layer_name]
 
-            noise = np.zeros(shape=(len(layer_block_sizes), len(layer_block_sizes), len(layer_block_sizes)))
 
-            block_sizes = [(i, j, k) for i in range(len(layer_block_sizes)) for j in range(len(layer_block_sizes)) for k in range(len(layer_block_sizes))]
-
-            for block_size_index_channel_1, block_size_index_channel_2, block_size_index_channel_3 in tqdm(block_sizes):
-
+            block_index_to_use = [0, 78]
+            noise = np.zeros(shape=[len(block_index_to_use)] * 20)
+            block_sizes = [(i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16, i17, i18, i19)
+                           for i0 in  range(2)
+                           for i1 in  range(2)
+                           for i2 in  range(2)
+                           for i3 in  range(2)
+                           for i4 in  range(2)
+                           for i5 in  range(2)
+                           for i6 in  range(2)
+                           for i7 in  range(2)
+                           for i8 in  range(2)
+                           for i9 in  range(2)
+                           for i10 in range(2)
+                           for i11 in range(2)
+                           for i12 in range(2)
+                           for i13 in range(2)
+                           for i14 in range(2)
+                           for i15 in range(2)
+                           for i16 in range(2)
+                           for i17 in range(2)
+                           for i18 in range(2)
+                           for i19 in range(2)
+                           ]
+            counter = 0
+            for i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16, i17, i18, i19  in tqdm(block_sizes):
+                counter += 1
                 block_size_indices = np.zeros(shape=layer_num_channels, dtype=np.int32)
-                block_size_indices[0] = block_size_index_channel_1
-                block_size_indices[1] = block_size_index_channel_2
-                block_size_indices[2] = block_size_index_channel_3
+                block_size_indices[0] = block_index_to_use[i0]
+                block_size_indices[1] = block_index_to_use[i1]
+                block_size_indices[2] = block_index_to_use[i2]
+                block_size_indices[3] = block_index_to_use[i3]
+                block_size_indices[4] = block_index_to_use[i4]
+                block_size_indices[5] = block_index_to_use[i5]
+                block_size_indices[6] = block_index_to_use[i6]
+                block_size_indices[7] = block_index_to_use[i7]
+                block_size_indices[8] = block_index_to_use[i8]
+                block_size_indices[9] = block_index_to_use[i9]
+                block_size_indices[10] = block_index_to_use[i10]
+                block_size_indices[11] = block_index_to_use[i11]
+                block_size_indices[12] = block_index_to_use[i12]
+                block_size_indices[13] = block_index_to_use[i13]
+                block_size_indices[14] = block_index_to_use[i14]
+                block_size_indices[15] = block_index_to_use[i15]
+                block_size_indices[16] = block_index_to_use[i16]
+                block_size_indices[17] = block_index_to_use[i17]
+                block_size_indices[18] = block_index_to_use[i18]
+                block_size_indices[19] = block_index_to_use[i19]
 
                 noise_val, _, _ = \
                     self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
@@ -753,22 +793,103 @@ class DeformationHandler:
                                           input_block_name=cur_block_name,
                                           output_block_name=next_block_name)
 
-                noise[block_size_index_channel_1, block_size_index_channel_2, block_size_index_channel_3] = noise_val
+                noise[i0, i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12, i13, i14, i15, i16, i17, i18, i19] = noise_val
+
+                if counter %(4**8) == 0:
+                    np.save(file=os.path.join(self.deformation_base_path, "tmp_3.npy"), arr=noise)
+            np.save(file=os.path.join(self.deformation_base_path, "tmp_3.npy"), arr=noise)
+
+    def foo_2(self, batch_index):
+        resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+
+        output_path = os.path.join(self.deformation_base_path, "block")
+        os.makedirs(output_path, exist_ok=True)
+
+        noise_vector_single = []
+        noise_vector_agg = []
+        block_size_spec = {}
+
+        layer_names = [
+            "layer2_0_1",
+            "layer2_0_2",
+            "layer2_0_3",
+            "layer2_1_1",
+            "layer2_1_2",
+            "layer2_1_3",
+            "layer2_2_1",
+            "layer2_2_2",
+            "layer2_2_3",
+            "layer2_3_1",
+            "layer2_3_2",
+            "layer2_3_3",
+        ]
+        init_block = "layer2_0"
+        with torch.no_grad():
+
+            torch.cuda.empty_cache()
+            for layer_name in layer_names:
+                layer_block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+                layer_num_channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
+                block_to_use = np.argwhere(np.all(np.array(layer_block_sizes) == [2, 2], axis=1))[0,0]
+                agg_block_size_indices = np.zeros(shape=layer_num_channels, dtype=np.int32)
+
+                for channel in tqdm(range(layer_num_channels)):
+
+                    block_size_indices = np.zeros(shape=layer_num_channels, dtype=np.int32)
+                    block_size_indices[channel] = block_to_use
+                    agg_block_size_indices[channel] = block_to_use
+
+                    noise_val, _, _ = \
+                        self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                              ground_truth=ground_truth,
+                                              loss_ce=loss_ce,
+                                              block_size_spec={layer_name: block_size_indices},
+                                              input_block_name=init_block,
+                                              output_block_name=None)
+
+                    noise_vector_single.append(noise_val)
+
+                    block_size_spec[layer_name] = agg_block_size_indices
+
+                    noise_val, _, _ = \
+                        self._get_deformation(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                              ground_truth=ground_truth,
+                                              loss_ce=loss_ce,
+                                              block_size_spec=block_size_spec,
+                                              input_block_name=init_block,
+                                              output_block_name=None)
+
+                    noise_vector_agg.append(noise_val)
+
+
+                np.save(file=os.path.join(self.deformation_base_path, "noise_vector_single.npy"), arr=noise_vector_single)
+                np.save(file=os.path.join(self.deformation_base_path, "noise_vector_agg.npy"), arr=noise_vector_agg)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--batch_index', type=str, default=None)
     parser.add_argument('--gpu_id', type=int, default=None)
+    # parser.add_argument('--batch_index', type=str, default=0)
+    # parser.add_argument('--gpu_id', type=int, default=0)
     parser.add_argument('--hierarchy_level', type=int, default=0)
     parser.add_argument('--hierarchy_type', type=str, default="blocks")
     parser.add_argument('--operation', type=str, default="extract")
     parser.add_argument('--param_json_file', type=str)
+    # parser.add_argument('--param_json_file', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/block_relu/distortion_handler_configs/resnet_COCO_164K_8_hierarchies.json")
     args = parser.parse_args()
 
     dh = DeformationHandler(gpu_id=args.gpu_id,
                             hierarchy_level=args.hierarchy_level,
                             is_extraction=args.operation == "extract",
                             param_json_file=args.param_json_file)
+    # dh = DeformationHandler(batch_size=8,
+    #                         gpu_id=args.gpu_id,
+    #                         hierarchy_level=args.hierarchy_level,
+    #                         is_extraction=args.operation == "extract",
+    #                         param_json_file=args.param_json_file)
+    # dh.foo_2(0)
+    # assert False
     # dh.collect_deformation_by_layers()
     # dh.get_block_spec()
     # dh.get_block_spec_v2()
