@@ -12,6 +12,11 @@ from research.block_relu.utils import get_model, get_data, center_crop, ArchUtil
 from research.block_relu.params import ParamsFactory
 
 from research.pipeline.backbones.secure_resnet import MyResNet # TODO: find better way to init
+
+from mmseg.ops import resize
+import torch.nn.functional as F
+from mmseg.core import intersect_and_union
+
 # TODO: add typing
 # TODO: pandas
 # TODO: docstring
@@ -654,22 +659,29 @@ class DeformationHandler:
             loss_deform = self.model.decode_head.losses(cur_out, ground_truth)['loss_ce']
         else:
             loss_deform = None
-        from mmseg.ops import resize
-        import torch.nn.functional as F
-        import time
-        from mmseg.core.evaluation.metrics import intersect_and_union
+
+        for layer_name_, orig_layer in layer_name_to_orig_layer.items():
+            self.arch_utils.set_layers(self.model, {layer_name_: orig_layer})
+
+
         seg_logit = resize(
             input=outs[-1],
             size=(512, 512),
             mode='bilinear',
             align_corners=self.model.decode_head.align_corners)
         output = F.softmax(seg_logit, dim=1)
-        seg_pred = output.argmax(dim=1)
 
-        assert time.time() <= 1663143538.0525708 + 1800
-        seg_map = self.dataset[0]['gt_semantic_seg'].data.shape
-        for layer_name_, orig_layer in layer_name_to_orig_layer.items():
-            self.arch_utils.set_layers(self.model, {layer_name_: orig_layer})
+        seg_pred = output.argmax(dim=1)
+        # seg_map = self.dataset[0]['gt_semantic_seg'].data
+
+        results = [intersect_and_union(
+            seg_pred.cpu().numpy(),
+            ground_truth[0].cpu().numpy(),
+            len(self.dataset.CLASSES),
+            self.dataset.ignore_index,
+            label_map=dict(),
+            reduce_zero_label=self.dataset.reduce_zero_label)]
+        metric = self.dataset.evaluate(results, **{'metric': ['mIoU']})['mIoU']
 
         noises = []
         signals = []
@@ -680,40 +692,110 @@ class DeformationHandler:
             noises.append(noise)
             signals.append(signal)
 
-        return noises, signals, loss_deform
+        return noises, signals, loss_deform, metric
 
+    def get_random_spec(self):
+        channel_ord_to_layer_name = np.hstack([self.params.LAYER_NAME_TO_CHANNELS[layer_name] * [layer_name] for layer_name in self.params.LAYER_NAMES])
+        channel_ord_to_channel_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_CHANNELS[layer_name]) for layer_name in self.params.LAYER_NAMES])
+        num_channels = len(channel_ord_to_layer_name)
+
+        layers_to_noise = ["stem_2",
+                           "stem_5",
+                           "stem_8",
+                           "layer1_0_1",
+                           "layer1_0_2",
+                           "layer1_0_3",
+                           "layer1_1_1",
+                           "layer1_1_2",
+                           "layer1_1_3",
+                           "layer1_2_1",
+                           "layer1_2_2",
+                           "layer1_2_3",
+                           "layer2_0_1",
+                           "layer2_0_2",
+                           "layer2_0_3",
+                           "layer2_1_1",
+                           "layer2_1_2",
+                           "layer2_1_3",
+                           "layer2_2_1",
+                           "layer2_2_2",
+                           "layer2_2_3",
+                           "layer2_3_1",
+                           "layer2_3_2",
+                           "layer2_3_3", ]
+
+        num_channel_to_add_noise_to = num_channels #// 2  # np.random.randint(low=0, high=num_channels)
+        channel_sample = np.random.choice(num_channels, size=num_channel_to_add_noise_to, replace=False)
+        layer_and_channels = [(channel_ord_to_layer_name[x], channel_ord_to_channel_index[x]) for x in channel_sample]
+        # block_size_pseudo_indices = np.random.choice(5, size=num_channel_to_add_noise_to, replace=True)
+        block_size_indices = [np.random.randint(1, len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])) for
+                              layer_name, _ in layer_and_channels]
+        block_size_spec = {
+            layer_name: np.zeros(shape=(self.params.LAYER_NAME_TO_CHANNELS[layer_name],), dtype=np.int32) for
+            layer_name in self.params.LAYER_NAMES if layer_name in layers_to_noise}
+
+        for index, (layer_name, channel) in zip(block_size_indices, layer_and_channels):
+            if layer_name in layers_to_noise:
+                block_size_spec[layer_name][channel] = index
+
+        return block_size_spec
     def get_distortion_and_miou_stats(self):
 
         self.batch_size = 1
-
+        os.makedirs(self.deformation_base_path, exist_ok=True)
         with torch.no_grad():
 
             torch.cuda.empty_cache()
+            channel_ord_to_layer_name = np.hstack([self.params.LAYER_NAME_TO_CHANNELS[layer_name] * [layer_name] for layer_name in self.params.LAYER_NAMES])
+            channel_ord_to_channel_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_CHANNELS[layer_name]) for layer_name in self.params.LAYER_NAMES])
 
-            for batch_index in tqdm(range(len(self.dataset))):
-                resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+            num_channels = len(channel_ord_to_layer_name)
+            results_noise = []
+            results_orig = []
+            while True:
+                for batch_index in tqdm(range(len(self.dataset))):
+                    resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+                    # num_channel_to_add_noise_to = num_channels // 2  # np.random.randint(low=0, high=num_channels)
+                    # sample_id = np.random.randint(0, self.batch_size)
+                    block_size_spec = self.get_random_spec()
+                    # channel_sample = np.random.choice(num_channels, size=num_channel_to_add_noise_to, replace=False)
+                    # layer_and_channels = [(channel_ord_to_layer_name[x], channel_ord_to_channel_index[x]) for x in channel_sample]
+                    # # block_size_pseudo_indices = np.random.choice(5, size=num_channel_to_add_noise_to, replace=True)
+                    # block_size_indices = [np.random.randint(1, len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])) for layer_name, _ in layer_and_channels]
+                    # block_size_spec = {
+                    #     layer_name: np.zeros(shape=(self.params.LAYER_NAME_TO_CHANNELS[layer_name],), dtype=np.int32) for
+                    #     layer_name in self.params.LAYER_NAMES}
+                    #
+                    # for index, (layer_name, channel) in zip(block_size_indices, layer_and_channels):
+                    #     block_size_spec[layer_name][channel] = index
 
-                block_size_spec = {}
-                for layer_name in self.params.LAYER_NAMES:
-                    channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
-                    indices = np.random.choice(len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), size=channels)
-                    block_size_spec[layer_name] = indices
+                    # for layer_name in self.params.LAYER_NAMES:
+                    #     channels = self.params.LAYER_NAME_TO_CHANNELS[layer_name]
+                    #     indices = np.random.choice(len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]), size=channels)
+                    #     block_size_spec[layer_name] = indices
 
-                # block_size_spec = get_random_spec()
-                noise_val, signal_val, loss_deform_val = \
-                    self._get_deformation_v2(resnet_block_name_to_activation=resnet_block_name_to_activation,
-                                             ground_truth=ground_truth,
-                                             block_size_spec=block_size_spec,
-                                             input_block_name="stem",
-                                             output_block_names=self.params.BLOCK_NAMES[1:])
-                print('LALA')
-                noise[reduction_index, 0] = noise_val
-                signal[reduction_index, 0] = signal_val
-                loss_deform[reduction_index, 0] = loss_deform_val
+                    # block_size_spec = get_random_spec()
+                    try:
+                        results_noise.append(
+                            self._get_deformation_v2(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                                     ground_truth=ground_truth,
+                                                     block_size_spec=block_size_spec,
+                                                     input_block_name="stem",
+                                                     output_block_names=self.params.BLOCK_NAMES[1:]))
 
-            np.save(file=noise_f_name, arr=noise)
-            np.save(file=signal_f_name, arr=signal)
-            np.save(file=loss_deform_f_name, arr=loss_deform)
+                        results_orig.append(
+                            self._get_deformation_v2(resnet_block_name_to_activation=resnet_block_name_to_activation,
+                                                     ground_truth=ground_truth,
+                                                     block_size_spec={},
+                                                     input_block_name="stem",
+                                                     output_block_names=self.params.BLOCK_NAMES[1:]))
+                    except:
+                        pass
+                        print('LALA')
+                    #
+                    if batch_index % 10 == 0:
+                        pickle.dump(obj=results_noise, file=open(os.path.join(self.deformation_base_path, "results_noise.pickle"), 'wb'))
+                        pickle.dump(obj=results_orig, file=open(os.path.join(self.deformation_base_path, "results_orig.pickle"), 'wb'))
 
     def foo(self, batch_index):
         resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
@@ -951,9 +1033,15 @@ if __name__ == '__main__':
     parser.add_argument('--hierarchy_level', type=int, default=0)
     parser.add_argument('--hierarchy_type', type=str, default="blocks")
     parser.add_argument('--operation', type=str, default="extract")
+    # parser.add_argument('--operation', type=str, default="get_distortion_and_miou_stats")
     parser.add_argument('--param_json_file', type=str)
     # parser.add_argument('--param_json_file', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/block_relu/distortion_handler_configs/resnet_COCO_164K_8_hierarchies.json")
     args = parser.parse_args()
+    # dh = DeformationHandler(gpu_id=args.gpu_id,
+    #                         hierarchy_level=args.hierarchy_level,
+    #                         is_extraction=True,
+    #                         param_json_file=args.param_json_file)
+    # dh.get_distortion_and_miou_stats()
 
     dh = DeformationHandler(gpu_id=args.gpu_id,
                             hierarchy_level=args.hierarchy_level,
