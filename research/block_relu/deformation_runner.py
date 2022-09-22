@@ -25,7 +25,7 @@ l = list(set(map(len, params.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GR
 l = [max(l)]
 print(l)
 #
-for hierarchy_level in range(6, l[0]):
+for hierarchy_level in range(8, l[0]):
 
     params_0 = ["--batch_index", "0,2", "--gpu_id", "0", "--hierarchy_type", "channels","--hierarchy_level", f"{hierarchy_level}",
                 "--operation", "extract", "--param_json_file", param_json_file]

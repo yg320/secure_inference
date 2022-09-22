@@ -146,6 +146,8 @@ def get_data(dataset):
 
 
 def center_crop(tensor, size):
+    if tensor.shape[1] < size or tensor.shape[2] < size:
+        raise ValueError
     h = (tensor.shape[1] - size) // 2
     w = (tensor.shape[2] - size) // 2
     return tensor[:, h:h + size, w:w + size]
