@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from mmseg.core import intersect_and_union
 import contextlib
 from research.block_relu.params import MobileNetV2Params
-
+from functools import lru_cache
 @contextlib.contextmanager
 def model_block_relu_transform(model, relu_spec, arch_utils, params):
 
@@ -234,6 +234,145 @@ class DistortionStatistics:
     #         signals.append(signal)
     #
     #     return noises, signals, loss, mIoU
+
+    def get_expected_distortion(self, seed):
+        np.random.seed(seed)
+        block_size_spec = get_random_spec(self.params.LAYER_NAMES, self.params)
+
+        num_samples = 64
+        batch_size = 8
+
+        batch_indices = np.arange(num_samples)
+        num_batches = num_samples // batch_size
+
+        losses_baseline = np.zeros(shape=(num_batches, batch_size))
+        losses_distorted = np.zeros(shape=(num_batches, batch_size))
+        mIoUs_baseline = np.zeros(shape=(num_batches, batch_size))
+        mIoUs_distorted = np.zeros(shape=(num_batches, batch_size))
+        noises_distorted = np.zeros(shape=(num_batches, batch_size))
+        signals_distorted = np.zeros(shape=(num_batches, batch_size))
+
+        with torch.no_grad():
+            for cur_batch_index, cur_batch_indices in enumerate(np.array_split(batch_indices, num_batches)):
+
+                torch.cuda.empty_cache()
+
+                # Baseline
+                batch, ground_truth = self.get_samples(cur_batch_indices)
+                resnet_block_name_to_activation_baseline, cur_losses, cur_mIoUs = \
+                    self.get_activations(input_block_name=self.params.BLOCK_NAMES[0],
+                                         input_tensor=batch,
+                                         output_block_names=self.params.BLOCK_NAMES[:-1],
+                                         model=self.model,
+                                         ground_truth=ground_truth)
+
+                losses_baseline[cur_batch_index] = cur_losses
+                mIoUs_baseline[cur_batch_index] = cur_mIoUs
+
+                with model_block_relu_transform(self.model, block_size_spec, self.arch_utils, self.params) as noisy_model:
+                    resnet_block_name_to_activation_distorted, cur_losses, cur_mIoUs = \
+                        self.get_activations(input_block_name=self.params.BLOCK_NAMES[0],
+                                             input_tensor=batch,
+                                             output_block_names=['decode'],
+                                             model=noisy_model,
+                                             ground_truth=ground_truth)
+
+                losses_distorted[cur_batch_index] = cur_losses
+                mIoUs_distorted[cur_batch_index] = cur_mIoUs
+
+                noises, signals = self.get_distortion(
+                    resnet_block_name_to_activation_baseline=resnet_block_name_to_activation_baseline,
+                    resnet_block_name_to_activation_distorted=resnet_block_name_to_activation_distorted)
+
+                noises_distorted[cur_batch_index] = noises["decode"]
+                signals_distorted[cur_batch_index] = signals["decode"]
+
+        assets = {
+            "losses_baseline": losses_baseline,
+            "losses_distorted": losses_distorted,
+            "mIoUs_baseline": mIoUs_baseline,
+            "mIoUs_distorted": mIoUs_distorted,
+            "noises_distorted": noises_distorted,
+            "signals_distorted": signals_distorted,
+        }
+        return assets
+
+    @lru_cache(maxsize=1)
+    def get_samples_and_activations(self, batch, batch_size, im_size):
+        batch_indices = np.arange(batch*batch_size, batch*batch_size + batch_size)
+        batch, ground_truth = self.get_samples(batch_indices, im_size=im_size)
+        resnet_block_name_to_activation_baseline, cur_losses, cur_mIoUs = \
+            self.get_activations(input_block_name=self.params.BLOCK_NAMES[0],
+                                 input_tensor=batch,
+                                 output_block_names=self.params.BLOCK_NAMES[:-1],
+                                 model=self.model,
+                                 ground_truth=ground_truth)
+
+        return batch, ground_truth, resnet_block_name_to_activation_baseline, cur_losses, cur_mIoUs
+
+    def get_estimated_distortion(self, seed, batch_index=0, batch_size=64):
+        num_of_splits = 40
+
+        np.random.seed(seed)
+        block_size_spec = get_random_spec(self.params.LAYER_NAMES, self.params)
+        split_block_size_specs = split_size_spec(self.params, block_size_spec, num_of_splits, "by_layer")
+
+        noises_additive = np.zeros(shape=(num_of_splits,  batch_size))
+        signals_additive = np.zeros(shape=(num_of_splits, batch_size))
+        loss_additive = np.zeros(shape=(num_of_splits, batch_size))
+        mIoU_additive = np.zeros(shape=(num_of_splits, batch_size))
+
+        with torch.no_grad():
+            torch.cuda.empty_cache()
+
+            # Baseline
+            batch, ground_truth, resnet_block_name_to_activation_baseline, estimated_losses_baseline, estimated_mIoUs_baseline =\
+                self.get_samples_and_activations(batch=batch_index, batch_size=batch_size, im_size=128)
+
+
+            for spec_index, cur_spec in enumerate(split_block_size_specs):
+                with model_block_relu_transform(self.model,
+                                                cur_spec,
+                                                self.arch_utils, self.params) as noisy_model:
+                    keys = list(cur_spec.keys())
+                    assert len(keys) == 1
+                    layer_name = keys[0]
+                    layer_block = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
+                    layer_block_index = np.argwhere(np.array(self.params.BLOCK_NAMES) == layer_block)[0, 0]
+                    input_block_name = self.params.BLOCK_NAMES[layer_block_index]
+
+                    if layer_block_index == 0:
+                        input_tensor = batch
+                    else:
+                        prev_block_name = self.params.BLOCK_NAMES[layer_block_index - 1]
+                        input_tensor = resnet_block_name_to_activation_baseline[prev_block_name]
+
+                    resnet_block_name_to_activation_distorted, layer_loss_distorted, layer_mIoU_distorted = \
+                        self.get_activations(input_block_name=input_block_name,
+                                             input_tensor=input_tensor,
+                                             output_block_names=['decode'],
+                                             model=noisy_model,
+                                             ground_truth=ground_truth)
+
+                noises, signals = self.get_distortion(
+                    resnet_block_name_to_activation_baseline=resnet_block_name_to_activation_baseline,
+                    resnet_block_name_to_activation_distorted=resnet_block_name_to_activation_distorted)
+
+                noises_additive[spec_index] = noises['decode']
+                signals_additive[spec_index] = signals['decode']
+                loss_additive[spec_index] = layer_loss_distorted
+                mIoU_additive[spec_index] = layer_mIoU_distorted
+
+        assets = {
+            "estimated_losses_baseline": estimated_losses_baseline,
+            "estimated_mIoUs_baseline": estimated_mIoUs_baseline,
+            "noises_additive": noises_additive,
+            "signals_additive": signals_additive,
+            "loss_additive": loss_additive,
+            "mIoU_additive": mIoU_additive,
+        }
+
+        return assets
 
     def get_network_additivity(self, seed, batch_size, num_batches, num_of_splits, split_type="random"):
 
@@ -522,7 +661,7 @@ if __name__ == '__main__':
                             im_size=im_size,
                             output_block_names=output_block_names)
                         pickle.dump(file=open(out_file,'wb'), obj=out)
-    elif True:
+    elif False:
         gpu_id = 1
         dh = DistortionStatistics(gpu_id=gpu_id)
         out_dir = f"/home/yakir/distortion_approximation/get_network_additivity_by_layer_batch_large/"
@@ -532,7 +671,7 @@ if __name__ == '__main__':
             assets = dh.get_network_additivity(seed=seed, batch_size=8, num_batches=16, num_of_splits=len(dh.params.LAYER_NAMES), split_type="by_layer")
             file_name = os.path.join(out_dir, f"{seed}.pickle")
             pickle.dump(obj=assets, file=open(file_name, 'wb'))
-    else:
+    elif False:
         gpu_id = 1
         dh = DistortionStatistics(gpu_id=gpu_id)
         out_dir = f"/home/yakir/distortion_approximation/get_network_additivity/"
@@ -542,7 +681,23 @@ if __name__ == '__main__':
             assets = dh.get_network_additivity(seed=seed, batch_size=8, num_batches=4, num_of_splits=200)
             file_name = os.path.join(out_dir, f"{seed}.pickle")
             pickle.dump(obj=assets, file=open(file_name, 'wb'))
+    else:
+        gpu_id = 1
+        dh = DistortionStatistics(gpu_id=gpu_id)
+        out_dir = f"/home/yakir/distortion_approximation/estimation/"
+        os.makedirs(out_dir, exist_ok=True)
+        for seed in tqdm(np.arange(gpu_id, 1000000, 2)):
+            # expected_distortion_assets = dh.get_expected_distortion(seed)
+            assets = dh.get_estimated_distortion(seed)
+            # assets = {"expected":expected_distortion_assets, "estimated":estimated_distortion_assets}
+            file_name = os.path.join(out_dir, f"{seed}.pickle")
+            pickle.dump(obj=assets, file=open(file_name, 'wb'))
 
+
+            print('hey')
+            # assets = dh.get_network_additivity(seed=seed, batch_size=8, num_batches=4, num_of_splits=200)
+            # file_name = os.path.join(out_dir, f"{seed}.pickle")
+            # pickle.dump(obj=assets, file=open(file_name, 'wb'))
         # layer_name_to_assets = dict()
         # for layer_name in dh.params.LAYER_NAMES[::4]:
         #     layer_name_to_assets[layer_name] = dh.get_additive_sample_estimation(seed=seed,
