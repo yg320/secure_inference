@@ -228,6 +228,12 @@ class ResNetUtils(ArchUtils):
             activation = model.backbone.maxpool(activation)
         elif block_name == "decode":
             activation = model.decode_head([None, None, None, activation])
+
+        #     activation = model.decode_head._forward_feature([None, None, None, activation])
+        #
+        # elif block_name == "cls_decode":
+        #     activation = model.decode_head.cls_seg(activation)
+
         else:
             res_layer_name, block_name = block_name.split("_")
             layer = getattr(model.backbone, res_layer_name)

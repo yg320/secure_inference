@@ -19,15 +19,32 @@ from mmseg.core import intersect_and_union
 import contextlib
 from research.block_relu.params import MobileNetV2Params
 from functools import lru_cache
+
+LEVEL_TO_BLOCK_SIZE = \
+    {
+        0: [[i, j] for i in range(1, 3) for j in range(1, 3)],
+        1: [[i, j] for i in range(1, 5) for j in range(1, 5)],
+        2: [[i, j] for i in range(1, 9) for j in range(1, 9)],
+        3: [[i, j] for i in range(1, 17) for j in range(1, 17)],
+        4: [[i, j] for i in range(1, 33) for j in range(1, 33)],
+    }
+
+
 @contextlib.contextmanager
 def model_block_relu_transform(model, relu_spec, arch_utils, params):
 
     layer_name_to_orig_layer = {}
-    for layer_name, block_size_indices in relu_spec.items():
+    for layer_name, block_size_info in relu_spec.items():
+        if type(block_size_info) is tuple:
+            block_size_indices, block_sizes = block_size_info
+        else:
+            block_size_indices = block_size_info
+            block_sizes = params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+
         orig_layer = arch_utils.get_layer(model, layer_name)
         layer_name_to_orig_layer[layer_name] = orig_layer
 
-        arch_utils.set_bReLU_layers(model, {layer_name: (block_size_indices, params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])})
+        arch_utils.set_bReLU_layers(model, {layer_name: (block_size_indices, block_sizes)})
 
     yield model
 
@@ -101,6 +118,17 @@ def get_random_spec(seed, layer_names, params, channel_count=None):
             layer_spec = np.zeros(shape=params.LAYER_NAME_TO_CHANNELS[layer_name], dtype=np.int32)
             layer_spec[channels] = values
             block_size_spec[layer_name] = layer_spec
+
+    return block_size_spec
+
+
+def get_random_spec_v2(seed, layer_names, params, level=None):
+    np.random.seed(seed)
+    if level is None:
+        level = np.random.randint(low=0, high=5)
+    block_size_spec = {layer_name: (np.random.randint(low=0, high=len(LEVEL_TO_BLOCK_SIZE[level]),
+                                                     size=params.LAYER_NAME_TO_CHANNELS[layer_name]), LEVEL_TO_BLOCK_SIZE[level]) for layer_name in
+                       layer_names}
 
     return block_size_spec
 
@@ -296,7 +324,7 @@ class DistortionStatistics:
 
         return input_tensor, input_block_name, output_block_names
 
-    def get_batch_distortion(self, block_size_spec, batch_index, batch_size=8, im_size=512, output_block_ind=None):
+    def get_batch_distortion(self, block_size_spec, batch_index, batch_size=8, im_size=512, output_block_names=None):
 
         with torch.no_grad():
             torch.cuda.empty_cache()
@@ -306,12 +334,10 @@ class DistortionStatistics:
 
             with model_block_relu_transform(self.model, block_size_spec, self.arch_utils, self.params) as noisy_model:
 
-                input_tensor, input_block_name, output_block_names = self.get_inputs(block_size_spec, batch, resnet_block_name_to_activation_baseline)
+                input_tensor, input_block_name, suggested_output_block_names = self.get_inputs(block_size_spec, batch, resnet_block_name_to_activation_baseline)
 
-                if output_block_ind is not None:
-                    output_block_names = [output_block_names[index] for index in output_block_ind]
-                    if len(output_block_names) > 1:
-                        assert False, "sort me"
+                if output_block_names is None:
+                    output_block_names = suggested_output_block_names
                 resnet_block_name_to_activation_distorted, losses_distorted, mIoUs_distorted = \
                     self.get_activations(input_block_name=input_block_name,
                                          input_tensor=input_tensor,
@@ -687,7 +713,7 @@ class DistortionStatistics:
 if __name__ == '__main__':
     # Image size, Batch size, Layer of distortion
 
-    action = "by_layer_additivity"
+    action = "by_layer_additivity_v2"
 
     if action == "baseline_distortion":
         gpu_id = 1
@@ -708,10 +734,7 @@ if __name__ == '__main__':
     if action == "by_layer_baseline_distortion":
         gpu_id = 1
         dh = DistortionStatistics(gpu_id=gpu_id)
-        # layer_names = ['layer2_1_1', 'layer3_2_1', 'layer4_1_0', 'layer5_0_0', 'layer6_2_0']
-        # layer_names = ['decode_3', 'layer2_1_1', 'layer6_1_0', 'layer3_0_1', 'layer3_2_0', 'layer3_2_1', 'layer6_2_1', 'layer4_3_1', 'layer5_0_0', 'layer5_1_0', 'layer4_0_1', 'layer4_1_0', 'layer1_0_0', 'layer5_2_1', 'layer4_2_0', 'decode_0', 'layer6_2_0', 'layer2_1_0']
         layer_names = ['layer1_0_0', 'layer4_2_1', 'layer5_0_1', 'decode_3', 'layer6_0_1', 'layer7_0_1', 'layer4_1_0', 'layer3_0_1', 'layer4_3_1', 'layer6_2_0', 'layer4_0_1', 'layer5_1_1', 'layer6_1_1', 'layer2_1_1', 'layer2_0_1', 'layer4_1_1', 'layer3_1_1', 'layer5_0_0', 'layer3_2_1', 'layer5_2_1']
-
 
         out_dir = f"/home/yakir/distortion_approximation_v2/by_layer_baseline_distortion/"
         os.makedirs(out_dir, exist_ok=True)
@@ -730,24 +753,80 @@ if __name__ == '__main__':
         gpu_id = 1
         dh = DistortionStatistics(gpu_id=gpu_id)
 
-        layer_names = ['layer1_0_0', 'layer4_2_1', 'layer5_0_1', 'decode_3', 'layer6_0_1', 'layer7_0_1', 'layer4_1_0', 'layer3_0_1', 'layer4_3_1', 'layer6_2_0', 'layer4_0_1', 'layer5_1_1', 'layer6_1_1', 'layer2_1_1', 'layer2_0_1', 'layer4_1_1', 'layer3_1_1', 'layer5_0_0', 'layer3_2_1', 'layer5_2_1']
         out_dir = f"/home/yakir/distortion_approximation_v2/by_layer_additivity/"
         os.makedirs(out_dir, exist_ok=True)
 
         for seed in np.arange(gpu_id, 1000000, 2):
-            for batch_index in range(1):#, desc=f"seed={seed}":
+            for batch_index in tqdm(range(4), desc=f"seed={seed}"):
                 block_size_spec = get_random_spec(seed, layer_names=dh.params.LAYER_NAMES, params=dh.params)
-                for layer_name in tqdm(layer_names, desc=f"seed={seed}"):
+                for layer_name in dh.params.LAYER_NAMES[:28]:
                     file_name = os.path.join(out_dir, f"{layer_name}_{seed}_{batch_index}.pickle")
-                    cur_block_size_spec = {layer_name:block_size_spec[layer_name]}
+                    cur_block_size_spec = {layer_name: block_size_spec[layer_name]}
+
+                    block_name = dh.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
+                    block_index = dh.params.BLOCK_NAMES_TO_BLOCK_INDEX[block_name]
+                    block_indices = [block_index, block_index + 1, block_index + 2, block_index + 3]
+                    block_names = [dh.params.BLOCK_NAMES[index] for index in block_indices]
+
                     if not os.path.exists(file_name):
-                        assets = dh.get_batch_distortion(cur_block_size_spec, batch_index, batch_size=8, im_size=512, output_block_ind=[0])
+                        assets = dh.get_batch_distortion(cur_block_size_spec, batch_index, batch_size=8, im_size=512)
                         additive_assets = []
                         additive_block_size_spec = {layer_name: np.zeros_like(block_size_spec[layer_name])}
                         for channel_index, channel_value in enumerate(block_size_spec[layer_name]):
                             additive_block_size_spec[layer_name][channel_index] = channel_value
-                            additive_assets.append(dh.get_batch_distortion(additive_block_size_spec, batch_index, batch_size=8, im_size=512, output_block_ind=[0]))
+                            additive_assets.append(dh.get_batch_distortion(additive_block_size_spec, batch_index, batch_size=8, im_size=512, output_block_names=block_names))
                             additive_block_size_spec[layer_name][channel_index] = 0
+
+                        pickle.dump(obj={"assets":assets, "additive_assets":additive_assets}, file=open(file_name, 'wb'))
+
+    if action == "between_layers_additivity":
+        gpu_id = 1
+        dh = DistortionStatistics(gpu_id=gpu_id)
+
+        out_dir = f"/home/yakir/distortion_approximation_v2/between_layers_additivity/"
+        os.makedirs(out_dir, exist_ok=True)
+
+        for seed in np.arange(gpu_id, 1000000, 2):
+            for batch_index in range(1):
+                file_name = os.path.join(out_dir, f"{seed}_{batch_index}.pickle")
+
+                block_size_spec = get_random_spec(seed, layer_names=dh.params.LAYER_NAMES, params=dh.params)
+                assets = dh.get_batch_distortion(block_size_spec, batch_index, batch_size=8, im_size=512)
+
+                layers_asset = []
+                for layer_name in tqdm(dh.params.LAYER_NAMES, desc=f"seed={seed}"):
+                    layers_asset.append(dh.get_batch_distortion({layer_name: block_size_spec[layer_name]}, batch_index, batch_size=8, im_size=512))
+
+                pickle.dump(obj={"assets": assets, "layers_asset": layers_asset}, file=open(file_name, 'wb'))
+
+    if action == "by_layer_additivity_v2":
+        gpu_id = 1
+        dh = DistortionStatistics(gpu_id=gpu_id)
+
+        out_dir = f"/home/yakir/distortion_approximation_v2/by_layer_additivity_v2/"
+        os.makedirs(out_dir, exist_ok=True)
+
+        for seed in np.arange(gpu_id, 1000000, 2):
+            for batch_index in tqdm(range(2), desc=f"seed={seed}"):
+                block_size_spec = get_random_spec_v2(seed, layer_names=dh.params.LAYER_NAMES, params=dh.params)
+
+                for layer_name in dh.params.LAYER_NAMES[:28]:
+                    file_name = os.path.join(out_dir, f"{layer_name}_{seed}_{batch_index}.pickle")
+                    cur_block_size_spec = {layer_name: block_size_spec[layer_name]}
+
+                    block_name = dh.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
+                    block_index = dh.params.BLOCK_NAMES_TO_BLOCK_INDEX[block_name]
+                    block_indices = [block_index, block_index + 1, block_index + 2, block_index + 3]
+                    block_names = [dh.params.BLOCK_NAMES[index] for index in block_indices]
+
+                    if not os.path.exists(file_name):
+                        assets = dh.get_batch_distortion(cur_block_size_spec, batch_index, batch_size=8, im_size=512)
+                        additive_assets = []
+                        additive_block_size_spec = {layer_name: (np.zeros_like(block_size_spec[layer_name][0]), block_size_spec[layer_name][1])}
+                        for channel_index, channel_value in enumerate(block_size_spec[layer_name][0]):
+                            additive_block_size_spec[layer_name][0][channel_index] = channel_value
+                            additive_assets.append(dh.get_batch_distortion(additive_block_size_spec, batch_index, batch_size=8, im_size=512, output_block_names=block_names))
+                            additive_block_size_spec[layer_name][0][channel_index] = 0
 
                         pickle.dump(obj={"assets":assets, "additive_assets":additive_assets}, file=open(file_name, 'wb'))
 

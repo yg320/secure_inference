@@ -341,7 +341,29 @@ class MobileNetV2Params:
                 "decode",
                 None
             ]
-
+        self.BLOCK_NAMES_TO_BLOCK_INDEX = \
+            {
+                "conv1":0,
+                "layer1_0":1,
+                "layer2_0":2,
+                "layer2_1":3,
+                "layer3_0":4,
+                "layer3_1":5,
+                "layer3_2":6,
+                "layer4_0":7,
+                "layer4_1":8,
+                "layer4_2":9,
+                "layer4_3":10,
+                "layer5_0":11,
+                "layer5_1":12,
+                "layer5_2":13,
+                "layer6_0":14,
+                "layer6_1":15,
+                "layer6_2":16,
+                "layer7_0":17,
+                "decode":18,
+                None:19,
+            }
         self.LAYER_NAME_TO_BLOCK_NAME = \
             {
                 'conv1': 'conv1',
@@ -704,6 +726,7 @@ class ResNetParams:
             'layer4_1',
             'layer4_2',
             'decode',
+            # 'cls_decode',
             None
         ]
 

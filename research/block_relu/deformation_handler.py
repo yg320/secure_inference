@@ -507,6 +507,7 @@ class DeformationHandler:
 
             for layer_group_index, layer_group in enumerate(self.params.LAYER_HIERARCHY_SPEC[self.hierarchy_level]):
 
+                assert False, "Fix this assumption"
                 layer_name_of_first_layer_in_group = layer_group[0]
                 # layer_group_name = f"hierarchy_{self.hierarchy_level}_group_{layer_group_index}"
                 noise_f_name, signal_f_name, loss_deform_f_name, noise, signal, loss_deform = \
@@ -568,7 +569,7 @@ class DeformationHandler:
                 pickle.dump(obj=red_spec, file=f)
 
     def collect_deformation_by_layers(self):
-        assert False
+        assert False, "Account for the different last folder"
         cache_dir = "/home/yakir/Data2/cache"
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)

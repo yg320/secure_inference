@@ -17,19 +17,18 @@ from mmseg.core import intersect_and_union
 
 
 class DistortionStatistics:
-    def __init__(self, gpu_id, param_json_file, batch_size=8):
+    def __init__(self, gpu_id, run_index, param_json_file, batch_size=8):
 
         self.gpu_id = gpu_id
         self.device = f"cuda:{gpu_id}"
-
+        self.run_index = run_index
         self.params = ParamsFactory()(param_json_file)
         self.deformation_base_path = os.path.join("/home/yakir/Data2/assets_v3/distortion_statistics_exploration", self.params.DATASET, self.params.BACKBONE)
 
         self.arch_utils = ArchUtilsFactory()(self.params.BACKBONE)
 
-        self.batch_size = batch_size
         self.im_size = 512
-
+        self.batch_size = batch_size
         self.model = get_model(
             config=self.params.CONFIG,
             gpu_id=self.gpu_id,
@@ -55,7 +54,26 @@ class DistortionStatistics:
             loss_ce = self.model.decode_head.losses(activations[-1], ground_truth)['loss_ce'].cpu()
             resnet_block_name_to_activation = dict(zip(self.params.BLOCK_NAMES, activations))
 
-            return resnet_block_name_to_activation, ground_truth, loss_ce
+            seg_logit = resize(
+                input=activations[-1],
+                size=(512, 512),
+                mode='bilinear',
+                align_corners=self.model.decode_head.align_corners)
+            output = F.softmax(seg_logit, dim=1)
+
+            seg_pred = output.argmax(dim=1)
+
+            results = [intersect_and_union(
+                seg_pred.cpu().numpy(),
+                ground_truth[:,0].cpu().numpy(),
+                len(self.dataset.CLASSES),
+                self.dataset.ignore_index,
+                label_map=dict(),
+                reduce_zero_label=self.dataset.reduce_zero_label)]
+
+            mIoU = self.dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU']
+
+            return resnet_block_name_to_activation, ground_truth, loss_ce, mIoU
 
     def _get_deformation_v2(self, resnet_block_name_to_activation, ground_truth, block_size_spec, input_block_name, output_block_names):
 
@@ -74,10 +92,13 @@ class DistortionStatistics:
                                                                        self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])})
 
         cur_out = input_tensor
+        # cur_out = cur_out + (torch.randn(size=input_tensor.shape).to(cur_out.device) * cur_out.std() * 0.2)
         outs = []
 
         for block_index in range(input_block_index, max(output_block_indices)):
             cur_out = self.arch_utils.run_model_block(self.model, cur_out, self.params.BLOCK_NAMES[block_index])
+            # if block_index < 5:
+            #     cur_out = cur_out + (torch.randn(size=cur_out.shape).to(cur_out.device) * cur_out.std() * 0.2)
             outs.append(cur_out)
 
         if output_block_names[-1] is None:
@@ -100,7 +121,7 @@ class DistortionStatistics:
 
         results = [intersect_and_union(
             seg_pred.cpu().numpy(),
-            ground_truth[0].cpu().numpy(),
+            ground_truth[:, 0].cpu().numpy(),
             len(self.dataset.CLASSES),
             self.dataset.ignore_index,
             label_map=dict(),
@@ -117,9 +138,11 @@ class DistortionStatistics:
             noises.append(noise)
             signals.append(signal)
 
-        return noises, signals, loss_deform.cpu().numpy(), mIoU.cpu().numpy()
+        return noises, signals, loss_deform.cpu().numpy(), mIoU
 
-    def get_random_spec(self):
+    def get_random_spec(self, seed):
+        np.random.seed(seed)
+
         channel_ord_to_layer_name = np.hstack([self.params.LAYER_NAME_TO_CHANNELS[layer_name] * [layer_name] for layer_name in self.params.LAYER_NAMES])
         channel_ord_to_channel_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_CHANNELS[layer_name]) for layer_name in self.params.LAYER_NAMES])
         num_channels = len(channel_ord_to_layer_name)
@@ -166,32 +189,76 @@ class DistortionStatistics:
         return block_size_spec
 
     def explore_noise_correlation(self):
-        self.batch_size = 1
-        os.makedirs(self.deformation_base_path, exist_ok=True)
+        print(self.gpu_id * 2 + self.run_index)
         with torch.no_grad():
 
             torch.cuda.empty_cache()
 
-            for batch_index in tqdm(range(len(self.dataset))):
+            all_noises = []
+            all_signals = []
+            mIoU_baselines = []
+            mIoU_noises = []
+            losses_baselines = []
+            losses_noises = []
+
+            seed = 0
+            index_start = self.gpu_id * 2 + self.run_index
+            batch_indices = range(len(self.dataset))[index_start::4]
+            for batch_index in tqdm(batch_indices):
                 try:
-                    resnet_block_name_to_activation, ground_truth, loss_ce = self.get_activations(batch_index)
+                    resnet_block_name_to_activation, ground_truth, loss_baseline, mIoU_baseline = self.get_activations(batch_index)
                 except ValueError:
                     continue
 
-                block_size_spec = self.get_random_spec()
+                block_size_spec = self.get_random_spec(seed)
+                seed += 1
 
-                noises, signals, loss_deform, mIoU = self._get_deformation_v2(
+                noises, signals, loss_noise, mIoU_noise = self._get_deformation_v2(
                     resnet_block_name_to_activation=resnet_block_name_to_activation,
                     ground_truth=ground_truth,
                     block_size_spec=block_size_spec,
                     input_block_name="stem",
-                    output_block_names=[None])
+                    output_block_names=self.params.BLOCK_NAMES[1:])
 
+                all_noises.append(noises)
+                all_signals.append(signals)
 
+                mIoU_baselines.append(mIoU_baseline)
+                mIoU_noises.append(mIoU_noise)
 
+                losses_baselines.append(loss_baseline)
+                losses_noises.append(loss_noise)
 
+                if seed % 100 == 0:
+
+                    mIoU_baselines_arr = np.array(mIoU_baselines)
+                    mIoU_noises_arr = np.array(mIoU_noises)
+
+                    losses_baselines_arr = np.array(losses_baselines)
+                    losses_noises_arr = np.array(losses_noises)
+
+                    all_noises_arr = np.array(all_noises)
+                    all_signals_arr = np.array(all_signals)
+
+                    np.save(file=f"/home/yakir/tmp/{index_start}_mIoU_baselines_arr.npy", arr=mIoU_baselines_arr)
+                    np.save(file=f"/home/yakir/tmp/{index_start}_mIoU_noises_arr.npy", arr=mIoU_noises_arr)
+                    np.save(file=f"/home/yakir/tmp/{index_start}_losses_baselines_arr.npy", arr=losses_baselines_arr)
+                    np.save(file=f"/home/yakir/tmp/{index_start}_losses_noises_arr.npy", arr=losses_noises_arr)
+                    np.save(file=f"/home/yakir/tmp/{index_start}_all_noises_arr.npy", arr=all_noises_arr)
+                    np.save(file=f"/home/yakir/tmp/{index_start}_all_signals_arr.npy", arr=all_signals_arr)
+
+                    # distortion = all_noises_arr / all_signals_arr
+                    #
+                    # mat = np.zeros(shape=(19,19))
+                    # for i in range(19):
+                    #     for j in range(19):
+                    #         mat[i,j] = np.corrcoef(distortion[:,i], distortion[:,j])[0,1]
+                    #
+                    # plt.imshow(mat)
+                    # plt.plot((1/distortion).mean(axis=0))
 if __name__ == '__main__':
-    dh = DistortionStatistics(gpu_id=0,
+    dh = DistortionStatistics(gpu_id=1,
+                              run_index=1,
                               param_json_file="/home/yakir/PycharmProjects/secure_inference/research/block_relu/distortion_handler_configs/resnet_COCO_164K_8_hierarchies.json")
 
     dh.explore_noise_correlation()
