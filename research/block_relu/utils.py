@@ -10,37 +10,71 @@ import numpy as np
 from mmseg.datasets import build_dataset
 
 
+# class BlockRelu(Module):
+#
+#     def __init__(self, block_size_indices, block_sizes):
+#         super(BlockRelu, self).__init__()
+#         self.block_size_indices = block_size_indices
+#         self.active_block_indices = np.unique(self.block_size_indices)
+#         self.block_sizes = block_sizes
+#
+#     def forward(self, activation):
+#
+#         with torch.no_grad():
+#             relu_map = torch.zeros_like(activation)
+#             relu_map[:, self.block_size_indices == 0] = \
+#                 activation[:, self.block_size_indices == 0].sign().add_(1).div_(2)
+#
+#             for block_size_index in self.active_block_indices:
+#                 if block_size_index == 0:
+#                     continue
+#                 if block_size_index in self.active_block_indices:
+#                     channels = self.block_size_indices == block_size_index
+#                     cur_input = activation[:, channels]
+#
+#                     avg_pool = torch.nn.AvgPool2d(
+#                         kernel_size=self.block_sizes[block_size_index],
+#                         stride=self.block_sizes[block_size_index], ceil_mode=True)
+#
+#                     cur_relu_map = avg_pool(cur_input).sign_().add_(1).div_(2)
+#                     o = F.interpolate(input=cur_relu_map, scale_factor=self.block_sizes[block_size_index])
+#                     relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
+#
+#                     torch.cuda.empty_cache()
+#         return relu_map.mul_(activation)
+#
+
 class BlockRelu(Module):
 
-    def __init__(self, block_size_indices, block_sizes):
+    def __init__(self, block_sizes):
         super(BlockRelu, self).__init__()
-        self.block_size_indices = block_size_indices
-        self.active_block_indices = np.unique(self.block_size_indices)
-        self.block_sizes = block_sizes
+        self.block_sizes = np.array(block_sizes)
+        self.active_block_sizes = np.unique(self.block_sizes, axis=0)
 
     def forward(self, activation):
 
         with torch.no_grad():
+
+            regular_relu_channels = np.all(self.block_sizes == [1, 1], axis=1)
             relu_map = torch.zeros_like(activation)
-            relu_map[:, self.block_size_indices == 0] = \
-                activation[:, self.block_size_indices == 0].sign().add_(1).div_(2)
+            relu_map[:, regular_relu_channels] = activation[:, regular_relu_channels].sign().add_(1).div_(2)
 
-            for block_size_index in self.active_block_indices:
-                if block_size_index == 0:
+            for block_size in self.active_block_sizes:
+                if np.all(block_size == [1, 1]):
                     continue
-                if block_size_index in self.active_block_indices:
-                    channels = self.block_size_indices == block_size_index
-                    cur_input = activation[:, channels]
 
-                    avg_pool = torch.nn.AvgPool2d(
-                        kernel_size=self.block_sizes[block_size_index],
-                        stride=self.block_sizes[block_size_index], ceil_mode=True)
+                channels = np.all(self.block_sizes == block_size, axis=1)
+                cur_input = activation[:, channels]
 
-                    cur_relu_map = avg_pool(cur_input).sign_().add_(1).div_(2)
-                    o = F.interpolate(input=cur_relu_map, scale_factor=self.block_sizes[block_size_index])
-                    relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
+                avg_pool = torch.nn.AvgPool2d(
+                    kernel_size=tuple(block_size),
+                    stride=tuple(block_size), ceil_mode=True)
 
-                    torch.cuda.empty_cache()
+                cur_relu_map = avg_pool(cur_input).sign_().add_(1).div_(2)
+                o = F.interpolate(input=cur_relu_map, scale_factor=tuple(block_size))
+                relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
+
+                torch.cuda.empty_cache()
         return relu_map.mul_(activation)
 
 
@@ -160,11 +194,9 @@ class ArchUtils:
         for layer_name, layer in layer_names_to_layers.items():
             self.set_layer(model, layer_name, layer)
 
-    def set_bReLU_layers(self, model, layer_name_to_block_size_indices_and_block_sizes):
-        layer_name_to_layers = {layer_name: BlockRelu(block_size_indices=block_size_indices, block_sizes=block_sizes)
-                                for
-                                layer_name, (block_size_indices, block_sizes) in
-                                layer_name_to_block_size_indices_and_block_sizes.items()}
+    def set_bReLU_layers(self, model, layer_name_to_block_sizes):
+        layer_name_to_layers = {layer_name: BlockRelu(block_sizes=block_sizes)
+                                for layer_name, block_sizes in layer_name_to_block_sizes.items()}
         self.set_layers(model, layer_name_to_layers)
 class MobileNetUtils(ArchUtils):
     def __init__(self):
