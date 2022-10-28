@@ -316,6 +316,288 @@ class Params:
         self.LAYER_HIERARCHY_SPEC = LAYER_HIERARCHY_SPEC
 
 
+class MobileNetV2_256_Params:
+    def __init__(self):
+        self.BACKBONE = "MobileNetV2"
+
+        self.BLOCK_NAMES = \
+            [
+                "conv1",
+                "layer1_0",
+                "layer2_0",
+                "layer2_1",
+                "layer3_0",
+                "layer3_1",
+                "layer3_2",
+                "layer4_0",
+                "layer4_1",
+                "layer4_2",
+                "layer4_3",
+                "layer5_0",
+                "layer5_1",
+                "layer5_2",
+                "layer6_0",
+                "layer6_1",
+                "layer6_2",
+                "layer7_0",
+                "decode",
+                None
+            ]
+
+        self.LAYER_NAME_TO_BLOCK_NAME = \
+            {
+                'conv1': 'conv1',
+                'layer1_0_0': 'layer1_0',
+                'layer2_0_0': 'layer2_0',
+                'layer2_0_1': 'layer2_0',
+                'layer2_1_0': 'layer2_1',
+                'layer2_1_1': 'layer2_1',
+                'layer3_0_0': 'layer3_0',
+                'layer3_0_1': 'layer3_0',
+                'layer3_1_0': 'layer3_1',
+                'layer3_1_1': 'layer3_1',
+                'layer3_2_0': 'layer3_2',
+                'layer3_2_1': 'layer3_2',
+                'layer4_0_0': 'layer4_0',
+                'layer4_0_1': 'layer4_0',
+                'layer4_1_0': 'layer4_1',
+                'layer4_1_1': 'layer4_1',
+                'layer4_2_0': 'layer4_2',
+                'layer4_2_1': 'layer4_2',
+                'layer4_3_0': 'layer4_3',
+                'layer4_3_1': 'layer4_3',
+                'layer5_0_0': 'layer5_0',
+                'layer5_0_1': 'layer5_0',
+                'layer5_1_0': 'layer5_1',
+                'layer5_1_1': 'layer5_1',
+                'layer5_2_0': 'layer5_2',
+                'layer5_2_1': 'layer5_2',
+                'layer6_0_0': 'layer6_0',
+                'layer6_0_1': 'layer6_0',
+                'layer6_1_0': 'layer6_1',
+                'layer6_1_1': 'layer6_1',
+                'layer6_2_0': 'layer6_2',
+                'layer6_2_1': 'layer6_2',
+                'layer7_0_0': 'layer7_0',
+                'layer7_0_1': 'layer7_0',
+                'decode_0': 'decode',
+                'decode_1': 'decode',
+                'decode_2': 'decode',
+                'decode_3': 'decode',
+                'decode_4': 'decode',
+                'decode_5': 'decode'
+            }
+
+        self.LAYER_NAMES = \
+            [
+                "conv1",  # self.conv1.activate
+
+                "layer1_0_0",  # layer1[0].conv[0].activate
+                # "layer1_0_1",
+
+                "layer2_0_0",  # layer2[0].conv[0].activate
+                "layer2_0_1",  # layer2[0].conv[1].activate
+                # "layer2_0_2",
+
+                "layer2_1_0",  # layer2[1].conv[0].activate
+                "layer2_1_1",  # layer2[1].conv[1].activate
+                # "layer2_1_2",
+
+                "layer3_0_0",  # layer3[0].conv[0].activate
+                "layer3_0_1",  # layer3[0].conv[1].activate
+                # "layer3_0_2",
+
+                "layer3_1_0",  # layer3[1].conv[0].activate
+                "layer3_1_1",  # layer3[1].conv[1].activate
+                # "layer3_1_2",
+
+                "layer3_2_0",  # layer3[2].conv[0].activate
+                "layer3_2_1",  # layer3[2].conv[1].activate
+                # "layer3_2_2",
+
+                "layer4_0_0",  # layer4[0].conv[0].activate
+                "layer4_0_1",  # layer4[0].conv[1].activate
+                # "layer4_0_2",
+
+                "layer4_1_0",  # layer4[1].conv[0].activate
+                "layer4_1_1",  # layer4[1].conv[1].activate
+                # "layer4_1_2",
+
+                "layer4_2_0",  # layer4[2].conv[0].activate
+                "layer4_2_1",  # layer4[2].conv[1].activate
+                # "layer4_2_2",
+
+                "layer4_3_0",  # layer4[3].conv[0].activate
+                "layer4_3_1",  # layer4[3].conv[1].activate
+                # "layer4_3_2",
+
+                "layer5_0_0",  # layer5[0].conv[0].activate
+                "layer5_0_1",  # layer5[0].conv[1].activate
+                # "layer5_0_2",
+
+                "layer5_1_0",  # layer5[1].conv[0].activate
+                "layer5_1_1",  # layer5[1].conv[1].activate
+                # "layer5_1_2",
+
+                "layer5_2_0",  # layer5[2].conv[0].activate
+                "layer5_2_1",  # layer5[2].conv[1].activate
+                # "layer5_2_2",
+
+                "layer6_0_0",  # layer6[0].conv[0].activate
+                "layer6_0_1",  # layer6[0].conv[1].activate
+                # "layer6_0_2",
+
+                "layer6_1_0",  # layer6[1].conv[0].activate
+                "layer6_1_1",  # layer6[1].conv[1].activate
+                # "layer6_1_2",
+
+                "layer6_2_0",  # layer6[2].conv[0].activate
+                "layer6_2_1",  # layer6[2].conv[1].activate
+                # "layer6_2_2",
+
+                "layer7_0_0",  # layer7[0].conv[0].activate
+                "layer7_0_1",  # layer7[0].conv[1].activate
+                # "layer7_0_2",
+                "decode_0",
+                "decode_1",
+                "decode_2",
+                "decode_3",
+                "decode_4",
+                "decode_5",
+            ]
+
+        self.IN_LAYER_PROXY_SPEC = \
+            {
+                'conv1': 'layer4_0',
+                'layer1_0_0': 'layer4_0',
+                'layer2_0_0': 'layer4_0',
+                'layer2_0_1': 'layer4_0',
+                'layer2_1_0': 'layer4_0',
+                'layer2_1_1': 'layer4_0',
+                'layer3_0_0': 'layer4_0',
+                'layer3_0_1': 'layer4_0',
+                'layer3_1_0': 'layer4_0',
+                'layer3_1_1': 'layer4_0',
+                'layer3_2_0': 'layer4_0',
+                'layer3_2_1': 'layer4_0',
+                'layer4_0_0': 'layer6_0',
+                'layer4_0_1': 'layer6_0',
+                'layer4_1_0': 'layer6_0',
+                'layer4_1_1': 'layer6_0',
+                'layer4_2_0': 'layer6_0',
+                'layer4_2_1': 'layer6_0',
+                'layer4_3_0': 'layer6_0',
+                'layer4_3_1': 'layer6_0',
+                'layer5_0_0': 'layer6_0',
+                'layer5_0_1': 'layer6_0',
+                'layer5_1_0': 'layer6_0',
+                'layer5_1_1': 'layer6_0',
+                'layer5_2_0': 'layer6_0',
+                'layer5_2_1': 'layer6_0',
+                'layer6_0_0': 'layer7_0',
+                'layer6_0_1': 'layer7_0',
+                'layer6_1_0': 'layer7_0',
+                'layer6_1_1': 'layer7_0',
+                'layer6_2_0': 'layer7_0',
+                'layer6_2_1': 'layer7_0',
+                'layer7_0_0': 'layer7_0',
+                'layer7_0_1': 'layer7_0',
+                'decode_0': "decode",
+                'decode_1': "decode",
+                'decode_2': "decode",
+                'decode_3': "decode",
+                'decode_4': "decode",
+                'decode_5': "decode"
+            }
+
+        self.LAYER_NAME_TO_BLOCK_SIZES = \
+            {
+                'conv1': BLOCK_SIZES_FULL,
+                'layer1_0_0': BLOCK_SIZES_FULL,
+                'layer2_0_0': BLOCK_SIZES_FULL,
+                'layer2_0_1': BLOCK_SIZES_FULL,
+                'layer2_1_0': BLOCK_SIZES_FULL,
+                'layer2_1_1': BLOCK_SIZES_FULL,
+                'layer3_0_0': BLOCK_SIZES_FULL,
+                'layer3_0_1': BLOCK_SIZES_FULL,
+                'layer3_1_0': BLOCK_SIZES_FULL,
+                'layer3_1_1': BLOCK_SIZES_FULL,
+                'layer3_2_0': BLOCK_SIZES_FULL,
+                'layer3_2_1': BLOCK_SIZES_FULL,
+                'layer4_0_0': BLOCK_SIZES_FULL,
+                'layer4_0_1': BLOCK_SIZES_FULL,
+                'layer4_1_0': BLOCK_SIZES_FULL,
+                'layer4_1_1': BLOCK_SIZES_FULL,
+                'layer4_2_0': BLOCK_SIZES_FULL,
+                'layer4_2_1': BLOCK_SIZES_FULL,
+                'layer4_3_0': BLOCK_SIZES_FULL,
+                'layer4_3_1': BLOCK_SIZES_FULL,
+                'layer5_0_0': BLOCK_SIZES_FULL,
+                'layer5_0_1': BLOCK_SIZES_FULL,
+                'layer5_1_0': BLOCK_SIZES_FULL,
+                'layer5_1_1': BLOCK_SIZES_FULL,
+                'layer5_2_0': BLOCK_SIZES_FULL,
+                'layer5_2_1': BLOCK_SIZES_FULL,
+                'layer6_0_0': BLOCK_SIZES_FULL,
+                'layer6_0_1': BLOCK_SIZES_FULL,
+                'layer6_1_0': BLOCK_SIZES_FULL,
+                'layer6_1_1': BLOCK_SIZES_FULL,
+                'layer6_2_0': BLOCK_SIZES_FULL,
+                'layer6_2_1': BLOCK_SIZES_FULL,
+                'layer7_0_0': BLOCK_SIZES_FULL,
+                'layer7_0_1': BLOCK_SIZES_FULL,
+                'decode_0': BLOCK_SIZES_MINI,
+                'decode_1': BLOCK_SIZES_MINI,
+                'decode_2': BLOCK_SIZES_MINI,
+                'decode_3': BLOCK_SIZES_MINI,
+                'decode_4': BLOCK_SIZES_MINI,
+                'decode_5': BLOCK_SIZES_MINI
+            }
+
+        self.BLOCK_INPUT_DICT = \
+            {
+                "conv1": "input_images",
+                "layer1_0": "conv1",
+                "layer2_0": "layer1_0",
+                "layer2_1": "layer2_0",
+                "layer3_0": "layer2_1",
+                "layer3_1": "layer3_0",
+                "layer3_2": "layer3_1",
+                "layer4_0": "layer3_2",
+                "layer4_1": "layer4_0",
+                "layer4_2": "layer4_1",
+                "layer4_3": "layer4_2",
+                "layer5_0": "layer4_3",
+                "layer5_1": "layer5_0",
+                "layer5_2": "layer5_1",
+                "layer6_0": "layer5_2",
+                "layer6_1": "layer6_0",
+                "layer6_2": "layer6_1",
+                "layer7_0": "layer6_2",
+                "decode": "layer7_0",
+                None: "decode"
+            }
+
+        self.LAYER_NAME_TO_DIMS = {'conv1': [32, 256, 256], 'layer1_0_0': [32, 128, 128], 'layer2_0_0': [96, 128, 128],
+                                   'layer2_0_1': [96, 64, 64], 'layer2_1_0': [144, 64, 64], 'layer2_1_1': [144, 64, 64],
+                                   'layer3_0_0': [144, 64, 64], 'layer3_0_1': [144, 32, 32],
+                                   'layer3_1_0': [192, 32, 32], 'layer3_1_1': [192, 32, 32],
+                                   'layer3_2_0': [192, 32, 32], 'layer3_2_1': [192, 32, 32],
+                                   'layer4_0_0': [192, 32, 32], 'layer4_0_1': [192, 32, 32],
+                                   'layer4_1_0': [384, 32, 32], 'layer4_1_1': [384, 32, 32],
+                                   'layer4_2_0': [384, 32, 32], 'layer4_2_1': [384, 32, 32],
+                                   'layer4_3_0': [384, 32, 32], 'layer4_3_1': [384, 32, 32],
+                                   'layer5_0_0': [384, 32, 32], 'layer5_0_1': [384, 32, 32],
+                                   'layer5_1_0': [576, 32, 32], 'layer5_1_1': [576, 32, 32],
+                                   'layer5_2_0': [576, 32, 32], 'layer5_2_1': [576, 32, 32],
+                                   'layer6_0_0': [576, 32, 32], 'layer6_0_1': [576, 32, 32],
+                                   'layer6_1_0': [960, 32, 32], 'layer6_1_1': [960, 32, 32],
+                                   'layer6_2_0': [960, 32, 32], 'layer6_2_1': [960, 32, 32],
+                                   'layer7_0_0': [960, 32, 32], 'layer7_0_1': [960, 32, 32], 'decode_0': [512, 1, 1],
+                                   'decode_1': [512, 32, 32], 'decode_2': [512, 32, 32], 'decode_3': [512, 32, 32],
+                                   'decode_4': [512, 32, 32], 'decode_5': [512, 32, 32]}
+
+
 class MobileNetV2Params:
     def __init__(self):
         self.BLOCK_NAMES = \
@@ -343,27 +625,28 @@ class MobileNetV2Params:
             ]
         self.BLOCK_NAMES_TO_BLOCK_INDEX = \
             {
-                "conv1":0,
-                "layer1_0":1,
-                "layer2_0":2,
-                "layer2_1":3,
-                "layer3_0":4,
-                "layer3_1":5,
-                "layer3_2":6,
-                "layer4_0":7,
-                "layer4_1":8,
-                "layer4_2":9,
-                "layer4_3":10,
-                "layer5_0":11,
-                "layer5_1":12,
-                "layer5_2":13,
-                "layer6_0":14,
-                "layer6_1":15,
-                "layer6_2":16,
-                "layer7_0":17,
-                "decode":18,
-                None:19,
+                "conv1": 0,
+                "layer1_0": 1,
+                "layer2_0": 2,
+                "layer2_1": 3,
+                "layer3_0": 4,
+                "layer3_1": 5,
+                "layer3_2": 6,
+                "layer4_0": 7,
+                "layer4_1": 8,
+                "layer4_2": 9,
+                "layer4_3": 10,
+                "layer5_0": 11,
+                "layer5_1": 12,
+                "layer5_2": 13,
+                "layer6_0": 14,
+                "layer6_1": 15,
+                "layer6_2": 16,
+                "layer7_0": 17,
+                "decode": 18,
+                None: 19,
             }
+
         self.LAYER_NAME_TO_BLOCK_NAME = \
             {
                 'conv1': 'conv1',
@@ -514,8 +797,8 @@ class MobileNetV2Params:
                 'layer5_1_1': 'layer6_1',
                 'layer5_2_0': 'layer6_2',
                 'layer5_2_1': 'layer6_2',
-                'layer6_0_0': 'layer7_0',
-                'layer6_0_1': 'layer7_0',
+                'layer6_0_0': 'decode',
+                'layer6_0_1': 'decode',
                 'layer6_1_0': 'decode',
                 'layer6_1_1': 'decode',
                 'layer6_2_0': 'decode',
@@ -630,12 +913,12 @@ class MobileNetV2Params:
             'layer6_2_1': [48, 16, 8, 4, 2, 1],
             'layer7_0_0': [48, 16, 8, 4, 2, 1],
             'layer7_0_1': [48, 16, 8, 4, 2, 1],
-            'decode_0':   [32, 16, 8, 4, 2, 1],
-            'decode_1':   [32, 16, 8, 4, 2, 1],
-            'decode_2':   [32, 16, 8, 4, 2, 1],
-            'decode_3':   [32, 16, 8, 4, 2, 1],
-            'decode_4':   [32, 16, 8, 4, 2, 1],
-            'decode_5':   [32, 16, 8, 4, 2, 1],
+            'decode_0': [32, 16, 8, 4, 2, 1],
+            'decode_1': [32, 16, 8, 4, 2, 1],
+            'decode_2': [32, 16, 8, 4, 2, 1],
+            'decode_3': [32, 16, 8, 4, 2, 1],
+            'decode_4': [32, 16, 8, 4, 2, 1],
+            'decode_5': [32, 16, 8, 4, 2, 1],
         }
 
         self.LAYER_NAME_TO_RELU_COUNT = {
@@ -688,20 +971,21 @@ class MobileNetV2Params:
             [['conv1', 'layer1_0_0'],
              ['layer2_0_0', 'layer2_0_1', 'layer2_1_0', 'layer2_1_1'],
              ['layer3_0_0', 'layer3_0_1', 'layer3_1_0', 'layer3_1_1', 'layer3_2_0', 'layer3_2_1'],
-             ['layer4_0_0', 'layer4_0_1', 'layer4_1_0', 'layer4_1_1', 'layer4_2_0', 'layer4_2_1', 'layer4_3_0', 'layer4_3_1'],
+             ['layer4_0_0', 'layer4_0_1', 'layer4_1_0', 'layer4_1_1', 'layer4_2_0', 'layer4_2_1', 'layer4_3_0',
+              'layer4_3_1'],
              ['layer5_0_0', 'layer5_0_1', 'layer5_1_0', 'layer5_1_1', 'layer5_2_0', 'layer5_2_1'],
              ['layer6_0_0', 'layer6_0_1', 'layer6_1_0', 'layer6_1_1', 'layer6_2_0', 'layer6_2_1'],
              ['layer7_0_0', 'layer7_0_1'],
-             ['decode_0', 'decode_1', 'decode_2','decode_3', 'decode_4', 'decode_5']],
+             ['decode_0', 'decode_1', 'decode_2', 'decode_3', 'decode_4', 'decode_5']],
 
             [self.LAYER_NAMES]
-
 
         ]
 
 
 class ResNetParams:
-    def __init__(self, HIERARCHY_NAME, LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, LAYER_HIERARCHY_SPEC, DATASET, CONFIG, CHECKPOINT):
+    def __init__(self, HIERARCHY_NAME, LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS, LAYER_HIERARCHY_SPEC,
+                 DATASET, CONFIG, CHECKPOINT):
         self.BACKBONE = "ResNetV1c"
         self.DATASET = DATASET
         self.CONFIG = CONFIG
@@ -1008,12 +1292,14 @@ class ResNetParams:
 
         self.LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS = LAYER_NAME_AND_HIERARCHY_LEVEL_TO_NUM_OF_CHANNEL_GROUPS
 
-        self.LAYER_NAME_TO_LAYER_DIM = {'stem_2': 256, 'stem_5': 256, 'stem_8': 256, 'layer1_0_1': 128,
-                                        'layer1_0_2': 128, 'layer1_0_3': 128, 'layer1_1_1': 128, 'layer1_1_2': 128,
-                                        'layer1_1_3': 128, 'layer1_2_1': 128, 'layer1_2_2': 128, 'layer1_2_3': 128,
-                                        'layer2_0_1': 128, 'layer2_0_2': 64, 'layer2_0_3': 64, 'layer2_1_1': 64,
-                                        'layer2_1_2': 64, 'layer2_1_3': 64, 'layer2_2_1': 64, 'layer2_2_2': 64,
-                                        'layer2_2_3': 64, 'layer2_3_1': 64, 'layer2_3_2': 64, 'layer2_3_3': 64,
+        self.LAYER_NAME_TO_LAYER_DIM = {'stem_2': 256, 'stem_5': 256, 'stem_8': 256,
+                                        'layer1_0_1': 128, 'layer1_0_2': 128, 'layer1_0_3': 128,
+                                        'layer1_1_1': 128, 'layer1_1_2': 128, 'layer1_1_3': 128,
+                                        'layer1_2_1': 128, 'layer1_2_2': 128, 'layer1_2_3': 128,
+                                        'layer2_0_1': 128, 'layer2_0_2': 64, 'layer2_0_3': 64,
+                                        'layer2_1_1': 64, 'layer2_1_2': 64, 'layer2_1_3': 64,
+                                        'layer2_2_1': 64, 'layer2_2_2': 64, 'layer2_2_3': 64,
+                                        'layer2_3_1': 64, 'layer2_3_2': 64, 'layer2_3_3': 64,
                                         'layer3_0_1': 64, 'layer3_0_2': 64, 'layer3_0_3': 64, 'layer3_1_1': 64,
                                         'layer3_1_2': 64, 'layer3_1_3': 64, 'layer3_2_1': 64, 'layer3_2_2': 64,
                                         'layer3_2_3': 64, 'layer3_3_1': 64, 'layer3_3_2': 64, 'layer3_3_3': 64,
@@ -1059,7 +1345,6 @@ class ResNetParams:
 
 class ParamsFactory:
     def __init__(self):
-
         self.classes = {
             "ResNetParams": ResNetParams,
             "MobileNetV2Params": MobileNetV2Params,
