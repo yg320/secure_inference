@@ -13,8 +13,9 @@ params.CONFIG = "/home/yakir/PycharmProjects/secure_inference/research/pipeline/
 params.CHECKPOINT = "/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_m-v2-d8_256x256_160k_ade20k/iter_160000.pth"
 
 
-baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_iter_0123_0.0833.pickle', 'rb'))
+# baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_iter_0123_0.0833.pickle', 'rb'))
 # baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_3x4.pickle', 'rb'))
+baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_2_groups_iter_01_0.0833.pickle', 'rb'))
 
 def get_block_index_to_num_relus(block_sizes, layer_dim):
     block_index_to_num_relus = []
@@ -30,8 +31,9 @@ def get_block_index_to_num_relus(block_sizes, layer_dim):
     W = np.array(block_index_to_num_relus)
     return W
 
+layer_names = [x for x in params.LAYER_NAMES if x in baseline_block_size_spec.keys()]
 layer_ratios = []
-for layer_name in params.LAYER_NAMES:
+for layer_name in layer_names:
     spec = np.array(baseline_block_size_spec[layer_name])
     b_sizes = np.unique(spec, axis=0) #np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
     x = get_block_index_to_num_relus(b_sizes, params.LAYER_NAME_TO_DIMS[layer_name][1])

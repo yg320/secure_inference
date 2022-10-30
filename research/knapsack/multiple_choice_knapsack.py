@@ -1,5 +1,6 @@
 import glob
 import os.path
+import time
 
 import numpy as np
 import torch
@@ -8,67 +9,22 @@ from research.block_relu.params import ResNetParams
 from tqdm import tqdm
 import argparse
 import pickle
+
+time.sleep(7200)
 from research.block_relu.params import ParamsFactory, MobileNetV2_256_Params
+from research.parameters.base import MobileNetV2_256_Params_2_Groups
+import gc
 
-iter_ = 3
-layer_names = [
-    [
-        "conv1",
-        "layer1_0_0",
-        "layer2_0_0",
-        "layer2_0_1",
-        "layer2_1_0",
-        "layer2_1_1",
-        "layer3_0_0",
-        "layer3_0_1",
-        "layer3_1_0",
-        "layer3_1_1",
-        "layer3_2_0",
-        "layer3_2_1",
-    ],
-    [
-        "layer4_0_0",
-        "layer4_0_1",
-        "layer4_1_0",
-        "layer4_1_1",
-        "layer4_2_0",
-        "layer4_2_1",
-        "layer4_3_0",
-        "layer4_3_1",
-        "layer5_0_0",
-        "layer5_0_1",
-        "layer5_1_0",
-        "layer5_1_1",
-        "layer5_2_0",
-        "layer5_2_1",
-    ],
-    [
-        "layer6_0_0",
-        "layer6_0_1",
-        "layer6_1_0",
-        "layer6_1_1",
-        "layer6_2_0",
-        "layer6_2_1",
-        "layer7_0_0",
-        "layer7_0_1"
-    ],
-    [
-        'decode_0',
-        'decode_1',
-        'decode_2',
-        'decode_3',
-        'decode_4',
-        'decode_5'
-    ]
-
-][iter_]
-ratio = 1 / 3 / 4
-
-params = MobileNetV2_256_Params()
+params = MobileNetV2_256_Params_2_Groups()
 params.DATASET = "ade_20k"
 params.CONFIG = "/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/deeplabv3_m-v2-d8_256x256_160k_ade20k.py"
 params.CHECKPOINT = "/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_m-v2-d8_256x256_160k_ade20k/iter_160000.pth"
+channel_distortion_path = "/home/yakir/Data2/assets_v4/distortions/ade_20k/MobileNetV2_256/channels_distortion_2_groups"
+iter_ = 1
+layer_names = params.LAYER_GROUPS[iter_]
 
+
+ratio = 1 / 3 / 4
 def get_block_index_to_num_relus(block_sizes, layer_dim):
     block_index_to_num_relus = []
     for block_size_index, block_size in enumerate(block_sizes):
@@ -92,8 +48,7 @@ for layer_name in layer_names:
 
     W = get_block_index_to_num_relus(block_sizes, layer_dim)
 
-    files = glob.glob(
-        f"/home/yakir/Data2/assets_v4/distortions/ade_20k/MobileNetV2_256/channels_distortion/{layer_name}_*.pickle")
+    files = glob.glob(os.path.join(channel_distortion_path, f"{layer_name}_*.pickle"))
     noise = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
     noise = noise.mean(axis=0).mean(axis=2).T
 
@@ -142,6 +97,12 @@ cur_P = Ps[layer_index]
 offset = 0
 for channel in tqdm(range(1, channels)):
     if channel == sum(channels_batch[:layer_index+1]):
+        files = glob.glob(f"/home/yakir/Data2/dp_data/*.npy")
+        np.save(file=f"/home/yakir/Data2/dp_data/dp_arg_{channel}.npy", arr=dp_arg)
+        np.save(file=f"/home/yakir/Data2/dp_data/dp_{channel}.npy", arr=dp)
+        for f in files:
+            os.remove(f)
+        gc.collect()
         layer_index += 1
         all_indices = np.maximum(np.arange(num_relus)[:, np.newaxis] - Ws[layer_index], 0)
         orig_shape = all_indices.shape
@@ -185,4 +146,14 @@ layer_name_to_block_size = dict()
 for layer_name in layer_names:
     layer_name_to_block_size[layer_name] = block_sizes[cur_chan:cur_chan + params.LAYER_NAME_TO_DIMS[layer_name][0], :]
     cur_chan += params.LAYER_NAME_TO_DIMS[layer_name][0]
-pickle.dump(obj=layer_name_to_block_size, file=open(f"/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_iter_{iter_}_0.0833.pickle", 'wb'))
+pickle.dump(obj=layer_name_to_block_size, file=open(f"/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_2_groups_iter_{iter_}_0.0833.pickle", 'wb'))
+
+
+import pickle
+
+out = {
+    **pickle.load(file=open(f"/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_2_groups_iter_0_0.0833.pickle", 'rb')),
+    **pickle.load(file=open(f"/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_2_groups_iter_1_0.0833.pickle", 'rb')),
+}
+
+pickle.dump(out, open(f"/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_2_groups_iter_01_0.0833.pickle", 'wb'))

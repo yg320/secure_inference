@@ -11,6 +11,7 @@ import shutil
 from research.block_relu.consts import TARGET_REDUCTIONS
 from research.block_relu.utils import get_model, get_data, center_crop, ArchUtilsFactory
 from research.block_relu.params import ParamsFactory, MobileNetV2_256_Params
+from research.parameters.base import MobileNetV2_256_Params_2_Groups
 from research.distortion.distortion_utils import DistortionUtils
 from research.pipeline.backbones.secure_resnet import MyResNet  # TODO: find better way to init
 
@@ -20,12 +21,9 @@ from mmseg.core import intersect_and_union
 import pandas as pd
 
 class ChannelDistortionHandler:
-    def __init__(self, gpu_id, output_path):
+    def __init__(self, gpu_id, output_path, params):
 
-        self.params = MobileNetV2_256_Params()
-        self.params.DATASET = "ade_20k"
-        self.params.CONFIG = "/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/deeplabv3_m-v2-d8_256x256_160k_ade20k.py"
-        self.params.CHECKPOINT = "/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_m-v2-d8_256x256_160k_ade20k/iter_160000.pth"
+        self.params = params
         self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params)
         self.output_path = output_path
 
@@ -69,67 +67,30 @@ class ChannelDistortionHandler:
                 pickle.dump(obj=layer_assets, file=file)
 
 if __name__ == "__main__":
-    # layer_names = [
-    #     "conv1",
-    #     "layer1_0_0",
-    #     "layer2_0_0",
-    #     "layer2_0_1",
-    #     "layer2_1_0",
-    #     "layer2_1_1",
-    #     "layer3_0_0",
-    #     "layer3_0_1",
-    #     "layer3_1_0",
-    #     "layer3_1_1",
-    #     "layer3_2_0",
-    #     "layer3_2_1",
-    # ]
-    # baseline_block_size_spec = dict()
 
-    # layer_names = [
-    #     "layer4_0_0",
-    #     "layer4_0_1",
-    #     "layer4_1_0",
-    #     "layer4_1_1",
-    #     "layer4_2_0",
-    #     "layer4_2_1",
-    #     "layer4_3_0",
-    #     "layer4_3_1",
-    #     "layer5_0_0",
-    #     "layer5_0_1",
-    #     "layer5_1_0",
-    #     "layer5_1_1",
-    #     "layer5_2_0",
-    #     "layer5_2_1",
-    # ]
-    # baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_iter_0_0.0833.pickle', 'rb'))
+    gpu_id = 1
+    params = MobileNetV2_256_Params_2_Groups()
+    params.DATASET = "ade_20k"
+    params.CONFIG = "/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/deeplabv3_m-v2-d8_256x256_160k_ade20k.py"
+    params.CHECKPOINT = "/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_m-v2-d8_256x256_160k_ade20k/iter_160000.pth"
 
-    # layer_names = [
-    #     "layer6_0_0",
-    #     "layer6_0_1",
-    #     "layer6_1_0",
-    #     "layer6_1_1",
-    #     "layer6_2_0",
-    #     "layer6_2_1",
-    #     "layer7_0_0",
-    #     "layer7_0_1"
-    # ]
-    #
-    # baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_iter_01_0.0833.pickle', 'rb'))
+    block_size_spec_f_format = "/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_2_groups_iter_{}_0.0833.pickle"
+    output_path = "/home/yakir/Data2/assets_v4/distortions/ade_20k/MobileNetV2_256/channels_distortion_2_groups"
 
-    layer_names = [
-        'decode_0',
-        # 'decode_1',
-        # 'decode_2',
-        # 'decode_3',
-        # 'decode_4',
-        # 'decode_5'
-    ]
+    iter_ = 1
+    layer_names = params.LAYER_GROUPS[iter_]
+    if iter_ == 0:
+        baseline_block_size_spec = dict()
+    else:
+        baseline_block_size_spec = pickle.load(open(block_size_spec_f_format.format(iter_-1), 'rb'))
 
-    baseline_block_size_spec = pickle.load(open('/home/yakir/Data2/block_relu_specs/deeplabv3_m-v2-d8_256x256_160k_ade20k_iter_012_0.0833.pickle', 'rb'))
+    if "decode_0" in layer_names:
+        layer_names.remove("decode_0")
+    chd = ChannelDistortionHandler(gpu_id=gpu_id,
+                                   output_path=output_path,
+                                   params=params)
 
-
-    chd = ChannelDistortionHandler(gpu_id=0, output_path="/home/yakir/Data2/assets_v4/distortions/ade_20k/MobileNetV2_256/channels_distortion")
-    chd.extract_deformation_by_blocks(batch_index=0,
+    chd.extract_deformation_by_blocks(batch_index=gpu_id,
                                       layer_names=layer_names,
                                       batch_size=16,
                                       baseline_block_size_spec=baseline_block_size_spec)
