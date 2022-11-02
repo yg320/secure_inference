@@ -5,7 +5,7 @@ model = dict(
     backbone=dict(
         type='MobileNetV2',
         widen_factor=1.0,
-        strides=(1, 2, 2, 1, 1, 1, 1),
+        strides=(2, 2, 2, 1, 1, 1, 1),
         dilations=(1, 1, 1, 2, 2, 4, 4),
         out_indices=(1, 2, 4, 6)),
     decode_head=dict(
@@ -75,8 +75,8 @@ test_pipeline = [
         ])
 ]
 data = dict(
-    samples_per_gpu=4,
-    workers_per_gpu=4,
+    samples_per_gpu=8,
+    workers_per_gpu=8,
     train=dict(
         type='ADE20KDataset',
         data_root='data/ade/ADEChallengeData2016',
@@ -158,7 +158,7 @@ lr_config = dict(policy='poly', power=0.9, min_lr=0.0001, by_epoch=False)
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=16000)
 evaluation = dict(interval=16000, metric='mIoU', pre_eval=True)
-work_dir = './work_dirs/deeplabv3_m-v2-d8_512x512_160k_ade20k'
+work_dir = './work_dirs/deeplabv3_m-v2-d8_256x256_160k_ade20k'
 gpu_ids = [0, 1]
 auto_resume = False
 relu_spec_file = None

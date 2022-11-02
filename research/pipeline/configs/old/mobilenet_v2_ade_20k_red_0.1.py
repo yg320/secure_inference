@@ -7,7 +7,9 @@ model = dict(
         widen_factor=1.0,
         strides=(1, 2, 2, 1, 1, 1, 1),
         dilations=(1, 1, 1, 2, 2, 4, 4),
-        out_indices=(1, 2, 4, 6)),
+        out_indices=(1, 2, 4, 6),
+        act_cfg=dict(type='ReLU'),
+    ),
     decode_head=dict(
         type='ASPPHead',
         in_channels=320,
@@ -152,13 +154,13 @@ load_from = None
 resume_from = None
 workflow = [('train', 1)]
 cudnn_benchmark = True
-optimizer = dict(type='SGD', lr=0.01, momentum=0.9, weight_decay=0.0005)
+optimizer = dict(type='SGD', lr=0.0005, momentum=0.9, weight_decay=0.0005)
 optimizer_config = dict()
 lr_config = dict(policy='poly', power=0.9, min_lr=0.0001, by_epoch=False)
-runner = dict(type='IterBasedRunner', max_iters=160000)
-checkpoint_config = dict(by_epoch=False, interval=16000)
-evaluation = dict(interval=16000, metric='mIoU', pre_eval=True)
-work_dir = './work_dirs/deeplabv3_m-v2-d8_512x512_160k_ade20k'
-gpu_ids = [0, 1]
+runner = dict(type='IterBasedRunner', max_iters=60000)
+checkpoint_config = dict(by_epoch=False, interval=4000)
+evaluation = dict(interval=4000, metric='mIoU', pre_eval=True)
+work_dir = '/home/yakir/Data2/experiments/mobilenet_v2_ade_20k/reduction_0.10'
+gpu_ids = range(0, 2)
 auto_resume = False
-relu_spec_file = None
+relu_spec_file = "/home/yakir/Data2/assets_v2/deformations/ade_20k/mobilenet_v2/reduction_specs/layer_reduction_0.10.pickle"

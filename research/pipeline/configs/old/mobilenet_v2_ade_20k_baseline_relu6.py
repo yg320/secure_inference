@@ -7,7 +7,9 @@ model = dict(
         widen_factor=1.0,
         strides=(1, 2, 2, 1, 1, 1, 1),
         dilations=(1, 1, 1, 2, 2, 4, 4),
-        out_indices=(1, 2, 4, 6)),
+        out_indices=(1, 2, 4, 6),
+        act_cfg=dict(type='ReLU6'),
+    ),
     decode_head=dict(
         type='ASPPHead',
         in_channels=320,
@@ -158,7 +160,7 @@ lr_config = dict(policy='poly', power=0.9, min_lr=0.0001, by_epoch=False)
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=16000)
 evaluation = dict(interval=16000, metric='mIoU', pre_eval=True)
-work_dir = './work_dirs/deeplabv3_m-v2-d8_512x512_160k_ade20k'
-gpu_ids = [0, 1]
+work_dir = '/home/yakir/Data2/experiments/mobilenet_v2_ade_20k/baseline_relu6'
+gpu_ids = range(0, 2)
 auto_resume = False
 relu_spec_file = None
