@@ -616,7 +616,6 @@ class MobileNetV2_256_Params_2_Groups(MobileNetV2_256_Params):
                     "layer7_0_1",
                 ],
                 [
-                    "decode_0",
                     "decode_1",
                     "decode_2",
                     "decode_3",
@@ -660,7 +659,6 @@ class MobileNetV2_256_Params_2_Groups(MobileNetV2_256_Params):
                 'layer6_2_1': 'layer7_0',
                 'layer7_0_0': 'layer7_0',
                 'layer7_0_1': 'layer7_0',
-                'decode_0': "decode",
                 'decode_1': "decode",
                 'decode_2': "decode",
                 'decode_3': "decode",
@@ -711,7 +709,6 @@ class MobileNetV2_512_Params_2_Groups(MobileNetV2_512_Params):
                     "layer7_0_1",
                 ],
                 [
-                    "decode_0",
                     "decode_1",
                     "decode_2",
                     "decode_3",
@@ -755,7 +752,6 @@ class MobileNetV2_512_Params_2_Groups(MobileNetV2_512_Params):
                 'layer6_2_1': 'layer7_0',
                 'layer7_0_0': 'layer7_0',
                 'layer7_0_1': 'layer7_0',
-                'decode_0': "decode",
                 'decode_1': "decode",
                 'decode_2': "decode",
                 'decode_3': "decode",
