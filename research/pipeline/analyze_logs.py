@@ -62,10 +62,12 @@ def plot_curve(log_dicts, args):
             else:
                 plt.xlabel('iter')
 
-
-                # N = 20
-                # plot_values = np.convolve(plot_values, np.ones(N)/N, mode='valid')
-                # plot_iters = plot_iters[(N-1)//2:-(N-1)//2]
+                if metric == "mIoU":
+                    pass
+                else:
+                    N = 5
+                    plot_values = np.convolve(plot_values, np.ones(N)/N, mode='valid')
+                    plot_iters = plot_iters[(N-1)//2:-(N-1)//2]
                 if len(plot_values) > 20:
                     plt.plot(plot_iters, plot_values, label=label, linewidth=0.5)
                 else:

@@ -204,9 +204,9 @@ def main():
     model.init_weights()
 
     if cfg.relu_spec_file is not None:
-        layer_name_to_block_size_indices = pickle.load(open(cfg.relu_spec_file, 'rb'))
+        layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
         arch_utils = ArchUtilsFactory()(cfg.model.backbone.type)
-        arch_utils.set_bReLU_layers(model, layer_name_to_block_size_indices)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, num_soft_start_steps=cfg.num_soft_start_steps)
 
     # SyncBN is not support for DP
     if not distributed:
