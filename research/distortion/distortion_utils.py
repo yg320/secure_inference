@@ -29,6 +29,19 @@ def model_block_relu_transform(model, relu_spec, arch_utils):
 IMAGES = "***"
 
 
+@lru_cache(maxsize=None)
+def get_num_relus(block_size, activation_dim):
+
+    avg_pool = torch.nn.AvgPool2d(
+        kernel_size=block_size,
+        stride=block_size, ceil_mode=True)
+
+    cur_input = torch.zeros(size=(1, 1, activation_dim, activation_dim))
+    cur_relu_map = avg_pool(cur_input)
+    num_relus = cur_relu_map.shape[2] * cur_relu_map.shape[3]
+
+    return num_relus
+
 class DistortionUtils:
     def __init__(self, gpu_id, params):
 
@@ -57,15 +70,12 @@ class DistortionUtils:
                     'loss_ce'].cpu().numpy())
         return loss_ce_list
 
-    def get_samples(self, batch_index, batch_size, im_size=512):
+    def get_samples(self, batch_index, batch_size):
 
         batch_indices = np.arange(batch_index * batch_size, batch_index * batch_size + batch_size)
         batch_indices = self.shuffled_indices[batch_indices]
-        batch = torch.stack(
-            [center_crop(self.dataset[sample_id]['img'].data, im_size) for sample_id in batch_indices]).to(self.device)
-        ground_truth = torch.stack(
-            [center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, im_size) for sample_id in batch_indices]).to(
-            self.device)
+        batch = torch.stack([center_crop(self.dataset[sample_id]['img'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
+        ground_truth = torch.stack([center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
         return batch, ground_truth
 
     @staticmethod
