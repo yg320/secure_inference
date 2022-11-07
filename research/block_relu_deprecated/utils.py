@@ -8,75 +8,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from mmseg.datasets import build_dataset
-
-
-# class BlockRelu(Module):
-#
-#     def __init__(self, block_size_indices, block_sizes):
-#         super(BlockRelu, self).__init__()
-#         self.block_size_indices = block_size_indices
-#         self.active_block_indices = np.unique(self.block_size_indices)
-#         self.block_sizes = block_sizes
-#
-#     def forward(self, activation):
-#
-#         with torch.no_grad():
-#             relu_map = torch.zeros_like(activation)
-#             relu_map[:, self.block_size_indices == 0] = \
-#                 activation[:, self.block_size_indices == 0].sign().add_(1).div_(2)
-#
-#             for block_size_index in self.active_block_indices:
-#                 if block_size_index == 0:
-#                     continue
-#                 if block_size_index in self.active_block_indices:
-#                     channels = self.block_size_indices == block_size_index
-#                     cur_input = activation[:, channels]
-#
-#                     avg_pool = torch.nn.AvgPool2d(
-#                         kernel_size=self.block_sizes[block_size_index],
-#                         stride=self.block_sizes[block_size_index], ceil_mode=True)
-#
-#                     cur_relu_map = avg_pool(cur_input).sign_().add_(1).div_(2)
-#                     o = F.interpolate(input=cur_relu_map, scale_factor=self.block_sizes[block_size_index])
-#                     relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
-#
-#                     torch.cuda.empty_cache()
-#         return relu_map.mul_(activation)
-#
-
-class BlockRelu(Module):
-
-    def __init__(self, block_sizes):
-        super(BlockRelu, self).__init__()
-        self.block_sizes = np.array(block_sizes)
-        self.active_block_sizes = np.unique(self.block_sizes, axis=0)
-
-    def forward(self, activation):
-
-        with torch.no_grad():
-
-            regular_relu_channels = np.all(self.block_sizes == [1, 1], axis=1)
-            relu_map = torch.zeros_like(activation)
-            relu_map[:, regular_relu_channels] = activation[:, regular_relu_channels].sign().add_(1).div_(2)
-
-            for block_size in self.active_block_sizes:
-                if np.all(block_size == [1, 1]):
-                    continue
-
-                channels = np.all(self.block_sizes == block_size, axis=1)
-                cur_input = activation[:, channels]
-
-                avg_pool = torch.nn.AvgPool2d(
-                    kernel_size=tuple(block_size),
-                    stride=tuple(block_size), ceil_mode=True)
-
-                cur_relu_map = avg_pool(cur_input).sign_().add_(1).div_(2)
-                o = F.interpolate(input=cur_relu_map, scale_factor=tuple(block_size))
-                relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
-
-                torch.cuda.empty_cache()
-        return relu_map.mul_(activation)
-
+from research.bReLU import BlockRelu
 
 def get_model(config, gpu_id, checkpoint_path):
     cfg = mmcv.Config.fromfile(config)
@@ -132,23 +64,25 @@ def get_data(dataset):
                 {'type': 'DefaultFormatBundle'},
                 {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
         }
-    elif dataset == "coco_stuff10k":
-        assert False
-        cfg = {'type': 'COCOStuffDataset',
-               'data_root': 'data/coco_stuff10k',
-               'reduce_zero_label': True,
-               'img_dir': 'images/test2014',
-               'ann_dir': 'annotations/test2014',
-               'pipeline': [
-                   {'type': 'LoadImageFromFile'},
-                   {'type': 'LoadAnnotations', 'reduce_zero_label': True},
-                   {'type': 'Resize', 'img_scale': (2048, 512), 'keep_ratio': True},
-                   {'type': 'RandomFlip', 'prob': 0.0},
-                   {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375],
-                    'to_rgb': True},
-                   {'type': 'DefaultFormatBundle'},
-                   {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
-               }
+        crop_size = 512
+
+    # elif dataset == "coco_stuff10k":
+    #     assert False
+    #     cfg = {'type': 'COCOStuffDataset',
+    #            'data_root': 'data/coco_stuff10k',
+    #            'reduce_zero_label': True,
+    #            'img_dir': 'images/test2014',
+    #            'ann_dir': 'annotations/test2014',
+    #            'pipeline': [
+    #                {'type': 'LoadImageFromFile'},
+    #                {'type': 'LoadAnnotations', 'reduce_zero_label': True},
+    #                {'type': 'Resize', 'img_scale': (2048, 512), 'keep_ratio': True},
+    #                {'type': 'RandomFlip', 'prob': 0.0},
+    #                {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375],
+    #                 'to_rgb': True},
+    #                {'type': 'DefaultFormatBundle'},
+    #                {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
+    #            }
     elif dataset == "ade_20k":
         cfg = {'type': 'ADE20KDataset',
                'data_root': 'data/ade/ADEChallengeData2016',
@@ -165,11 +99,30 @@ def get_data(dataset):
                    {'type': 'DefaultFormatBundle'},
                    {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
                }
+        crop_size = 512
+
+    elif dataset == "ade_20k_256x256":
+        cfg = {'type': 'ADE20KDataset',
+               'data_root': 'data/ade/ADEChallengeData2016',
+               'img_dir': 'images/training',
+               'ann_dir': 'annotations/training',
+               'pipeline': [
+                   {'type': 'LoadImageFromFile'},
+                   {'type': 'LoadAnnotations', 'reduce_zero_label': True},
+                   {'type': 'Resize', 'img_scale': (1024, 256), 'keep_ratio': True},
+                   {'type': 'RandomFlip', 'prob': 0.0},
+                   {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+                   {'type': 'Pad', 'size': (256, 256), 'pad_val': 0, 'seg_pad_val': 255},
+                   {'type': 'DefaultFormatBundle'},
+                   {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
+               }
+
+        crop_size = 256
     else:
         cfg = None
 
     dataset = build_dataset(cfg)
-
+    dataset.crop_size = crop_size
     return dataset
 
 
@@ -194,8 +147,8 @@ class ArchUtils:
         for layer_name, layer in layer_names_to_layers.items():
             self.set_layer(model, layer_name, layer)
 
-    def set_bReLU_layers(self, model, layer_name_to_block_sizes):
-        layer_name_to_layers = {layer_name: BlockRelu(block_sizes=block_sizes)
+    def set_bReLU_layers(self, model, layer_name_to_block_sizes, num_soft_start_steps=0):
+        layer_name_to_layers = {layer_name: BlockRelu(block_sizes=block_sizes, num_soft_start_steps=num_soft_start_steps)
                                 for layer_name, block_sizes in layer_name_to_block_sizes.items()}
         self.set_layers(model, layer_name_to_layers)
 class MobileNetUtils(ArchUtils):

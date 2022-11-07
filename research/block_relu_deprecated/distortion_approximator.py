@@ -50,29 +50,6 @@ def model_block_relu_transform(model, relu_spec, arch_utils, params):
         arch_utils.set_layers(model, {layer_name_: orig_layer})
 
 
-# def get_random_spec(self, seed, layers):
-#     np.random.seed(seed)
-#
-#     channel_ord_to_layer_name = np.hstack([self.params.LAYER_NAME_TO_CHANNELS[layer_name] * [layer_name] for layer_name in self.params.LAYER_NAMES])
-#     channel_ord_to_channel_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_CHANNELS[layer_name]) for layer_name in self.params.LAYER_NAMES])
-#     num_channels = len(channel_ord_to_layer_name)
-#
-#     num_channel_to_add_noise_to = num_channels
-#     channel_sample = np.random.choice(num_channels, size=num_channel_to_add_noise_to, replace=False)
-#     layer_and_channels = [(channel_ord_to_layer_name[x], channel_ord_to_channel_index[x]) for x in channel_sample]
-#
-#     block_size_indices = [np.random.randint(1, len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])) for
-#                           layer_name, _ in layer_and_channels]
-#     block_size_spec = {
-#         layer_name: np.zeros(shape=(self.params.LAYER_NAME_TO_CHANNELS[layer_name],), dtype=np.int32) for
-#         layer_name in self.params.LAYER_NAMES if layer_name in layers}
-#
-#     for index, (layer_name, channel) in zip(block_size_indices, layer_and_channels):
-#         if layer_name in layers:
-#             block_size_spec[layer_name][channel] = index
-#
-#     return block_size_spec
-
 def split_size_spec(params, block_size_spec, num_specs, split_method="random"):
     if split_method == "random":
         channel_ord_to_layer_name = np.hstack(
