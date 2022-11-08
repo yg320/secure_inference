@@ -11,6 +11,7 @@ import argparse
 import shutil
 from research.distortion.distortion_utils import get_num_relus, get_brelu_bandwidth
 from research.parameters.base import ParamsFactory
+# from research.share_array import make_shared_array, get_shared_array
 import gc
 import time
 
@@ -235,6 +236,71 @@ def main_dp(Ws, Ps, channels, num_relus):
     dp_arg.flush()
     return dp_arg, dp[:-1]
 
+
+# def worker_function(s, e, channel, indices_orig_shape):
+#
+#     Ws = get_shared_array('Ws')
+#     Ps = get_shared_array('Ps')
+#     dp = get_shared_array('dp')
+#     arange = get_shared_array('arange')[s:e]
+#     indices = get_shared_array('indices')[s:e]
+#     buffer = get_shared_array('buffer')
+#
+#
+#     np.subtract(arange, Ws[channel], out=indices)
+#     np.maximum(indices, -1, out=indices)
+#     indices = indices.reshape(-1)
+#     np.take(dp, indices, out=buffer)
+#     indices = indices.reshape(indices_orig_shape)
+#     buffer = buffer.reshape(indices_orig_shape)
+#     np.add(buffer, Ps[channel], out=buffer)
+#
+#
+# def main_dp_multiprocess(Ws, Ps, channels, num_relus):
+#     assert num_relus < np.iinfo(np.int32).max
+#     arange = np.arange(num_relus, dtype=np.int32)[:, np.newaxis]
+#     indices = np.zeros(shape=(num_relus, Ws[0].shape[0]), dtype=np.int32)
+#     buffer = np.zeros(shape=(num_relus * Ws[0].shape[0], ), dtype=np.float64)
+#
+#     dp_arg = IO_Buffer(num_relus)
+#     dp = - np.inf * np.ones(shape=(num_relus + 1,))
+#
+#     buffer_orig_shape = buffer.shape
+#     indices_orig_shape = indices.shape
+#     init_row = np.copy(dp_arg[0])
+#     init_row[Ws[0]] = np.arange(Ws[0].shape[0])
+#     dp_arg[0] = init_row
+#     dp[Ws[0]] = Ps[0]
+#
+#     make_shared_array(Ws, name='Ws')
+#     make_shared_array(Ps, name='Ps')
+#     make_shared_array(dp, name='dp')
+#     make_shared_array(arange, name='arange')
+#
+#     make_shared_array(indices, name='indices')
+#     make_shared_array(buffer, name='buffer')
+#
+#     indices = get_shared_array('indices')
+#     buffer = get_shared_array('buffer')
+#
+#     for channel in tqdm(range(1, channels)):
+#         gc.collect()
+#
+#         np.subtract(arange, Ws[channel], out=indices)
+#         np.maximum(indices, -1, out=indices)
+#         indices = indices.reshape(-1)
+#         np.take(dp, indices, out=buffer)
+#         indices = indices.reshape(indices_orig_shape)
+#         buffer = buffer.reshape(indices_orig_shape)
+#         np.add(buffer, Ps[channel], out=buffer)
+#
+#         dp_arg[channel] = np.argmax(buffer, axis=1)
+#         dp[:-1] = buffer[arange[:, 0], dp_arg[channel]]
+#         dp_arg[channel][np.all(buffer == -np.inf, axis=1)] = 255
+#         buffer = buffer.reshape(buffer_orig_shape)  # Consider: buffer.shape = buffer_orig_shape to avoid rare case of copying
+#
+#     dp_arg.flush()
+#     return dp_arg, dp[:-1]
 
 def convert_dp_arg_to_block_size_spec(dp_arg, Ws, arg_and_channel_order_to_block_size, relu_count):
 
