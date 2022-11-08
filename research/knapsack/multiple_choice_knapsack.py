@@ -9,35 +9,39 @@ from tqdm import tqdm
 import pickle
 import argparse
 import shutil
-
+from research.distortion.distortion_utils import get_num_relus, get_brelu_bandwidth
 from research.parameters.base import ParamsFactory
 import gc
+import time
 
 
-def get_block_index_to_num_relus(block_sizes, layer_dim):
-    block_index_to_num_relus = []
-    for block_size_index, block_size in enumerate(block_sizes):
-        avg_pool = torch.nn.AvgPool2d(
-            kernel_size=tuple(block_size),
-            stride=tuple(block_size), ceil_mode=True)
+def get_cost(block_size, activation_dim, cost_type, division=1):
 
-        cur_input = torch.zeros(size=(1, 1, layer_dim, layer_dim))
-        cur_relu_map = avg_pool(cur_input)
-        num_relus = cur_relu_map.shape[2] * cur_relu_map.shape[3]
-        block_index_to_num_relus.append(num_relus)
-    W = np.array(block_index_to_num_relus)
-    return W
+    if cost_type == "Bandwidth":
+        cost_func = get_brelu_bandwidth
+    elif cost_type == "ReLU":
+        cost_func = get_num_relus
+    else:
+        cost_func = None
 
-def get_matrix_data(channel_distortion_path, params):
+    cost = cost_func(tuple(block_size), activation_dim) // division
+
+    return cost
+
+
+
+
+def get_matrix_data(channel_distortion_path, params, cost_type, division):
     Ps = []
     Ws = []
     layer_name_to_block_shape_index_and_channel_to_block_size = {}
+    # TODO: replace the 56
     for layer_name in layer_names:
         block_sizes = np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
         assert np.max(block_sizes) < 255
         layer_dim = params.LAYER_NAME_TO_DIMS[layer_name][1]
 
-        W = get_block_index_to_num_relus(block_sizes, layer_dim)
+        W = np.array([get_cost(tuple(block_size), layer_dim, cost_type, division) for block_size in block_sizes])
 
         files = glob.glob(os.path.join(channel_distortion_path, f"{layer_name}_*.pickle"))
         assert len(files) == 2
@@ -48,7 +52,8 @@ def get_matrix_data(channel_distortion_path, params):
 
         block_size_groups = defaultdict(list)
         for block_size_index, block_size in enumerate(block_sizes):
-            block_size_groups[block_size[0] * block_size[1]].append(block_size_index)
+            cur_cost = get_cost(tuple(block_size), layer_dim, cost_type, division) #1 here to avoid weird stuff
+            block_size_groups[cur_cost].append(block_size_index)
 
         P_new = []
         W_new = []
@@ -63,9 +68,20 @@ def get_matrix_data(channel_distortion_path, params):
             block_shape_index_and_channel_to_block_size.append(cur_block_sizes[argmax])
             P_new.append(max_)
             W_new.append(W[v[0]])
-        layer_name_to_block_shape_index_and_channel_to_block_size[layer_name] = np.array(block_shape_index_and_channel_to_block_size)
+
+        block_shape_index_and_channel_to_block_size = np.array(block_shape_index_and_channel_to_block_size)
         P = np.array(P_new).T
         W = np.array(W_new).T
+
+        pad_W = np.zeros(shape=(56 - W.shape[0],), dtype=W.dtype)
+        pad_P = -np.inf * np.ones(shape=(P.shape[0], 56 - P.shape[1]), dtype=P.dtype)
+        shape = block_shape_index_and_channel_to_block_size.shape
+        pad_block_sizes_tracker = np.zeros(shape=(56 - shape[0], shape[1], shape[2]), dtype=block_shape_index_and_channel_to_block_size.dtype)
+
+        P = np.concatenate([P, pad_P], axis=1)
+        W = np.concatenate([W, pad_W], axis=0)
+        block_shape_index_and_channel_to_block_size = np.concatenate([block_shape_index_and_channel_to_block_size, pad_block_sizes_tracker], axis=0)
+        layer_name_to_block_shape_index_and_channel_to_block_size[layer_name] = block_shape_index_and_channel_to_block_size
         Ps.append(P)
         Ws.append(W)
     arg_and_channel_to_block_size = np.concatenate([layer_name_to_block_shape_index_and_channel_to_block_size[layer_name] for layer_name in layer_names], axis=1)
@@ -74,25 +90,114 @@ def get_matrix_data(channel_distortion_path, params):
     Ws = np.concatenate([np.repeat(Ws[layer_index][:,np.newaxis], params.LAYER_NAME_TO_DIMS[layer_name][0], axis=1) for layer_index, layer_name in enumerate(layer_names)], axis=1).T
     return Ps, Ws, channel_and_arg_to_block_size
 
-
 def main_dp_not_efficient(Ws, Ps, channels, num_relus):
 
     dp_arg = 255 * np.ones(shape=(channels, num_relus), dtype=np.uint8)
-    # dp_arg = np.zeros(shape=(channels, num_relus), dtype=np.uint8)
     dp_arg[0, Ws[0]] = np.arange(Ws[0].shape[0])
 
-    dp = - np.inf * np.ones(shape=(num_relus,))
+    # dp[-1] should always hold -inf, so in line # indices = np.maximum((desired_relu_count - Ws[channel]), -1) we can be sure that bad indices will get -inf
+    dp = - np.inf * np.ones(shape=(num_relus + 1,))
+
     dp[Ws[0]] = Ps[0]
 
     for channel in tqdm(range(1, channels)):
         gc.collect()
         dp_prev = dp.copy()
         for desired_relu_count in range(num_relus):
-            indices = np.maximum((desired_relu_count - Ws[channel]), 0)
+            indices = np.maximum((desired_relu_count - Ws[channel]), -1)
             dp[desired_relu_count] = (dp_prev[indices] + Ps[channel]).max()
-            dp_arg[channel, desired_relu_count] = (dp_prev[indices] + Ps[channel]).argmax()
-        assert dp[0] == -np.inf
-    return dp_arg
+            if np.any((dp_prev[indices] + Ps[channel]) > -np.inf):
+                dp_arg[channel, desired_relu_count] = (dp_prev[indices] + Ps[channel]).argmax()
+
+        dp[-1] = -np.inf
+    return dp_arg, dp[:-1]
+
+def main_dp_super_not_efficient(Ws, Ps, channels, num_relus):
+
+    dp_arg = 255 * np.ones(shape=(channels, num_relus), dtype=np.uint8)
+    dp_arg[0, Ws[0]] = np.arange(Ws[0].shape[0])
+
+    dp = - np.inf * np.ones(shape=(num_relus,))
+    dp[Ws[0]] = Ps[0]
+
+    for channel in range(1, channels):
+        gc.collect()
+        dp_prev = dp.copy()
+        for desired_relu_count in tqdm(range(num_relus)):
+
+            max_val = -np.inf
+            argmax = None
+
+            # Go over the cost (num relus) for each block configuration of channel
+            for cur_block_size_index, cur_num_relus in enumerate(Ws[channel]):
+
+                # If you use desired_relu_count amount of relus, and current configuration cost cur_num_relus, then we
+                # should examine the previous channel cost of desired_relu_count - cur_num_relus (i.e. dp_prev[desired_relu_count - cur_num_relus] )
+                # Obviously, we should add  Ps[channel][cur_block_size_index] to the cost and pick the best configuration
+                index = desired_relu_count - cur_num_relus
+                if index >= 0:
+                    cur_v = dp_prev[index] + Ps[channel][cur_block_size_index]
+                    if cur_v > max_val:
+                        max_val = cur_v
+                        argmax = cur_block_size_index
+
+            if argmax is not None:
+                dp[desired_relu_count] = max_val
+                dp_arg[channel, desired_relu_count] = argmax
+
+            # indices = np.maximum((desired_relu_count - Ws[channel]), -1)
+            # dp[desired_relu_count] = (dp_prev[indices] + Ps[channel]).max()
+            # dp_arg[channel, desired_relu_count] = (dp_prev[indices] + Ps[channel]).argmax()
+
+    return dp_arg, dp
+
+# #
+class IO_Buffer:
+    def __init__(self, word_size):
+        self.buffer_size = 50
+        self.buffer_dir = "/home/yakir/buffer_dir/"
+        self.buffer_path_format = os.path.join(self.buffer_dir, "{}.npy")
+        self.word_size = word_size
+        self.buffer_init_value = 255
+        self.cur_frame = 0
+        self.dirty = False
+        self.buffer = self.buffer_init_value * np.ones(shape=(self.buffer_size, self.word_size), dtype=np.uint8)
+
+        if os.path.exists(self.buffer_dir):
+            shutil.rmtree(self.buffer_dir)
+
+        os.makedirs(self.buffer_dir)
+
+    def get_channel_frame(self, channel):
+        return channel // self.buffer_size
+
+    def reload(self, channel_frame):
+        if self.dirty:
+            np.save(file=self.buffer_path_format.format(self.cur_frame), arr=self.buffer)
+            self.dirty = False
+
+        if os.path.exists(self.buffer_path_format.format(channel_frame)):
+            self.buffer = np.load(self.buffer_path_format.format(channel_frame))
+        else:
+            self.buffer[:] = self.buffer_init_value
+        self.cur_frame = channel_frame
+
+    def flush(self):
+        self.reload(self.cur_frame)
+
+    def __setitem__(self, channel, value):
+        channel_frame = self.get_channel_frame(channel)
+        if channel_frame != self.cur_frame:
+            self.reload(channel_frame)
+        self.buffer[channel % self.buffer_size] = value
+        self.dirty = True
+
+    def __getitem__(self, channel):
+        channel_frame = self.get_channel_frame(channel)
+        if channel_frame != self.cur_frame:
+            self.reload(channel_frame)
+        return self.buffer[channel % self.buffer_size]
+
 
 def main_dp(Ws, Ps, channels, num_relus):
 
@@ -100,40 +205,43 @@ def main_dp(Ws, Ps, channels, num_relus):
     arange = np.arange(num_relus, dtype=np.int32)[:, np.newaxis]
     indices = np.zeros(shape=(num_relus, Ws[0].shape[0]), dtype=np.int32)
     buffer = np.zeros(shape=(num_relus * Ws[0].shape[0], ), dtype=np.float64)
-    # dp_arg = 255 * np.ones(shape=(channels, num_relus), dtype=np.uint8)
-    dp_arg = np.zeros(shape=(channels, num_relus), dtype=np.uint8)
-    dp = - np.inf * np.ones(shape=(num_relus,))
+
+    dp_arg = IO_Buffer(num_relus)
+    dp = - np.inf * np.ones(shape=(num_relus + 1,))
 
     buffer_orig_shape = buffer.shape
     indices_orig_shape = indices.shape
-    dp_arg[0, Ws[0]] = np.arange(Ws[0].shape[0])
+    init_row = np.copy(dp_arg[0])
+    init_row[Ws[0]] = np.arange(Ws[0].shape[0])
+    dp_arg[0] = init_row
     dp[Ws[0]] = Ps[0]
 
     for channel in tqdm(range(1, channels)):
         gc.collect()
+
         np.subtract(arange, Ws[channel], out=indices)
-        np.maximum(indices, 0, out=indices)
+        np.maximum(indices, -1, out=indices)
         indices = indices.reshape(-1)
         np.take(dp, indices, out=buffer)
         indices = indices.reshape(indices_orig_shape)
         buffer = buffer.reshape(indices_orig_shape)
         np.add(buffer, Ps[channel], out=buffer)
 
-        np.argmax(buffer, axis=1, out=dp_arg[channel])
-        dp = buffer[arange[:, 0], dp_arg[channel]]
+        dp_arg[channel] = np.argmax(buffer, axis=1)
+        dp[:-1] = buffer[arange[:, 0], dp_arg[channel]]
+        dp_arg[channel][np.all(buffer == -np.inf, axis=1)] = 255
         buffer = buffer.reshape(buffer_orig_shape)  # Consider: buffer.shape = buffer_orig_shape to avoid rare case of copying
 
-    return dp_arg
+    dp_arg.flush()
+    return dp_arg, dp[:-1]
 
 
-def convert_dp_arg_to_block_size_spec(dp_arg, Ws, arg_and_channel_order_to_block_size):
-    relu_count = dp_arg.shape[1] - 1
-    num_channels = dp_arg.shape[0]
+def convert_dp_arg_to_block_size_spec(dp_arg, Ws, arg_and_channel_order_to_block_size, relu_count):
+
+    num_channels = Ws.shape[0]
     block_sizes = []
     for channel_order in reversed(range(num_channels)):
-        arg = dp_arg[channel_order, relu_count]
-        if arg == 255:
-            print('j')
+        arg = dp_arg[channel_order][relu_count]
         channel_num_relus = Ws[channel_order, arg]
         relu_count -= channel_num_relus
         block_sizes.append(arg_and_channel_order_to_block_size[channel_order, arg])
@@ -149,20 +257,25 @@ def convert_dp_arg_to_block_size_spec(dp_arg, Ws, arg_and_channel_order_to_block
     return layer_name_to_block_size
 
 
-def get_block_size_spec(layer_names, params, channel_distortion_path, ratio):
+def get_block_size_spec(layer_names, params, channel_distortion_path, ratio, cost_type, division):
 
     num_channels = sum(params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names)
-    num_relus = int(sum(np.prod(params.LAYER_NAME_TO_DIMS[layer_name]) for layer_name in layer_names) * ratio)
 
-    Ps, Ws, channel_and_arg_to_block_size = get_matrix_data(channel_distortion_path, params)
+    max_cost = int(sum(get_cost((1,1), params.LAYER_NAME_TO_DIMS[layer_name][1], cost_type, division) * params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names) * ratio)
+    print(max_cost)
+    Ps, Ws, channel_and_arg_to_block_size = get_matrix_data(channel_distortion_path, params, cost_type, division)
 
-    # dp_arg_0 = main_dp_not_efficient(Ws, Ps, 100, num_relus)
-    # dp_arg_1 = main_dp(Ws, Ps, 100, num_relus)
-    dp_arg = main_dp(Ws, Ps, num_channels, num_relus)
+    # dp_arg_2, dp_2 = main_dp(Ws, Ps, 50, 100000)
+    # dp_arg_0, dp_0 = main_dp_super_not_efficient(Ws, Ps, 50, 100000)
+    # dp_arg_1, dp_1 = main_dp_not_efficient(Ws, Ps, 50, 100000)
+    # assert np.all(dp_arg_2.buffer[:50] == dp_arg_0)
+    # assert np.all(dp_2 == dp_0)
+    # assert False
+    dp_arg = main_dp(Ws, Ps, num_channels, max_cost)
 
 
 
-    layer_name_to_block_size = convert_dp_arg_to_block_size_spec(dp_arg, Ws, channel_and_arg_to_block_size)
+    layer_name_to_block_size = convert_dp_arg_to_block_size_spec(dp_arg, Ws, channel_and_arg_to_block_size, max_cost - 1)
     return layer_name_to_block_size, dp_arg
 
 
@@ -175,13 +288,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--iter', type=int, default=0)
-    parser.add_argument('--block_size_spec_file_name', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_0.0625/block_spec.pickle")
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_0.0625/channel_distortions")
-    parser.add_argument('--ratio', type=float, default=0.0625)
+    parser.add_argument('--block_size_spec_file_name', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec.pickle")
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/channel_distortions")
+    parser.add_argument('--ratio', type=float, default=0.1)
     parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
+    # parser.add_argument('--cost_type', type=str, default="ReLU")
+    parser.add_argument('--cost_type', type=str, default="Bandwidth")
+    parser.add_argument('--division', type=int, default=128)
     args = parser.parse_args()
-    # import time
-    # assert time.time() <= 1667812589.9087472 + 1800
     params = ParamsFactory()(args.params_name)
 
     channel_distortion_path = args.output_path
@@ -189,7 +303,7 @@ if __name__ == "__main__":
     ratio = args.ratio
     block_size_spec_file_name = args.block_size_spec_file_name
     assert os.path.exists(block_size_spec_file_name) or args.iter == 0
-    layer_name_to_block_size, dp_arg = get_block_size_spec(layer_names, params, channel_distortion_path, ratio)
+    layer_name_to_block_size, dp_arg = get_block_size_spec(layer_names, params, channel_distortion_path, ratio, args.cost_type, args.division)
 
     if os.path.exists(block_size_spec_file_name):
         older_block_size_spec = pickle.load(file=open(block_size_spec_file_name, 'rb'))
