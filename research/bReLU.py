@@ -19,11 +19,16 @@ class BlockRelu(Module):
         with torch.no_grad():
 
             regular_relu_channels = np.all(self.block_sizes == [1, 1], axis=1)
+            zero_channels = np.all(self.block_sizes == [1, 0], axis=1)
+            identity_channels = np.all(self.block_sizes == [0, 1], axis=1)
+
             relu_map = torch.zeros_like(activation)
             relu_map[:, regular_relu_channels] = activation[:, regular_relu_channels].sign().add_(1).div_(2)
+            relu_map[:, identity_channels] = 1
+            relu_map[:, zero_channels] = 0
 
             for block_size in self.active_block_sizes:
-                if np.all(block_size == [1, 1]):
+                if np.all(block_size == [1, 1]) or np.all(block_size == [0, 1]) or np.all(block_size == [1, 0]):
                     continue
 
                 channels = np.all(self.block_sizes == block_size, axis=1)
