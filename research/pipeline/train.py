@@ -21,7 +21,7 @@ from mmseg.models import build_segmentor
 from mmseg.utils import (collect_env, get_device, get_root_logger,
                          setup_multi_processes)
 
-from research.block_relu.utils import ArchUtilsFactory
+from research.distortion.utils import ArchUtilsFactory
 from research.pipeline.backbones.secure_resnet import SecureResNet
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a segmentor')
