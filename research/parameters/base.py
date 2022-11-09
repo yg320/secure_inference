@@ -257,7 +257,9 @@ BLOCK_SIZES_FULL = \
      # [15, 16],
      # [16, 15],
      [16, 16],
-     [32, 32]
+     [32, 32],
+     [0, 1],
+     [1, 0]
      ]
 
 BLOCK_SIZES_MINI = [
@@ -293,10 +295,10 @@ BLOCK_SIZES_MINI = [
     [14, 14],
     [15, 15],
     [16, 16],
-    [64, 64]
+    [64, 64],
+    [0, 1],
+    [1, 0]
 ]
-
-BLOCK_SIZE_COMPLETE = [[i, j] for i in range(1, 65) for j in range(1, 65)]
 
 class MobileNetV2_Params:
     def __init__(self):
