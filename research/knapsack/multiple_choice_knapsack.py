@@ -42,7 +42,7 @@ def get_matrix_data(channel_distortion_path, params, cost_type, division):
     layer_name_to_block_shape_index_and_channel_to_block_size = {}
     # TODO: replace the 56
     for layer_name in layer_names:
-        block_sizes = np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
+        block_sizes = np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])#[:-2]
         assert np.max(block_sizes) < 255
         layer_dim = params.LAYER_NAME_TO_DIMS[layer_name][1]
 
@@ -158,8 +158,8 @@ def main_dp_super_not_efficient(Ws, Ps, channels, num_relus):
 
 # #
 class IO_Buffer:
-    def __init__(self, word_size, package="numpy", load=False):
-        self.buffer_size = 10
+    def __init__(self, word_size, package="numpy", load=False, buffer_size=10):
+        self.buffer_size = buffer_size
         self.buffer_dir = f"/home/yakir/Data2/buffer_dir/{package}"
 
         self.word_size = word_size
@@ -196,9 +196,9 @@ class IO_Buffer:
 
         if os.path.exists(self.buffer_path_format.format(channel_frame)):
             if self.package == "numpy":
-                self.buffer = np.load(self.buffer_path_format.format(channel_frame))
+                self.buffer[:] = np.load(self.buffer_path_format.format(channel_frame))
             elif self.package == "torch":
-                self.buffer = torch.load(self.buffer_path_format.format(channel_frame))
+                self.buffer[:] = torch.load(self.buffer_path_format.format(channel_frame))
         else:
             self.buffer[:] = self.buffer_init_value
         self.cur_frame = channel_frame
@@ -217,6 +217,7 @@ class IO_Buffer:
         channel_frame = self.get_channel_frame(channel)
         if channel_frame != self.cur_frame:
             self.reload(channel_frame)
+        self.dirty = True  # The user can change the buffer later on
         return self.buffer[channel % self.buffer_size]
 
 
@@ -306,6 +307,60 @@ def main_dp_torch(Ws, Ps, channels, num_relus):
 
     dp_arg.flush()
     return dp_arg, dp[:-1]
+
+def main_dp_torch_memory(Ws, Ps, channels, num_relus):
+
+    device = torch.device("cuda:1")
+    Ws = torch.from_numpy(Ws)
+    Ps = torch.from_numpy(Ps)
+
+    assert num_relus < np.iinfo(np.int32).max
+    arange = torch.arange(num_relus, dtype=torch.int64)
+    indices = torch.zeros(size=(num_relus,), dtype=torch.int64)
+    opt_buffer = - float("Inf") * torch.ones(size=(num_relus, ), dtype=torch.float64)
+    buffer = torch.zeros(size=(num_relus, ), dtype=torch.float64)
+    boolean_index_buffer = torch.zeros(size=(num_relus, ), dtype=torch.bool)
+
+    dp_arg = IO_Buffer(num_relus, package="torch", buffer_size=1)
+    dp = - float("Inf") * torch.ones(size=(num_relus + 1,), dtype=torch.float64)
+
+    init_row = dp_arg[0].clone()
+    init_row[Ws[0]] = torch.arange(Ws[0].shape[0], dtype=torch.uint8)
+    dp_arg[0] = init_row
+    dp[Ws[0]] = Ps[0]
+
+    negative_one = -torch.ones(size=(1,), dtype=torch.int64)
+
+    Ws = Ws.to(device)  # (torch.Size([14272, 56]), torch.int64)                6.39M
+    Ps = Ps.to(device)  # (torch.Size([14272, 56]), torch.float64)              6.39M
+    arange = arange.to(device)  # (torch.Size([15656345, 1]), torch.int64)      125.25M
+    indices = indices.to(device)  # (torch.Size([15656345, 56]), torch.int64)
+    negative_one = negative_one.to(device)
+    dp = dp.to(device)  # (torch.Size([15656346]), torch.float64)
+    opt_buffer = opt_buffer.to(device)  # (torch.Size([876755320]), torch.float64)
+    buffer = buffer.to(device)  # (torch.Size([876755320]), torch.float64)
+    dp_arg.buffer = dp_arg.buffer.to(device)  # (torch.Size([10, 15656345]), torch.uint8)
+    boolean_index_buffer = boolean_index_buffer.to(device)  # (torch.Size([10, 15656345]), torch.uint8)
+
+    for channel in tqdm(range(1, channels)):
+        opt_buffer[:] = -float("Inf")
+        for index in range(Ws.shape[1]):
+
+            torch.sub(arange, Ws[channel][index], out=indices)
+            torch.max(indices, negative_one, out=indices)
+
+            torch.take(dp, indices, out=buffer)
+            torch.add(buffer, Ps[channel][index], out=buffer)
+
+            torch.gt(buffer, opt_buffer, out=boolean_index_buffer)
+            dp_arg[channel][boolean_index_buffer] = index
+            opt_buffer[boolean_index_buffer] = buffer[boolean_index_buffer]
+
+        dp[:-1] = opt_buffer
+
+    dp_arg.flush()
+    return dp_arg, dp[:-1]
+
 
 # def worker_function(s, e, channel, indices_orig_shape):
 #
@@ -418,9 +473,23 @@ def get_block_size_spec(layer_names, params, channel_distortion_path, ratio, cos
     # dp_arg_1[5, [302592, 304356, 307968]]
     # print('ej')
 
-    dp_arg, dp_0 = main_dp_torch(Ws, Ps, num_channels, max_cost)
+
+    # dp_arg_0, dp_0 = main_dp_torch(Ws, Ps, 10, max_cost)
+    # dp_arg_0 = dp_arg_0.buffer.cpu().numpy()
+    # dp_0 = dp_0.cpu().numpy()
+
+    dp_arg, dp = main_dp_torch_memory(Ws, Ps, num_channels, max_cost)
+    np.save(file="/home/yakir/dp.npy", arr=dp.cpu().numpy())
+    # print('hey')
     #
-    # dp_arg = IO_Buffer(max_cost, package="torch", load=True)
+    # dp_arg_1 = dp_arg_1.buffer.cpu().numpy()
+    # dp_1 = dp_1.cpu().numpy()
+    #
+    # dp_arg_2, dp_2 = main_dp(Ws, Ps, 25, max_cost)
+    # np.all(dp_arg_2.buffer == dp_arg_1)
+    # np.all(dp_2 == dp_1)
+    # #
+    # # dp_arg = IO_Buffer(max_cost, package="torch", load=True)
     layer_name_to_block_size = convert_dp_arg_to_block_size_spec(dp_arg, Ws, channel_and_arg_to_block_size, max_cost - 1)
     return layer_name_to_block_size, dp_arg
 
@@ -434,13 +503,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--iter', type=int, default=0)
-    parser.add_argument('--block_size_spec_file_name', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec.pickle")
+    parser.add_argument('--block_size_spec_file_name', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec_relu_reduction_01_10_inf.pickle")
     parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/channel_distortions")
-    parser.add_argument('--ratio', type=float, default=0.1)
+    parser.add_argument('--ratio', type=float, default=0.07875)
     parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
     # parser.add_argument('--cost_type', type=str, default="ReLU")
-    parser.add_argument('--cost_type', type=str, default="Bandwidth")
-    parser.add_argument('--division', type=int, default=128)
+    parser.add_argument('--cost_type', type=str, default="ReLU")
+    parser.add_argument('--division', type=int, default=1)
     args = parser.parse_args()
     params = ParamsFactory()(args.params_name)
 
