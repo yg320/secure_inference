@@ -76,8 +76,8 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py")
     parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth")
     parser.add_argument('--iter', type=int, default=1)
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_0.0625/block_spec.pickle")
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_0.0625/channel_distortions")
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec.pickle")
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/channel_distortions")
     parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
     args = parser.parse_args()
 
@@ -94,13 +94,13 @@ if __name__ == "__main__":
     layer_names = params.LAYER_GROUPS[iteration]
 
     if args.block_size_spec_file_name and os.path.exists(args.block_size_spec_file_name):
+        assert iteration > 0
         baseline_block_size_spec = pickle.load(open(args.block_size_spec_file_name, 'rb'))
     else:
         assert iteration == 0
         baseline_block_size_spec = dict()
 
-    if "decode_0" in layer_names:
-        layer_names.remove("decode_0")
+    assert "decode_0" not in layer_names
 
     chd = ChannelDistortionHandler(gpu_id=gpu_id,
                                    output_path=output_path,
