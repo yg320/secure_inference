@@ -1,26 +1,14 @@
-# def run_model_block(self, model, activation, block_name):
-#     if block_name == "stem":
-#         activation = model.backbone.stem(activation)
-#         activation = model.backbone.maxpool(activation)
-#     elif block_name == "decode":
-#         activation = model.decode_head([None, None, None, activation])
-#     else:
-#         res_layer_name, block_name = block_name.split("_")
-#         layer = getattr(model.backbone, res_layer_name)
-#         res_block = layer._modules[block_name]
-#         activation = res_block(activation)
-#
-#     return activatio
 import torch
 import research
 import pickle
-from research.block_relu.utils import get_model, ArchUtilsFactory
+
+from research.distortion.utils import get_model, ArchUtilsFactory
 from research.pipeline.backbones.secure_resnet import MyResNet
+from research.distortion.distortion_utils import get_brelu_bandwidth
 
 
+def get_conv_cost(tensor_shape, conv_module, l=8):
 
-def get_conv_cost(tensor_shape, conv_module):
-    # assert False, "Dilation?"
     assert conv_module.kernel_size[0] == conv_module.kernel_size[1]
     assert conv_module.stride[0] == conv_module.stride[1]
     assert tensor_shape[1] == conv_module.in_channels, f"{tensor_shape[1]}, {conv_module.in_channels}"
@@ -38,29 +26,21 @@ def get_conv_cost(tensor_shape, conv_module):
     else:
         assert groups == o == i
         cost = groups * (2 * m ** 2 + 2 * f ** 2 + q ** 2)
-    return cost, [m, o]
+    return cost*l, [m, o]
 
 
-def get_relu_cost(tensor_shape, relu_module):
+def get_relu_cost(tensor_shape, relu_module, l=8):
+
     m = tensor_shape[0]
     log_p = 8
 
-    if type(relu_module) == research.block_relu.utils.BlockRelu:
-        assert tensor_shape[1] == len(relu_module.block_size_indices)
-        communication_mult = 0
-        communication_porthos_dReLU_bandwidth = 0
-
-        for block_size_index in relu_module.block_size_indices:
-            block_size = relu_module.block_sizes[block_size_index]
-            bb = block_size[0] * block_size[1]
-            communication_mult += (3 + 2 / bb) * m ** 2
-            communication_porthos_dReLU_bandwidth += (6 * log_p + 19 - 5) * m ** 2 / bb
-
-        return communication_mult + communication_porthos_dReLU_bandwidth, tensor_shape
-
+    if type(relu_module) == research.bReLU.BlockRelu:
+        assert tensor_shape[1] == len(relu_module.block_sizes)
+        communication_cost = sum(get_brelu_bandwidth(block_size=tuple(block_size), activation_dim=int(m)) for block_size in relu_module.block_sizes)
     else:
-        communication_cost = (5 * m ** 2 + (6 * log_p + 19 - 5) * m ** 2) * tensor_shape[1]
-        return communication_cost, tensor_shape
+        communication_cost = l * ((5 * m ** 2 + (6 * log_p + 19 - 5) * m ** 2) * tensor_shape[1])
+
+    return communication_cost, tensor_shape
 
 
 def get_resnet_block_cost(block, tensor_shape):
@@ -84,7 +64,7 @@ def get_resnet_block_cost(block, tensor_shape):
     return cost, tensor_shape
 
 
-def get_resnet_stem_cost(model, tensor_shape):
+def get_resnet_stem_cost(model, tensor_shape, l=8):
     stem = model.backbone.stem
     cost_conv1, tensor_shape = get_conv_cost(tensor_shape, stem[0])
     cost_relu1, tensor_shape = get_relu_cost(tensor_shape, stem[2])
@@ -100,7 +80,7 @@ def get_resnet_stem_cost(model, tensor_shape):
         print('Hey')
         tensor_shape[0] /= stride
         log_p = 8
-        cost += (model.backbone.maxpool.kernel_size - 1) * (6 * log_p + 24) * (tensor_shape[0] ** 2 * tensor_shape[1])
+        cost += ((model.backbone.maxpool.kernel_size - 1) * (6 * log_p + 24) * (tensor_shape[0] ** 2 * tensor_shape[1])) * l
     else:
         tensor_shape[0] /= stride
     return cost, tensor_shape
@@ -170,7 +150,9 @@ def get_mobilenetv2_cost(model, tensor_shape):
 
                 cur_cost, tensor_shape = get_conv_cost(tensor_shape, block.conv[2].conv)
                 cost += cur_cost
+
     cost += get_deeplab_decoder_cost(model, tensor_shape)
+
     return cost
 
 
@@ -181,30 +163,97 @@ def get_mobilenetv2_cost(model, tensor_shape):
 # )
 #
 # relu_spec_file = "/home/yakir/Data2/assets_v2/deformations/ade_20k/mobilenet_v2/reduction_specs/layer_reduction_0.07.pickle"
-
-
+#
+#
 # layer_name_to_block_size_indices = pickle.load(open(relu_spec_file, 'rb'))
+# layer_name_to_block_size = {layer_name: np.array(layer_name_to_block_size_indices[layer_name][1])[layer_name_to_block_size_indices[layer_name][0]] for layer_name in layer_name_to_block_size_indices.keys()}
 # arch_utils = ArchUtilsFactory()("MobileNetV2")
-# arch_utils.set_bReLU_layers(model, layer_name_to_block_size_indices)
-
+# arch_utils.set_bReLU_layers(model, layer_name_to_block_size)
+#
 # tensor_shape = [512, 3]
 #
 # print(get_mobilenetv2_cost(model, tensor_shape))
-# 1138772825.7433875/6183918464.0
-model = get_model(
-    config="/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/resnet_coco_164K_2_hiers_a_pool_0.1.py",
+#
+#
+#
+#
+# 981351856.0815492/6183918464.0
+
+
+
+
+
+
+
+
+
+model_base = get_model(
+    config="/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/m-v2_256x256_ade20k/3x4_algo.py",
     gpu_id=None,
-    checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/deeplabv3_r50-d8_512x512_4x4_80k_coco-stuff164k/iter_80000.pth"
+    checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
+)
+model = get_model(
+    config="/home/yakir/PycharmProjects/secure_inference/research/pipeline/configs/m-v2_256x256_ade20k/3x4_algo.py",
+    gpu_id=None,
+    checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
 )
 #
-# relu_spec_file = "/home/yakir/Data2/assets_v3/deformations/coco_stuff164k/ResNetV1c/V0/reduction_specs/layer_reduction_0.10.pickle"
-#
-#
-# layer_name_to_block_size_indices = pickle.load(open(relu_spec_file, 'rb'))
-# arch_utils = ArchUtilsFactory()("SecureResNet")
-# arch_utils.set_bReLU_layers(model, layer_name_to_block_size_indices)
-tensor_shape = [512, 3]
-print(get_resent_cost(model, tensor_shape))
+relu_spec_file ="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_0.0625/block_spec.pickle"
+relu_spec_file ="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec_32.pickle"
 
+layer_name_to_block_size_indices = pickle.load(open(relu_spec_file, 'rb'))
+tensor_shape = [256, 3]
+
+print(get_mobilenetv2_cost(model_base, tensor_shape))
+
+
+# MobileNet:
+# All: 12583738368
+# Backbone-All: 10530724864
+# Backbone-convs: 510663680 # 4.84 %
+# Backbone-ReLUs: 10020061184 # 95.1%
+
+# Decoder-All: 2053013504
+# Decoder-CoNVs: 366903296 # 17.8%
+# Decoder-ReLUs: 1686110208 # 82.1%
+
+
+# arch_utils = ArchUtilsFactory()("MobileNetV2")
+# arch_utils.set_bReLU_layers(model, layer_name_to_block_size_indices)
+# tensor_shape = [256, 3]
+# print(get_mobilenetv2_cost(model, tensor_shape) / get_mobilenetv2_cost(model_base, tensor_shape))
+# bandwidth_bytes = 12583738368
+# # get_deeplab_decoder_cost(model, [32, 3])
+# bandwidth_bytes = 11706171392
+# num_relus = 21316096
+# 12583738368 / 21316096
+# 3565682688 / 12583738368
+# # ReluCount = 21316096
+#
+#
+# deep_lab_cost = 2053013504
+# baseline_cost = 12583738368
+#
+# (3565682688 - deep_lab_cost)/(baseline_cost-deep_lab_cost)
+#
+
+# 1512669184
+# 788430336
+# 2301099520
+
+# 10530724864.0
+# 12583738368.0
+
+# Baseline:
+
+# backbone: 10530724864.0
+# Decoder: 2053013504
+# All: 12583738368.0
+
+# Mine:
+
+# backbone: 1512669184.0
+# Decoder: 788430336
+# All: 2301099520.0
 
 
