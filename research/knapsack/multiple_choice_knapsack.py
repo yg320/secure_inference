@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
 import glob
 import os.path
 import time
@@ -14,6 +17,7 @@ from research.parameters.base import ParamsFactory
 # from research.share_array import make_shared_array, get_shared_array
 import gc
 import time
+import torch
 
 
 def get_cost(block_size, activation_dim, cost_type, division=1):
@@ -154,31 +158,47 @@ def main_dp_super_not_efficient(Ws, Ps, channels, num_relus):
 
 # #
 class IO_Buffer:
-    def __init__(self, word_size):
-        self.buffer_size = 50
-        self.buffer_dir = "/home/yakir/buffer_dir/"
-        self.buffer_path_format = os.path.join(self.buffer_dir, "{}.npy")
+    def __init__(self, word_size, package="numpy", load=False):
+        self.buffer_size = 10
+        self.buffer_dir = f"/home/yakir/Data2/buffer_dir/{package}"
+
         self.word_size = word_size
         self.buffer_init_value = 255
         self.cur_frame = 0
         self.dirty = False
-        self.buffer = self.buffer_init_value * np.ones(shape=(self.buffer_size, self.word_size), dtype=np.uint8)
+        self.package = package
 
-        if os.path.exists(self.buffer_dir):
-            shutil.rmtree(self.buffer_dir)
+        if self.package == "numpy":
+            self.buffer_path_format = os.path.join(self.buffer_dir, "{}.npy")
+            self.buffer = self.buffer_init_value * np.ones(shape=(self.buffer_size, self.word_size), dtype=np.uint8)
+        elif self.package == "torch":
+            self.buffer_path_format = os.path.join(self.buffer_dir, "{}.pt")
+            self.buffer = self.buffer_init_value * torch.ones(size=(self.buffer_size, self.word_size), dtype=torch.uint8)
 
-        os.makedirs(self.buffer_dir)
+        if not load:
+            if os.path.exists(self.buffer_dir):
+                shutil.rmtree(self.buffer_dir)
+
+            os.makedirs(self.buffer_dir)
+        else:
+            self.reload(0)
 
     def get_channel_frame(self, channel):
         return channel // self.buffer_size
 
     def reload(self, channel_frame):
         if self.dirty:
-            np.save(file=self.buffer_path_format.format(self.cur_frame), arr=self.buffer)
+            if self.package == "numpy":
+                np.save(file=self.buffer_path_format.format(self.cur_frame), arr=self.buffer)
+            elif self.package == "torch":
+                torch.save(f=self.buffer_path_format.format(self.cur_frame), obj=self.buffer)
             self.dirty = False
 
         if os.path.exists(self.buffer_path_format.format(channel_frame)):
-            self.buffer = np.load(self.buffer_path_format.format(channel_frame))
+            if self.package == "numpy":
+                self.buffer = np.load(self.buffer_path_format.format(channel_frame))
+            elif self.package == "torch":
+                self.buffer = torch.load(self.buffer_path_format.format(channel_frame))
         else:
             self.buffer[:] = self.buffer_init_value
         self.cur_frame = channel_frame
@@ -236,6 +256,56 @@ def main_dp(Ws, Ps, channels, num_relus):
     dp_arg.flush()
     return dp_arg, dp[:-1]
 
+
+def main_dp_torch(Ws, Ps, channels, num_relus):
+    Ws = torch.from_numpy(Ws)
+    Ps = torch.from_numpy(Ps)
+
+    assert num_relus < np.iinfo(np.int32).max
+    arange = torch.arange(num_relus, dtype=torch.int64).unsqueeze(dim=1)
+    indices = torch.zeros(size=(num_relus, Ws[0].shape[0]), dtype=torch.int64)
+    buffer = torch.zeros(size=(num_relus * Ws[0].shape[0], ), dtype=torch.float64)
+
+    dp_arg = IO_Buffer(num_relus, package="torch")
+    dp = - float("Inf") * torch.ones(size=(num_relus + 1,), dtype=torch.float64)
+
+    buffer_orig_shape = buffer.shape
+    indices_orig_shape = indices.shape
+    init_row = dp_arg[0].clone()
+    init_row[Ws[0]] = torch.arange(Ws[0].shape[0], dtype=torch.uint8)
+    dp_arg[0] = init_row
+    dp[Ws[0]] = Ps[0]
+
+    negative_one = -torch.ones(size=(1,), dtype=torch.int64)
+
+    device = torch.device("cuda:1")
+    Ws = Ws.to(device)  # (torch.Size([14272, 56]), torch.int64)                6.39M
+    Ps = Ps.to(device)  # (torch.Size([14272, 56]), torch.float64)              6.39M
+    arange = arange.to(device)  # (torch.Size([15656345, 1]), torch.int64)      125.25M
+    indices = indices.to(device)  # (torch.Size([15656345, 56]), torch.int64)
+    negative_one = negative_one.to(device)
+    dp = dp.to(device)  # (torch.Size([15656346]), torch.float64)
+    buffer = buffer.to(device)  # (torch.Size([876755320]), torch.float64)
+    dp_arg.buffer = dp_arg.buffer.to(device)  # (torch.Size([10, 15656345]), torch.uint8)
+
+    for channel in tqdm(range(1, channels)):
+        gc.collect()
+
+        torch.sub(arange, Ws[channel], out=indices)
+        torch.max(indices, negative_one, out=indices)
+        indices = indices.reshape(-1)
+        torch.take(dp, indices, out=buffer)
+        indices = indices.reshape(indices_orig_shape)
+        buffer = buffer.reshape(indices_orig_shape)
+        torch.add(buffer, Ps[channel], out=buffer)
+
+        dp_arg[channel] = torch.argmax(buffer, dim=1)
+        dp[:-1] = buffer[arange[:, 0], dp_arg[channel].to(torch.int64)]
+        dp_arg[channel][torch.all(buffer == -float("Inf"), dim=1)] = 255
+        buffer = buffer.reshape(buffer_orig_shape)  # Consider: buffer.shape = buffer_orig_shape to avoid rare case of copying
+
+    dp_arg.flush()
+    return dp_arg, dp[:-1]
 
 # def worker_function(s, e, channel, indices_orig_shape):
 #
@@ -306,7 +376,8 @@ def convert_dp_arg_to_block_size_spec(dp_arg, Ws, arg_and_channel_order_to_block
 
     num_channels = Ws.shape[0]
     block_sizes = []
-    for channel_order in reversed(range(num_channels)):
+    relu_count = int(torch.nonzero(dp_arg[num_channels-1] != 255).max().cpu().numpy())
+    for channel_order in tqdm(reversed(range(num_channels))):
         arg = dp_arg[channel_order][relu_count]
         channel_num_relus = Ws[channel_order, arg]
         relu_count -= channel_num_relus
@@ -337,10 +408,19 @@ def get_block_size_spec(layer_names, params, channel_distortion_path, ratio, cos
     # assert np.all(dp_arg_2.buffer[:50] == dp_arg_0)
     # assert np.all(dp_2 == dp_0)
     # assert False
-    dp_arg = main_dp(Ws, Ps, num_channels, max_cost)
+    # dp_arg_0, dp_0 = main_dp_torch(Ws, Ps, 6, max_cost)
+    # dp_arg_1, dp_1 = main_dp(Ws, Ps, 6, max_cost)
+    #
+    # dp_arg_0 = dp_arg_0.buffer.cpu().numpy()
+    # dp_arg_1 = dp_arg_1.buffer
+    # l = np.argwhere(dp_arg_0[5] != dp_arg_1[5])[:,0]
+    # dp_arg_0[5, [302592, 304356, 307968]]
+    # dp_arg_1[5, [302592, 304356, 307968]]
+    # print('ej')
 
-
-
+    dp_arg, dp_0 = main_dp_torch(Ws, Ps, num_channels, max_cost)
+    #
+    # dp_arg = IO_Buffer(max_cost, package="torch", load=True)
     layer_name_to_block_size = convert_dp_arg_to_block_size_spec(dp_arg, Ws, channel_and_arg_to_block_size, max_cost - 1)
     return layer_name_to_block_size, dp_arg
 
