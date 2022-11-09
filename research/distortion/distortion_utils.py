@@ -1,13 +1,12 @@
 import torch
 import numpy as np
 
-from research.block_relu.utils import get_model, get_data, center_crop, ArchUtilsFactory
+from research.distortion.utils import get_model, get_data, center_crop, ArchUtilsFactory
 
-from mmseg.ops import resize
-import torch.nn.functional as F
-from mmseg.core import intersect_and_union
+# from mmseg.ops import resize
+# import torch.nn.functional as F
+# from mmseg.core import intersect_and_union
 import contextlib
-from research.block_relu.params import MobileNetV2Params
 from functools import lru_cache
 import ctypes
 
@@ -32,6 +31,12 @@ IMAGES = "***"
 @lru_cache(maxsize=None)
 def get_num_relus(block_size, activation_dim):
 
+    if block_size in [(0, 1), (1, 0)]:
+        return 0
+
+    if block_size == (1, 1):
+        return activation_dim ** 2
+
     avg_pool = torch.nn.AvgPool2d(
         kernel_size=block_size,
         stride=block_size, ceil_mode=True)
@@ -41,6 +46,19 @@ def get_num_relus(block_size, activation_dim):
     num_relus = cur_relu_map.shape[2] * cur_relu_map.shape[3]
 
     return num_relus
+
+
+@lru_cache(maxsize=None)
+def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8):
+
+    if block_size in [(0, 1), (1, 0)]:
+        return 0
+    num_relus = get_num_relus(block_size, activation_dim)
+    dReLU_bandwidth = (6 * log_p + 19 - 5) * num_relus
+    mult_bandwidth = 3 * activation_dim ** 2 + 2 * num_relus
+    bandwidth = l * (dReLU_bandwidth + mult_bandwidth)
+    return bandwidth  # Bandwidth is in Bytes (therefore l=8 and not 64)
+
 
 class DistortionUtils:
     def __init__(self, gpu_id, params):
