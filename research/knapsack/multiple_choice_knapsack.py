@@ -28,7 +28,8 @@ def get_cost(block_size, activation_dim, cost_type, division=1):
         cost_func = get_num_relus
     else:
         cost_func = None
-
+    cost = cost_func(tuple(block_size), activation_dim)
+    assert cost % division == 0
     cost = cost_func(tuple(block_size), activation_dim) // division
 
     return cost
@@ -39,7 +40,7 @@ def get_cost(block_size, activation_dim, cost_type, division=1):
 def get_matrix_data(channel_distortion_path, params, cost_type, division):
     Ps = []
     Ws = []
-    layer_name_to_block_shape_index_and_channel_to_block_size = {}
+    block_size_trackers = []
     # TODO: replace the 56
     for layer_name in layer_names:
         block_sizes = np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])#[:-2]
@@ -62,7 +63,7 @@ def get_matrix_data(channel_distortion_path, params, cost_type, division):
 
         P_new = []
         W_new = []
-        block_shape_index_and_channel_to_block_size = []
+        cur_block_size_tracker = []
         for k, v in block_size_groups.items():
             cur_block_sizes = block_sizes[v]
 
@@ -70,26 +71,26 @@ def get_matrix_data(channel_distortion_path, params, cost_type, division):
             argmax = P_same_weight.argmax(axis=0)
             max_ = P_same_weight.max(axis=0)
 
-            block_shape_index_and_channel_to_block_size.append(cur_block_sizes[argmax])
+            cur_block_size_tracker.append(cur_block_sizes[argmax])
             P_new.append(max_)
             W_new.append(W[v[0]])
 
-        block_shape_index_and_channel_to_block_size = np.array(block_shape_index_and_channel_to_block_size)
+        cur_block_size_tracker = np.array(cur_block_size_tracker)
         P = np.array(P_new).T
         W = np.array(W_new).T
 
         pad_W = np.zeros(shape=(56 - W.shape[0],), dtype=W.dtype)
         pad_P = -np.inf * np.ones(shape=(P.shape[0], 56 - P.shape[1]), dtype=P.dtype)
-        shape = block_shape_index_and_channel_to_block_size.shape
-        pad_block_sizes_tracker = np.zeros(shape=(56 - shape[0], shape[1], shape[2]), dtype=block_shape_index_and_channel_to_block_size.dtype)
+        shape = cur_block_size_tracker.shape
+        pad_block_sizes_tracker = np.zeros(shape=(56 - shape[0], shape[1], shape[2]), dtype=cur_block_size_tracker.dtype)
 
         P = np.concatenate([P, pad_P], axis=1)
         W = np.concatenate([W, pad_W], axis=0)
-        block_shape_index_and_channel_to_block_size = np.concatenate([block_shape_index_and_channel_to_block_size, pad_block_sizes_tracker], axis=0)
-        layer_name_to_block_shape_index_and_channel_to_block_size[layer_name] = block_shape_index_and_channel_to_block_size
+        cur_block_size_tracker = np.concatenate([cur_block_size_tracker, pad_block_sizes_tracker], axis=0)
+        block_size_trackers.append(cur_block_size_tracker)
         Ps.append(P)
         Ws.append(W)
-    arg_and_channel_to_block_size = np.concatenate([layer_name_to_block_shape_index_and_channel_to_block_size[layer_name] for layer_name in layer_names], axis=1)
+    arg_and_channel_to_block_size = np.concatenate(block_size_trackers, axis=1)
     channel_and_arg_to_block_size = arg_and_channel_to_block_size.transpose([1, 0, 2])
     Ps = np.concatenate(Ps, axis=0)
     Ws = np.concatenate([np.repeat(Ws[layer_index][:,np.newaxis], params.LAYER_NAME_TO_DIMS[layer_name][0], axis=1) for layer_index, layer_name in enumerate(layer_names)], axis=1).T
@@ -362,71 +363,6 @@ def main_dp_torch_memory(Ws, Ps, channels, num_relus):
     return dp_arg, dp[:-1]
 
 
-# def worker_function(s, e, channel, indices_orig_shape):
-#
-#     Ws = get_shared_array('Ws')
-#     Ps = get_shared_array('Ps')
-#     dp = get_shared_array('dp')
-#     arange = get_shared_array('arange')[s:e]
-#     indices = get_shared_array('indices')[s:e]
-#     buffer = get_shared_array('buffer')
-#
-#
-#     np.subtract(arange, Ws[channel], out=indices)
-#     np.maximum(indices, -1, out=indices)
-#     indices = indices.reshape(-1)
-#     np.take(dp, indices, out=buffer)
-#     indices = indices.reshape(indices_orig_shape)
-#     buffer = buffer.reshape(indices_orig_shape)
-#     np.add(buffer, Ps[channel], out=buffer)
-#
-#
-# def main_dp_multiprocess(Ws, Ps, channels, num_relus):
-#     assert num_relus < np.iinfo(np.int32).max
-#     arange = np.arange(num_relus, dtype=np.int32)[:, np.newaxis]
-#     indices = np.zeros(shape=(num_relus, Ws[0].shape[0]), dtype=np.int32)
-#     buffer = np.zeros(shape=(num_relus * Ws[0].shape[0], ), dtype=np.float64)
-#
-#     dp_arg = IO_Buffer(num_relus)
-#     dp = - np.inf * np.ones(shape=(num_relus + 1,))
-#
-#     buffer_orig_shape = buffer.shape
-#     indices_orig_shape = indices.shape
-#     init_row = np.copy(dp_arg[0])
-#     init_row[Ws[0]] = np.arange(Ws[0].shape[0])
-#     dp_arg[0] = init_row
-#     dp[Ws[0]] = Ps[0]
-#
-#     make_shared_array(Ws, name='Ws')
-#     make_shared_array(Ps, name='Ps')
-#     make_shared_array(dp, name='dp')
-#     make_shared_array(arange, name='arange')
-#
-#     make_shared_array(indices, name='indices')
-#     make_shared_array(buffer, name='buffer')
-#
-#     indices = get_shared_array('indices')
-#     buffer = get_shared_array('buffer')
-#
-#     for channel in tqdm(range(1, channels)):
-#         gc.collect()
-#
-#         np.subtract(arange, Ws[channel], out=indices)
-#         np.maximum(indices, -1, out=indices)
-#         indices = indices.reshape(-1)
-#         np.take(dp, indices, out=buffer)
-#         indices = indices.reshape(indices_orig_shape)
-#         buffer = buffer.reshape(indices_orig_shape)
-#         np.add(buffer, Ps[channel], out=buffer)
-#
-#         dp_arg[channel] = np.argmax(buffer, axis=1)
-#         dp[:-1] = buffer[arange[:, 0], dp_arg[channel]]
-#         dp_arg[channel][np.all(buffer == -np.inf, axis=1)] = 255
-#         buffer = buffer.reshape(buffer_orig_shape)  # Consider: buffer.shape = buffer_orig_shape to avoid rare case of copying
-#
-#     dp_arg.flush()
-#     return dp_arg, dp[:-1]
-
 def convert_dp_arg_to_block_size_spec(dp_arg, Ws, arg_and_channel_order_to_block_size, relu_count):
 
     num_channels = Ws.shape[0]
@@ -505,11 +441,12 @@ if __name__ == "__main__":
     parser.add_argument('--iter', type=int, default=0)
     parser.add_argument('--block_size_spec_file_name', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec_relu_reduction_01_10_inf.pickle")
     parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/channel_distortions")
-    parser.add_argument('--ratio', type=float, default=0.07875)
+    # parser.add_argument('--ratio', type=float, default=0.07875)
+    parser.add_argument('--ratio', type=float, default=0.1)
     parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
     # parser.add_argument('--cost_type', type=str, default="ReLU")
-    parser.add_argument('--cost_type', type=str, default="ReLU")
-    parser.add_argument('--division', type=int, default=1)
+    parser.add_argument('--cost_type', type=str, default="Bandwidth")
+    parser.add_argument('--division', type=int, default=512)
     args = parser.parse_args()
     params = ParamsFactory()(args.params_name)
 
