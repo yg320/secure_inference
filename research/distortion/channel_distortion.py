@@ -37,6 +37,9 @@ class ChannelDistortionHandler:
                             self.keys}
             for channel in tqdm(range(layer_num_channels), desc=f"Batch={batch_index} Layer={layer_name}"):
                 for block_size_index, block_size in enumerate(block_sizes):
+                    if layer_name == "decode_0":
+                        if np.prod(block_size) > 1:
+                            continue
                     layer_block_sizes = np.ones(shape=(layer_num_channels, 2), dtype=np.int32)  # TODO: reuse
                     layer_block_sizes[channel] = block_size
                     block_size_spec = {layer_name: layer_block_sizes}
@@ -60,25 +63,27 @@ class ChannelDistortionHandler:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
-    # parser.add_argument('--batch_index', type=int)
-    # parser.add_argument('--gpu_id', type=int)
-    # parser.add_argument('--dataset', type=str)
-    # parser.add_argument('--config', type=str)
-    # parser.add_argument('--checkpoint', type=str)
-    # parser.add_argument('--iter', type=int)
-    # parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    # parser.add_argument('--output_path', type=str, default=None)
-    # parser.add_argument('--params_name', type=str, default=None)
+    parser.add_argument('--batch_index', type=int)
+    parser.add_argument('--gpu_id', type=int)
+    parser.add_argument('--dataset', type=str)
+    parser.add_argument('--config', type=str)
+    parser.add_argument('--checkpoint', type=str)
+    parser.add_argument('--iter', type=int)
+    parser.add_argument('--block_size_spec_file_name', type=str, default=None)
+    parser.add_argument('--output_path', type=str, default=None)
+    parser.add_argument('--params_name', type=str, default=None)
 
-    parser.add_argument('--batch_index', type=int, default=1)
-    parser.add_argument('--gpu_id', type=int, default=1)
-    parser.add_argument('--dataset', type=str, default="ade_20k_256x256")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth")
-    parser.add_argument('--iter', type=int, default=1)
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec.pickle")
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/channel_distortions")
-    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
+    # parser.add_argument('--batch_index', type=int, default=3)
+    # parser.add_argument('--gpu_id', type=int, default=1)
+    # parser.add_argument('--dataset', type=str, default="ade_20k_256x256")
+    # parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py")
+    # parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/b_96_identity/iter_20000.pth")
+    # # parser.add_argument('--iter', type=int, default=0)
+    # parser.add_argument('--iter', type=int, default=1)
+    # # parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity_64/block_spec.pickle")
+    # parser.add_argument('--block_size_spec_file_name', type=str, default='/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity_64/block_spec_exclude_special_blocks_false.pickle')
+    # parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity_64/channel_distortions")
+    # parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
     args = parser.parse_args()
 
     gpu_id = args.gpu_id
@@ -100,13 +105,13 @@ if __name__ == "__main__":
         assert iteration == 0
         baseline_block_size_spec = dict()
 
-    assert "decode_0" not in layer_names
-
+    # assert "decode_0" not in layer_names
+    # layer_names = ["decode_0"]
     chd = ChannelDistortionHandler(gpu_id=gpu_id,
                                    output_path=output_path,
                                    params=params)
 
-    chd.extract_deformation_by_blocks(batch_index=gpu_id,
+    chd.extract_deformation_by_blocks(batch_index=args.batch_index,
                                       layer_names=layer_names,
                                       batch_size=16,
                                       baseline_block_size_spec=baseline_block_size_spec)
