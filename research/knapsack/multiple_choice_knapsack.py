@@ -29,8 +29,10 @@ def get_cost(block_size, activation_dim, cost_type, division=1):
     else:
         cost_func = None
     cost = cost_func(tuple(block_size), activation_dim)
-    assert cost % division == 0
-    cost = cost_func(tuple(block_size), activation_dim) // division
+
+    # 536 for decode_0
+    assert (cost == 536 and cost_type == "Bandwidth") or cost % division == 0
+    cost = cost // division
 
     return cost
 
@@ -43,14 +45,20 @@ def get_matrix_data(channel_distortion_path, params, cost_type, division):
     block_size_trackers = []
     # TODO: replace the 56
     for layer_name in layer_names:
-        block_sizes = np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])#[:-2]
+        block_sizes = np.array(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])
+        if params.exclude_special_blocks:
+            assert np.prod(block_sizes[-1]) == np.prod(block_sizes[-2]) == 0
+            block_sizes = block_sizes[:-2]
+        else:
+            block_sizes = block_sizes[:-1]
         assert np.max(block_sizes) < 255
         layer_dim = params.LAYER_NAME_TO_DIMS[layer_name][1]
 
         W = np.array([get_cost(tuple(block_size), layer_dim, cost_type, division) for block_size in block_sizes])
+        glob_pattern = os.path.join(channel_distortion_path, f"{layer_name}_*.pickle")
+        files = glob.glob(glob_pattern)
+        assert len(files) == 6, glob_pattern
 
-        files = glob.glob(os.path.join(channel_distortion_path, f"{layer_name}_*.pickle"))
-        assert len(files) == 2
         noise = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
         noise = noise.mean(axis=0).mean(axis=2).T  # noise.shape = [N-block-sizes, N-channels]
 
@@ -438,18 +446,20 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--iter', type=int, default=0)
-    parser.add_argument('--block_size_spec_file_name', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/block_spec_relu_reduction_01_10_inf.pickle")
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity/channel_distortions")
-    # parser.add_argument('--ratio', type=float, default=0.07875)
-    parser.add_argument('--ratio', type=float, default=0.1)
-    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
-    # parser.add_argument('--cost_type', type=str, default="ReLU")
-    parser.add_argument('--cost_type', type=str, default="Bandwidth")
-    parser.add_argument('--division', type=int, default=512)
-    args = parser.parse_args()
-    params = ParamsFactory()(args.params_name)
+    parser.add_argument('--iter', type=int)
+    parser.add_argument('--block_size_spec_file_name', type=str)
+    parser.add_argument('--output_path', type=str)
+    parser.add_argument('--ratio', type=float)
+    parser.add_argument('--params_name', type=str)
+    parser.add_argument('--exclude_special_blocks', type=bool, default=False)
+    parser.add_argument('--cost_type', type=str)
+    parser.add_argument('--division', type=int)
 
+
+    args = parser.parse_args()
+    assert not args.exclude_special_blocks, args.exclude_special_blocks
+    params = ParamsFactory()(args.params_name)
+    params.exclude_special_blocks = args.exclude_special_blocks
     channel_distortion_path = args.output_path
     layer_names = params.LAYER_GROUPS[args.iter]#[1:]
     ratio = args.ratio
