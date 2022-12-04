@@ -19,7 +19,7 @@ from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 from mmseg.utils import build_ddp, build_dp, get_device, setup_multi_processes
 from research.distortion.utils import ArchUtils, MobileNetUtils, ArchUtilsFactory
-from research.pipeline.backbones.secure_resnet import SecureResNet
+from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 import pickle
 
 def parse_args():

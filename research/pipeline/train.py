@@ -22,7 +22,7 @@ from mmseg.utils import (collect_env, get_device, get_root_logger,
                          setup_multi_processes)
 
 from research.distortion.utils import ArchUtilsFactory
-from research.pipeline.backbones.secure_resnet import SecureResNet
+from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a segmentor')
     parser.add_argument('config', help='train config file path')
@@ -111,6 +111,7 @@ def parse_args():
 
 
 def main():
+
     args = parse_args()
 
     cfg = Config.fromfile(args.config)
