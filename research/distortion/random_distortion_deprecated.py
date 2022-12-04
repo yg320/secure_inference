@@ -8,14 +8,14 @@ from typing import Dict, List
 import pickle
 
 from research.parameters.base import MobileNetV2_256_Params_2_Groups
-from research.distortion.distortion_utils import DistortionUtils
+from research.distortion.distortion_utils import DistortionUtils, get_num_relus
 
 from matplotlib import pyplot as plt
 
 # def
 class RandomDistortionHandler:
     def __init__(self, gpu_id, output_path, params):
-
+        self.device = gpu_id
         self.params = params
         self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params)
         self.output_path = output_path
@@ -43,7 +43,7 @@ class RandomDistortionHandler:
         tot_channel_count = sum(self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names)
         channel_order_to_channel = np.hstack([np.arange(self.params.LAYER_NAME_TO_DIMS[layer_name][0]) for layer_name in layer_names])
         channel_order_to_layer = np.hstack([[layer_name] * self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names])
-        layer_to_noise_statistics = {layer_name:pickle.load(open(f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_0.0625/channel_distortions/{layer_name}_0.pickle", 'rb')) for layer_name in layer_names}
+        layer_to_noise_statistics = {layer_name:pickle.load(open(f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/2_groups_160k_with_identity_64/channel_distortions/{layer_name}_0.pickle", 'rb')) for layer_name in layer_names}
 
 
         for i in tqdm(range(100000)):
@@ -51,7 +51,7 @@ class RandomDistortionHandler:
             block_size_spec = {layer_name: np.ones((self.params.LAYER_NAME_TO_DIMS[layer_name][0], 2), dtype=np.uint8) for layer_name in layer_names}
             block_size_indices_spec = {layer_name: np.zeros((self.params.LAYER_NAME_TO_DIMS[layer_name][0],), dtype=np.uint8) for layer_name in layer_names}
 
-            num_of_channels_to_noise = 5000 #np.random.randint(tot_channel_count)
+            num_of_channels_to_noise = tot_channel_count #5000 #np.random.randint(tot_channel_count)
             np.random.seed(i)
             channels_to_noise = np.random.choice(tot_channel_count, size=num_of_channels_to_noise, replace=False)
 
@@ -79,6 +79,150 @@ class RandomDistortionHandler:
             reductions.append(reduction)
             num_channels_to_noise.append(num_of_channels_to_noise)
 
+            if len(losses) % 1000 == 0:
+                print('ej')
+
+    def foo_bar2(self):
+        noises = []
+        losses = []
+
+        input_block_name = "conv1"
+        output_block_name = "decode"
+        layer_names = self.params.LAYER_NAMES
+
+        channel_order_to_dim = np.hstack([[self.params.LAYER_NAME_TO_DIMS[layer_name][1]] * self.params.LAYER_NAME_TO_DIMS[layer_name][0]  for layer_name in layer_names])
+        channel_order_to_block_size_len = np.hstack([[len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])] * self.params.LAYER_NAME_TO_DIMS[layer_name][0]  for layer_name in layer_names])
+        channel_order_to_channel = np.hstack([np.arange(self.params.LAYER_NAME_TO_DIMS[layer_name][0]) for layer_name in layer_names])
+        channel_order_to_layer = np.hstack([[layer_name] * self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names])
+
+        tot_channel_count = sum(self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names)
+        layer_to_noise_statistics = {layer_name:pickle.load(open(f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/snr/channel_distortions/{layer_name}_0.pickle", 'rb')) for layer_name in layer_names}
+        layer_to_noise_statistics['decode_0']["Signal"][:, :, :] = layer_to_noise_statistics['decode_0']["Signal"][:, :1, :]
+
+        all_channels = np.arange(tot_channel_count)
+        for i in tqdm(range(100000)):
+            seed = 2*i+self.device
+            block_size_spec = {layer_name: np.ones((self.params.LAYER_NAME_TO_DIMS[layer_name][0], 2), dtype=np.uint8) for layer_name in layer_names}
+            block_size_indices_spec = {layer_name: np.zeros((self.params.LAYER_NAME_TO_DIMS[layer_name][0],), dtype=np.uint8) for layer_name in layer_names}
+
+            num_of_channels_to_noise = tot_channel_count #5000 #np.random.randint(tot_channel_count)
+
+            # channels_to_noise = np.random.choice(tot_channel_count, size=num_of_channels_to_noise, replace=False)
+
+            for dim in np.unique(channel_order_to_dim):
+                for n_blocks in np.unique(np.unique(channel_order_to_block_size_len)):
+                    np.random.seed(seed)
+                    cur_channels_orders = all_channels[np.logical_and(channel_order_to_dim == dim, channel_order_to_block_size_len == n_blocks)]
+                    np.random.shuffle(cur_channels_orders)
+                    np.random.seed(13)
+                    for channel_order in cur_channels_orders:
+                        layer_name = channel_order_to_layer[channel_order]
+                        channel = channel_order_to_channel[channel_order]
+                        block_size_index = np.random.randint(len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]))
+                        block_size = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name][block_size_index]
+                        block_size_indices_spec[layer_name][channel] = block_size_index
+                        block_size_spec[layer_name][channel] = block_size
+
+            cur_assets = self.distortion_utils.get_batch_distortion(
+                baseline_block_size_spec=dict(),
+                block_size_spec=block_size_spec,
+                batch_index=0,
+                batch_size=16,
+                input_block_name=input_block_name,
+                output_block_name=output_block_name)
+
+            noise = np.hstack([layer_to_noise_statistics[layer_name]["Noise"][np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]), block_size_indices_spec[layer_name]].mean(axis=1) for layer_name in layer_names])
+            signal = np.hstack([layer_to_noise_statistics[layer_name]["Signal"][np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]), block_size_indices_spec[layer_name]].mean(axis=1) for layer_name in layer_names])
+            loss = cur_assets['Distorted Loss'].mean()
+            relus_count = sum([sum([get_num_relus(tuple(block_size),self.params.LAYER_NAME_TO_DIMS[layer_name][1]) for block_size in block_size_spec[layer_name]]) for layer_name in layer_names])
+
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats", f"noise_{seed}.npy"), arr=noise)
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats", f"signal_{seed}.npy"), arr=signal)
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats", f"loss_{seed}.npy"), arr=loss)
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats", f"relus_count_{seed}.npy"), arr=relus_count)
+
+            # print(relus_count)
+            # additive_noise = sum([(cur_noise / cur_signal).sum() for cur_noise, cur_signal in zip(noise, signal)])
+            # # additive_noise = sum([layer_to_noise_statistics[layer_name]["Noise"][np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]), block_size_indices_spec[layer_name]].sum(axis=0).mean() for layer_name in layer_names])
+            # # reduction = sum(np.mean(1/np.prod(block_size_spec[layer_name], axis=1)) * relus[layer_name] for layer_name in layer_names) / total_relus
+            # noises.append(additive_noise)
+            # losses.append(cur_assets['Distorted Loss'].mean())
+            # # reductions.append(reduction)
+            # num_channels_to_noise.append(num_of_channels_to_noise)
+
+            # if len(losses) % 1000 == 0:
+            #     print('ej')
+
+    def foo_bar3(self):
+        noises = []
+        losses = []
+
+        input_block_name = "conv1"
+        output_block_name = "decode"
+        layer_names = self.params.LAYER_NAMES[:34]
+
+        channel_order_to_dim = np.hstack([[self.params.LAYER_NAME_TO_DIMS[layer_name][1]] * self.params.LAYER_NAME_TO_DIMS[layer_name][0]  for layer_name in layer_names])
+        channel_order_to_block_size_len = np.hstack([[len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])] * self.params.LAYER_NAME_TO_DIMS[layer_name][0]  for layer_name in layer_names])
+        channel_order_to_channel = np.hstack([np.arange(self.params.LAYER_NAME_TO_DIMS[layer_name][0]) for layer_name in layer_names])
+        channel_order_to_layer = np.hstack([[layer_name] * self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names])
+
+        tot_channel_count = sum(self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names)
+        layer_to_noise_statistics = {layer_name:pickle.load(open(f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/snr/channel_distortions/{layer_name}_0.pickle", 'rb')) for layer_name in layer_names}
+        # layer_to_noise_statistics['decode_0']["Signal"][:, :, :] = layer_to_noise_statistics['decode_0']["Signal"][:, :1, :]
+
+        all_channels = np.arange(tot_channel_count)
+        for i in tqdm(range(100000)):
+            seed = 2*i+self.device
+            block_size_spec = {layer_name: np.ones((self.params.LAYER_NAME_TO_DIMS[layer_name][0], 2), dtype=np.uint8) for layer_name in layer_names}
+            block_size_indices_spec = {layer_name: np.zeros((self.params.LAYER_NAME_TO_DIMS[layer_name][0],), dtype=np.uint8) for layer_name in layer_names}
+
+            num_of_channels_to_noise = tot_channel_count #5000 #np.random.randint(tot_channel_count)
+
+            # channels_to_noise = np.random.choice(tot_channel_count, size=num_of_channels_to_noise, replace=False)
+
+            for dim in np.unique(channel_order_to_dim):
+                for n_blocks in np.unique(np.unique(channel_order_to_block_size_len)):
+                    np.random.seed(seed)
+                    cur_channels_orders = all_channels[np.logical_and(channel_order_to_dim == dim, channel_order_to_block_size_len == n_blocks)]
+                    np.random.shuffle(cur_channels_orders)
+                    np.random.seed(13)
+                    for channel_order in cur_channels_orders:
+                        layer_name = channel_order_to_layer[channel_order]
+                        channel = channel_order_to_channel[channel_order]
+                        block_size_index = np.random.randint(len(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]))
+                        block_size = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name][block_size_index]
+                        block_size_indices_spec[layer_name][channel] = block_size_index
+                        block_size_spec[layer_name][channel] = block_size
+
+            cur_assets = self.distortion_utils.get_batch_distortion(
+                baseline_block_size_spec=dict(),
+                block_size_spec=block_size_spec,
+                batch_index=0,
+                batch_size=16,
+                input_block_name=input_block_name,
+                output_block_name=output_block_name)
+
+            noise = np.hstack([layer_to_noise_statistics[layer_name]["Noise"][np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]), block_size_indices_spec[layer_name]].mean(axis=1) for layer_name in layer_names])
+            signal = np.hstack([layer_to_noise_statistics[layer_name]["Signal"][np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]), block_size_indices_spec[layer_name]].mean(axis=1) for layer_name in layer_names])
+            loss = cur_assets['Distorted Loss'].mean()
+            relus_count = sum([sum([get_num_relus(tuple(block_size),self.params.LAYER_NAME_TO_DIMS[layer_name][1]) for block_size in block_size_spec[layer_name]]) for layer_name in layer_names])
+
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats/foo_bar3", f"noise_{seed}.npy"), arr=noise)
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats/foo_bar3", f"signal_{seed}.npy"), arr=signal)
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats/foo_bar3", f"loss_{seed}.npy"), arr=loss)
+            np.save(file=os.path.join("/home/yakir/Data2/tmp_stats/foo_bar3", f"relus_count_{seed}.npy"), arr=relus_count)
+
+            # print(relus_count)
+            # additive_noise = sum([(cur_noise / cur_signal).sum() for cur_noise, cur_signal in zip(noise, signal)])
+            # # additive_noise = sum([layer_to_noise_statistics[layer_name]["Noise"][np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]), block_size_indices_spec[layer_name]].sum(axis=0).mean() for layer_name in layer_names])
+            # # reduction = sum(np.mean(1/np.prod(block_size_spec[layer_name], axis=1)) * relus[layer_name] for layer_name in layer_names) / total_relus
+            # noises.append(additive_noise)
+            # losses.append(cur_assets['Distorted Loss'].mean())
+            # # reductions.append(reduction)
+            # num_channels_to_noise.append(num_of_channels_to_noise)
+
+            # if len(losses) % 1000 == 0:
+            #     print('ej')
 
     def bar(self):
         noises = []
@@ -248,8 +392,6 @@ if __name__ == "__main__":
     params.CHECKPOINT = args.checkpoint
 
 
-    chd = RandomDistortionHandler(gpu_id=gpu_id,
-                                   output_path=None,
-                                   params=params)
+    chd = RandomDistortionHandler(gpu_id=gpu_id, output_path=None, params=params)
 
-    chd.foo_bar()
+    chd.foo_bar3()
