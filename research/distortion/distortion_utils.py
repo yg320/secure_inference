@@ -49,13 +49,23 @@ def get_num_relus(block_size, activation_dim):
 
 
 @lru_cache(maxsize=None)
-def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8):
-
+def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8, protocol="Porthos", scalar_vector_optimization=True, with_prf=True):
+    assert with_prf
     if block_size in [(0, 1), (1, 0)]:
         return 0
     num_relus = get_num_relus(block_size, activation_dim)
-    dReLU_bandwidth = (6 * log_p + 19 - 5) * num_relus
-    mult_bandwidth = 3 * activation_dim ** 2 + 2 * num_relus
+    if protocol == "Porthos":
+        dReLU_bandwidth = (6 * log_p + 19 - 5) * num_relus
+    elif protocol == "SecureNN":
+        dReLU_bandwidth = (8 * log_p + 24 - 5) * num_relus
+    else:
+        assert False
+    if scalar_vector_optimization:
+        assert with_prf
+        mult_bandwidth = 3 * activation_dim ** 2 + 2 * num_relus
+    else:
+        assert with_prf
+        mult_bandwidth = 5 * activation_dim ** 2
     bandwidth = l * (dReLU_bandwidth + mult_bandwidth)
     return bandwidth  # Bandwidth is in Bytes (therefore l=8 and not 64)
 
@@ -179,3 +189,20 @@ class DistortionUtils:
         return assets
 
 
+if __name__ == "__main__":
+    import matplotlib
+    matplotlib.use("TkAgg")
+    from matplotlib import pyplot as plt
+
+    from research.parameters.base import ParamsFactory
+    from research.parameters.base import BLOCK_SIZES_FULL
+    params = ParamsFactory()("MobileNetV2_256_Params_2_Groups")
+
+    dim_32_bandwidth = []
+    dim_32_num_relus = []
+    for dim in [32, 64, 128]:
+        for block_size in BLOCK_SIZES_FULL:
+            dim_32_bandwidth.append(get_brelu_bandwidth(tuple(block_size), dim))
+            dim_32_num_relus.append(get_num_relus(tuple(block_size), dim))
+
+    plt.scatter(dim_32_num_relus, dim_32_bandwidth)
