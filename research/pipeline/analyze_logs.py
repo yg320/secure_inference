@@ -58,14 +58,15 @@ def plot_curve(log_dicts, args):
                 plt.xlabel('epoch')
                 # print(sum(plot_values))
                 # print(max(plot_values))
+
                 plt.plot(plot_epochs, plot_values, label=label, marker='o')
             else:
                 plt.xlabel('iter')
 
                 if metric == "mIoU":
-                    pass
+                    print(np.mean(plot_values))
                 else:
-                    N = 5
+                    N = 3
                     plot_values = np.convolve(plot_values, np.ones(N)/N, mode='valid')
                     plot_iters = plot_iters[(N-1)//2:-(N-1)//2]
                 if len(plot_values) > 20:
