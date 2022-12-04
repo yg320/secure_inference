@@ -62,6 +62,13 @@ def get_matrix_data(channel_distortion_path, params, cost_type, division):
         noise = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
         noise = noise.mean(axis=0).mean(axis=2).T  # noise.shape = [N-block-sizes, N-channels]
 
+        signal = np.stack([pickle.load(open(f, 'rb'))["Signal"] for f in files])
+        signal = signal.mean(axis=0).mean(axis=2).T
+        if layer_name == "decode_0":
+            signal[:] = signal[0]
+        assert signal.min() > 0
+
+        noise = noise / signal
         P = -np.array(noise)
 
         block_size_groups = defaultdict(list)
@@ -447,13 +454,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--iter', type=int)
-    parser.add_argument('--block_size_spec_file_name', type=str)
-    parser.add_argument('--output_path', type=str)
-    parser.add_argument('--ratio', type=float)
-    parser.add_argument('--params_name', type=str)
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/snr/block_size_spec.pickle")
+    parser.add_argument('--output_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/snr/channel_distortions")
+    parser.add_argument('--ratio', type=float, default=0.1)
+    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_2_Groups")
     parser.add_argument('--exclude_special_blocks', type=bool, default=False)
-    parser.add_argument('--cost_type', type=str)
-    parser.add_argument('--division', type=int)
+    parser.add_argument('--cost_type', type=str, default="Bandwidth")
+    parser.add_argument('--division', type=int, default=512)
 
 
     args = parser.parse_args()
@@ -461,10 +468,10 @@ if __name__ == "__main__":
     params = ParamsFactory()(args.params_name)
     params.exclude_special_blocks = args.exclude_special_blocks
     channel_distortion_path = args.output_path
-    layer_names = params.LAYER_GROUPS[args.iter]#[1:]
+    layer_names = params.LAYER_NAMES # params.LAYER_GROUPS[args.iter]#[1:]
     ratio = args.ratio
     block_size_spec_file_name = args.block_size_spec_file_name
-    assert os.path.exists(block_size_spec_file_name) or args.iter == 0
+    # assert os.path.exists(block_size_spec_file_name) or args.iter == 0
     layer_name_to_block_size, dp_arg = get_block_size_spec(layer_names, params, channel_distortion_path, ratio, args.cost_type, args.division)
 
     if os.path.exists(block_size_spec_file_name):
