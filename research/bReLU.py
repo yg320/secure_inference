@@ -46,7 +46,10 @@ class BlockRelu(Module):
 
             # if self.training and (self.training_forward_counter < self.num_soft_start_steps):
             #     alpha = self.training_forward_counter / self.num_soft_start_steps
-            #     relu_map = alpha * relu_map + (1 - alpha) * activation.sign().add_(1).div_(2)
+            #     relu_map = relu_map.mul_(alpha)
+            #     tmp = activation.sign().add_(1).div_(2).mul_(1-alpha)
+            #     relu_map = relu_map.add_(tmp)
             #     self.training_forward_counter += 1
+            #     torch.cuda.empty_cache()
 
         return relu_map.mul_(activation)
