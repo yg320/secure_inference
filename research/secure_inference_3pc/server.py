@@ -1,6 +1,14 @@
 import torch
 from research.communication.utils import send_recv, send, recv
 import time
+import numpy as np
+
+num_bit_to_dtype = {
+    8: np.ubyte,
+    16: np.ushort,
+    32: np.uintc,
+    64: np.ulonglong
+}
 
 class Server:
     def __init__(self, client_server_prf, server_provider_prf, client_server_socket, server_client_socket, server_provider_socket, provider_server_socket):
@@ -10,6 +18,27 @@ class Server:
         self.server_client_socket = server_client_socket
         self.server_provider_socket = server_provider_socket
         self.provider_server_socket = provider_server_socket
+
+        self.numpy_client_server_prf = np.random.default_rng(seed=123)
+        self.num_bits = 32
+        self.dtype = num_bit_to_dtype[self.num_bits]
+
+        self.min_val = np.iinfo(self.dtype).min
+        self.max_val = np.iinfo(self.dtype).max
+
+        self.L_minus_1 = 2 ** self.num_bits - 1
+
+    def add_mode_L_minus_one(self, a, b):
+        ret = a + b
+        ret[ret < a] += self.dtype(1)
+        ret[ret == self.L_minus_1] = self.dtype(0)
+        return ret
+
+    def sub_mode_L_minus_one(self, a, b):
+        ret = a - b
+        ret[b > a] -= self.dtype(1)
+        return ret
+
 
     def conv2d(self, X_share, Y_share, stride=1):
         assert Y_share.shape[2] == Y_share.shape[3]
@@ -44,6 +73,36 @@ class Server:
             torch.conv2d(X_share, F, bias=None, stride=stride, padding=padding, dilation=1, groups=1) + \
             torch.conv2d(E, Y_share, bias=None, stride=stride, padding=padding, dilation=1, groups=1) + C_share
 
+    def share_convert(self, a_1):
+        eta_pp = self.numpy_client_server_prf.integers(0, 2, size=a_0.shape, dtype=self.dtype)
+
+        r = self.numpy_client_server_prf.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
+        r_0 = self.numpy_client_server_prf.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
+        r_1 = r - r_0
+
+        alpha = (r < r_0).astype(self.dtype)
+
+        a_tild_1 = a_1 + r_1
+        beta_1 = (a_tild_1 < a_1).astype(self.dtype)
+        send(self.server_provider_socket, a_tild_1)
+
+        delta_1 = recv(self.provider_server_socket)
+
+        # execute_secure_compare
+
+        eta_p_1 = recv(self.provider_server_socket+1)
+
+        t0 = eta_pp * eta_p_1
+        t1 = self.add_mode_L_minus_one(t0, t0)
+        eta_1 = self.sub_mode_L_minus_one(eta_p_1, t1)
+
+        t0 = self.add_mode_L_minus_one(delta_1, eta_1)
+        theta_1 = self.add_mode_L_minus_one(beta_1, t0)
+
+        y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
+
+        return y_1
+
 
 if __name__ == "__main__":
 
@@ -56,59 +115,43 @@ if __name__ == "__main__":
     server = Server(
         client_server_prf=torch.Generator().manual_seed(1),
         server_provider_prf=torch.Generator().manual_seed(3),
-        client_server_socket=22123,
-        server_client_socket=22124,
-        server_provider_socket=22127,
-        provider_server_socket=22128,
+        client_server_socket=27123,
+        server_client_socket=28124,
+        server_provider_socket=23127,
+        provider_server_socket=24128,
     )
 
-    image_share_server = torch.rand(size=(1, 3, 256, 256), generator=server.client_server_prf)
-    weight_0_share_client = torch.rand(size=(32, 3, 3, 3), generator=server.client_server_prf)
-    weight_1_share_client = torch.rand(size=(32, 32, 3, 3), generator=server.client_server_prf)
-    weight_2_share_client = torch.rand(size=(64, 32, 3, 3), generator=server.client_server_prf)
+    rng = np.random.default_rng(seed=0)
+    a_0 = rng.integers(server.min_val, server.max_val + 1, size=(1000,), dtype=server.dtype)
+    a_1 = rng.integers(server.min_val, server.max_val + 1, size=(1000,), dtype=server.dtype)
+    a = a_0 + a_1
+    y_1 = server.share_convert(a_1)
+    y_0 = recv(server.client_server_socket)
 
-    weight_0_share_server = weight_0 - weight_0_share_client
-    weight_1_share_server = weight_1 - weight_1_share_client
-    weight_2_share_server = weight_2 - weight_2_share_client
+    print(np.all(server.add_mode_L_minus_one(y_0, y_1) == a))
+    print('fd')
 
-    t0 = time.time()
-    activation_share_server = image_share_server
-    activation_share_server = server.conv2d(activation_share_server, weight_0_share_server, stride=2)
-    activation_share_server = server.conv2d(activation_share_server, weight_1_share_server)
-    activation_share_server = server.conv2d(activation_share_server, weight_2_share_server)
-    print(time.time() - t0)
-    activation_share_client = recv(server.client_server_socket)
+
+    # image_share_server = torch.rand(size=(1, 3, 256, 256), generator=server.client_server_prf)
+    # weight_0_share_client = torch.rand(size=(32, 3, 3, 3), generator=server.client_server_prf)
+    # weight_1_share_client = torch.rand(size=(32, 32, 3, 3), generator=server.client_server_prf)
+    # weight_2_share_client = torch.rand(size=(64, 32, 3, 3), generator=server.client_server_prf)
+    #
+    # weight_0_share_server = weight_0 - weight_0_share_client
+    # weight_1_share_server = weight_1 - weight_1_share_client
+    # weight_2_share_server = weight_2 - weight_2_share_client
+    #
+    # t0 = time.time()
+    # activation_share_server = image_share_server
+    # activation_share_server = server.conv2d(activation_share_server, weight_0_share_server, stride=2)
+    # activation_share_server = server.conv2d(activation_share_server, weight_1_share_server)
+    # activation_share_server = server.conv2d(activation_share_server, weight_2_share_server)
+    # print(time.time() - t0)
+    # activation_share_client = recv(server.client_server_socket)
     #
     # activation_recon = activation_share_client + activation_share_server
     t0 = time.time()
-    activation_non_secure = torch.conv2d(torch.conv2d(torch.conv2d(image, weight_0, padding=1, stride=2), weight_1, padding=1), weight_2, padding=1)
-    print(time.time() - t0)
-    print((activation_non_secure - (activation_share_server + activation_share_client)).abs().max())
-    print('fdslkj')
-    # weights = torch.rand(size=(64, 3, 7, 7))
-    # print(send_recv(11213, 22123 , weights.numpy()))
-    # server_client_socket = 22123
-    # client_server_socket = 11213
-    # recv_list = [None]
-    # t0 = Thread(target=recv, args=(server_client_socket, recv_list))
-    # t1 = Thread(target=send, args=(client_server_socket,))
-    #
-    # t0.start()
-    # t1.start()
-    #
-    # t0.join()
-    # t1.join()
-    # print(recv_list[0])
-
-    #
-    #
-    #
-    # print(recv(server_client_socket))
-    # send(client_server_socket, data=np.arange(1000))
-    # with NumpySocket() as s:
-    #     s.bind(('', 9999))
-    #     s.listen()
-    #     conn, addr = s.accept()
-    #     with conn:
-    #         frame = conn.recv()
-    #
+    # activation_non_secure = torch.conv2d(torch.conv2d(torch.conv2d(image, weight_0, padding=1, stride=2), weight_1, padding=1), weight_2, padding=1)
+    # print(time.time() - t0)
+    # print((activation_non_secure - (activation_share_server + activation_share_client)).abs().max())
+    # print('fdslkj')

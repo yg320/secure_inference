@@ -15,11 +15,13 @@ def recv(socket):
         with conn:
             frame = conn.recv()
         print("Done!")
+    return frame
     return torch.from_numpy(frame)
 
 
 def send(socket, data):
-    data = data.numpy()
+    if type(data) == torch.Tensor:
+        data = data.numpy()
     with NumpySocket() as s:
         while True:
             succeeded = True
