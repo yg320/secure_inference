@@ -158,7 +158,7 @@ if __name__ == "__main__":
     crypt_provider = CryptoProvider(
         server_provider_prf=torch.Generator().manual_seed(3),
         client_provider_prf=torch.Generator().manual_seed(2),
-        client_provider_socket=41125,
+        client_provider_socket=45125,
         provider_client_socket=22126,
         server_provider_socket=23127,
         provider_server_socket=24128

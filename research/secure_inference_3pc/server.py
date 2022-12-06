@@ -30,6 +30,9 @@ class Server:
 
         self.L_minus_1 = 2 ** self.num_bits - 1
 
+        self.send_time = 0
+        self.recv_time = 0
+
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
         ret[ret < a] += self.dtype(1)
@@ -40,7 +43,6 @@ class Server:
         ret = a - b
         ret[b > a] -= self.dtype(1)
         return ret
-
 
     def conv2d(self, X_share, Y_share, stride=1, bias=None):
         assert Y_share.shape[2] == Y_share.shape[3]
@@ -60,13 +62,26 @@ class Server:
         E_share = X_share - A_share
         F_share = Y_share - B_share
 
+        t0 = time.time()
         send(self.server_client_socket, E_share)
-        E_share_client = torch.from_numpy(recv(self.client_server_socket))
-        send(self.server_client_socket, F_share)
-        F_share_client = torch.from_numpy(recv(self.client_server_socket))
+        self.send_time += (time.time() - t0)
 
-        # E_share_client = send_recv(self.client_server_socket, self.server_client_socket, E_share)
-        # F_share_client = send_recv(self.client_server_socket, self.server_client_socket, F_share)
+        t0 = time.time()
+        x = recv(self.client_server_socket)
+        self.recv_time += (time.time() - t0)
+
+        E_share_client = torch.from_numpy(x)
+
+        t0 = time.time()
+        send(self.server_client_socket, F_share)
+        self.send_time += (time.time() - t0)
+
+        t0 = time.time()
+        x = recv(self.client_server_socket)
+        self.recv_time += (time.time() - t0)
+
+        F_share_client = torch.from_numpy(x)
+
 
         E = E_share_client + E_share
         F = F_share_client + F_share
@@ -86,16 +101,26 @@ class Server:
         E_share = X_share - A_share
         F_share = Y_share - B_share
 
+        t0 = time.time()
         send(self.server_client_socket, E_share)
+        self.send_time += (time.time() - t0)
+
+        t0 = time.time()
         E_share_client = recv(self.client_server_socket)
+        self.recv_time += (time.time() - t0)
+
+        t0 = time.time()
         send(self.server_client_socket, F_share)
+        self.send_time += (time.time() - t0)
+
+        t0 = time.time()
         F_share_client = recv(self.client_server_socket)
+        self.recv_time += (time.time() - t0)
 
         E = E_share_client + E_share
         F = F_share_client + F_share
 
         return - E * F + X_share * F + Y_share * E + C_share
-
 
     def share_convert(self, a_1):
         eta_pp = self.numpy_client_server_prf.integers(0, 2, size=a_1.shape, dtype=self.dtype)
@@ -108,15 +133,30 @@ class Server:
 
         a_tild_1 = a_1 + r_1
         beta_1 = (a_tild_1 < a_1).astype(self.dtype)
+
+
+        t0 = time.time()
         send(self.server_provider_socket, a_tild_1)
+        self.send_time += (time.time() - t0)
 
+
+        t0 = time.time()
         delta_1 = recv(self.provider_server_socket)
+        self.recv_time += (time.time() - t0)
 
+
+        t0 = time.time()
         send(self.server_provider_socket, r)
-        send(self.server_provider_socket, eta_pp)
-        # execute_secure_compare
+        self.send_time += (time.time() - t0)
 
+        t0 = time.time()
+        send(self.server_provider_socket, eta_pp)
+        self.send_time += (time.time() - t0)
+
+        # execute_secure_compare
+        t0 = time.time()
         eta_p_1 = recv(self.provider_server_socket)
+        self.recv_time += (time.time() - t0)
 
         t0 = eta_pp * eta_p_1
         t1 = self.add_mode_L_minus_one(t0, t0)
@@ -131,21 +171,41 @@ class Server:
 
     def msb(self, a_1):
         beta = self.numpy_client_server_prf.integers(0, 2, size=a_1.shape, dtype=self.dtype)
-
+        t0 = time.time()
         x_1 = recv(self.provider_server_socket)
+        self.recv_time += (time.time() - t0)
+
+        t0 = time.time()
         x_bit_0_1 = recv(self.provider_server_socket)
+        self.recv_time += (time.time() - t0)
 
         y_1 = self.add_mode_L_minus_one(a_1, a_1)
         r_1 = self.add_mode_L_minus_one(x_1, y_1)
+
+
+        t0 = time.time()
         send(self.server_client_socket, r_1)
+        self.send_time += (time.time() - t0)
+
+        t0 = time.time()
         r_0 = recv(self.client_server_socket)
+        self.recv_time += (time.time() - t0)
+
         r = self.add_mode_L_minus_one(r_0, r_1)
 
+        t0 = time.time()
         send(self.server_provider_socket, r)
-        send(self.server_provider_socket, beta)
-        # execute_secure_compare
+        self.send_time += (time.time() - t0)
 
+        t0 = time.time()
+        send(self.server_provider_socket, beta)
+        self.send_time += (time.time() - t0)
+
+
+        # execute_secure_compare
+        t0 = time.time()
         beta_p_1 = recv(self.provider_server_socket)
+        self.recv_time += (time.time() - t0)
 
         gamma_1 = beta_p_1 + (1 * beta) - (2 * beta * beta_p_1)
         delta_1 = x_bit_0_1 + (1 * (r % 2)) - (2 * (r % 2) * x_bit_0_1)
@@ -306,11 +366,10 @@ if __name__ == "__main__":
 
         Ws_1 = [Ws[i] - Ws_0[i] for i in range(5)]
 
+        t0 = time.time()
         a_1 = I1
         a_1 = worker.conv2d(a_1, Ws_1[0], stride=2, bias=Bs[0])
         a_1 = worker.relu(a_1.numpy())
-
-
 
         # Block 0
         identity = a_1
@@ -328,6 +387,8 @@ if __name__ == "__main__":
         a_1 = a_1 + identity
         a_1 = worker.relu(a_1.numpy())
 
+        print(time.time() - t0)
+        print(worker.send_time + worker.recv_time)
         a_0 = recv(socket=server.client_server_socket)
         out = torch.from_numpy(a_0) + a_1
         out_float = out.to(torch.float32) / 10000
