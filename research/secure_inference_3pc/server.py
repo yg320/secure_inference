@@ -3,30 +3,30 @@ from research.communication.utils import Sender, Receiver
 import time
 import numpy as np
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn
-
+from scipy.signal import fftconvolve
 
 from research.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
 
 
 class SecureConv2DServer(SecureModule):
-    def __init__(self, W, bias, stride, dilation, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+    def __init__(self, W, bias, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
 
         self.W_share = W
         self.bias = bias
         self.stride = stride
         self.dilation = dilation
+        self.padding = padding
 
     def forward(self, X_share):
 
         assert self.W_share.shape[2] == self.W_share.shape[3]
+        if self.W_share.shape[1] != X_share.shape[1]:
+            print('fds')
         assert self.W_share.shape[1] == X_share.shape[1]
-        assert X_share.shape[2] == X_share.shape[3]
+        # assert X_share.shape[2] == X_share.shape[3]
         assert self.stride[0] == self.stride[1]
-
-        _, _, _, f = self.W_share.shape
-        padding = (f - 1) // 2
 
         A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
         B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_12_torch)
@@ -43,14 +43,18 @@ class SecureConv2DServer(SecureModule):
         F = F_share_client + F_share
 
         out = \
-            torch.conv2d(E, self.W_share - F, bias=None, stride=self.stride, padding=padding, dilation=1, groups=1) + \
-            torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=padding, dilation=1, groups=1)
+            torch.conv2d(E, self.W_share - F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
+            torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+        # E.shape
+        # tmp_0 = fftconvolve(E.numpy(), F.numpy(), mode=).shape
+        # tmp_1 = torch.conv2d(E, F).shape
 
         C_share = self.crypto_assets.get_random_tensor_over_L(shape=out.shape, prf=self.crypto_assets.prf_12_torch)
 
         out = out + C_share
         out = out // self.trunc
-        out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
+        if self.bias is not None:
+            out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
         return out
 
 
@@ -174,25 +178,77 @@ class SecureReLUServer(SecureModule):
         relu_0 = self.mult(X_share, MSB_0)
         return torch.from_numpy(relu_0.astype(np.int64))
 
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
+    if bn_module:
+        W, B = fuse_conv_bn(conv_module=conv_module, batch_norm_module=bn_module)
+        W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
+        B = (B * crypto_assets.trunc).to(crypto_assets.torch_dtype)
+        W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
+    else:
+        W = conv_module.weight
+        W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
+        W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
+        B = None
+
+    return SecureConv2DServer(
+        W=W,
+        bias=B,
+        stride=conv_module.stride,
+        dilation=conv_module.dilation,
+        padding=conv_module.padding,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets
+    )
+
+
+def aspp_head_secure_forward(self, inputs):
+    """Forward function for feature maps before classifying each pixel with
+    ``self.cls_seg`` fc.
+
+    Args:
+        inputs (list[Tensor]): List of multi-level img features.
+
+    Returns:
+        feats (Tensor): A tensor of shape (batch_size, self.channels,
+            H, W) which is feature map for last layer of decoder head.
+    """
+    x = self._transform_inputs(inputs)
+
+    aspp_outs = [
+        torch.ones_like(x) * x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
+    ]
+    aspp_outs.extend(self.aspp_modules(x))
+    aspp_outs = torch.cat(aspp_outs, dim=1)
+    feats = self.bottleneck(aspp_outs)
+    return feats
 
 if __name__ == "__main__":
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 
-    image_shape = (1, 3, 64, 64)
+    image_shape = (1, 3, 192, 256)
+    model_baseline = get_model(
+        config="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py",
+        gpu_id=None,
+        checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
+    )
+
     model = get_model(
         config="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py",
         gpu_id=None,
         checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
     )
-    desired_out = model.backbone.stem(torch.load("/home/yakir/tmp/data.pt") )
+    # model_baseline.decode_head._forward_feature = aspp_head_secure_forward
+    desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0)))
+    # input.mean(dim=[2,3], keepdims=True)
     #
-    port_01 = 12354
-    port_10 = 12355
-    port_02 = 12356
-    port_20 = 12357
-    port_12 = 12358
-    port_21 = 12359
+    port_01 = 12444
+    port_10 = 12445
+    port_02 = 12446
+    port_20 = 12447
+    port_12 = 12448
+    port_21 = 12449
+
 
     prf_01_seed = 0
     prf_02_seed = 1
@@ -230,62 +286,75 @@ if __name__ == "__main__":
         receiver_12=receiver_12
     )
 
-
-    W, B = fuse_conv_bn(conv_module=model.backbone.stem[0], batch_norm_module=model.backbone.stem[1])
-    W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-    B = (B * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-    W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
-    model.backbone.stem[0] = SecureConv2DServer(
-        W=W,
-        bias=B,
-        stride=model.backbone.stem[0].stride,
-        dilation=model.backbone.stem[0].dilation,
-        crypto_assets=crypto_assets,
-        network_assets=network_assets
-    )
-
+    model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
     model.backbone.stem[1] = torch.nn.Identity()
     model.backbone.stem[2] = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
 
-    W, B = fuse_conv_bn(conv_module=model.backbone.stem[3], batch_norm_module=model.backbone.stem[4])
-    W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-    B = (B * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-    W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
-    model.backbone.stem[3] = SecureConv2DServer(
-        W=W,
-        bias=B,
-        stride=model.backbone.stem[3].stride,
-        dilation=model.backbone.stem[3].dilation,
-        crypto_assets=crypto_assets,
-        network_assets=network_assets
-    )
-
+    model.backbone.stem[3] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[3], model.backbone.stem[4])
     model.backbone.stem[4] = torch.nn.Identity()
     model.backbone.stem[5] = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
 
-    W, B = fuse_conv_bn(conv_module=model.backbone.stem[6], batch_norm_module=model.backbone.stem[7])
-    W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-    B = (B * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-    W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
-    model.backbone.stem[6] = SecureConv2DServer(
-        W=W,
-        bias=B,
-        stride=model.backbone.stem[6].stride,
-        dilation=model.backbone.stem[6].dilation,
-        crypto_assets=crypto_assets,
-        network_assets=network_assets
-    )
-
+    model.backbone.stem[6] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[6], model.backbone.stem[7])
     model.backbone.stem[7] = torch.nn.Identity()
     model.backbone.stem[8] = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
+
+    for layer in [1, 2, 3, 4]:
+        for block in [0, 1]:
+            cur_res_layer = getattr(model.backbone, f"layer{layer}")
+            cur_res_layer[block].conv1 = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].conv1, cur_res_layer[block].bn1)
+            cur_res_layer[block].bn1 = torch.nn.Identity()
+            cur_res_layer[block].relu_1 = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
+
+            cur_res_layer[block].conv2 = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].conv2, cur_res_layer[block].bn2)
+            cur_res_layer[block].bn2 = torch.nn.Identity()
+            cur_res_layer[block].relu_2 = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
+
+            if cur_res_layer[block].downsample:
+                cur_res_layer[block].downsample = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].downsample[0], cur_res_layer[block].downsample[1])
+
+
+    model.decode_head.image_pool[1].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.image_pool[1].conv, model.decode_head.image_pool[1].bn)
+    model.decode_head.image_pool[1].bn = torch.nn.Identity()
+    model.decode_head.image_pool[1].activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
+
+    for i in range(4):
+        model.decode_head.aspp_modules[i].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.aspp_modules[i].conv, model.decode_head.aspp_modules[i].bn)
+        model.decode_head.aspp_modules[i].bn = torch.nn.Identity()
+        model.decode_head.aspp_modules[i].activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
+
+    model.decode_head.bottleneck.conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.bottleneck.conv, model.decode_head.bottleneck.bn)
+    model.decode_head.bottleneck.bn = torch.nn.Identity()
+    model.decode_head.bottleneck.activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
+
+    model.decode_head.conv_seg = build_secure_conv(crypto_assets, network_assets, model.decode_head.conv_seg, None)
+    model.decode_head.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
+
+
 
     I1 = crypto_assets.get_random_tensor_over_L(image_shape, prf=crypto_assets.prf_01_torch)
     import time
     time.sleep(5)
     print("Start")
-    out_1 = model.backbone.stem(I1)
+
+    # out_1 = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(I1)))
+    image = I1
+    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image))))
+    # out = model.backbone.layer1[0].relu_1(out)
+    # out = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image)))))
+    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(out))
+
+    # out = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(image)))
+
+    out = model.decode_head(model.backbone(image))    # xx = model.backbone.maxpool(model.backbone.stem(image))
+    # yy = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(xx)))
+    # yy = model.backbone.layer1[0].bn2(model.backbone.layer1[0].conv2(yy))
+    # yy = yy + xx
+    # out = model.backbone.layer1[0].relu_2(yy)
+
     out_0 = network_assets.receiver_01.get()
 
-    out = (torch.from_numpy(out_0) + out_1)
-    out = out.to(torch.float32) / 10000
+    # desired_out = model_baseline.backbone.layer1(model_baseline.backbone.maxpool(model_baseline.backbone.stem(torch.load("/home/yakir/tmp/data.pt"))))
+    X = (torch.from_numpy(out_0) + out)
+    X = X.to(torch.float32) / 10000
+    print((X-desired_out).abs().max())
     assert False
