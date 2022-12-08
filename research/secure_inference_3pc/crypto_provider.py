@@ -3,7 +3,7 @@ from research.communication.utils import Sender, Receiver
 import numpy as np
 import time
 
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult_single
 
 
 from research.communication.utils import Sender, Receiver
@@ -11,6 +11,47 @@ from research.secure_inference_3pc.base import SecureModule, NetworkAssets, Cryp
 
 
 class SecureConv2DCryptoProvider(SecureModule):
+    def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+        super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
+
+        self.W_shape = W_shape
+        self.stride = stride
+        self.dilation = dilation
+        self.padding = padding
+
+    def forward(self, X_share):
+
+        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
+        B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
+        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
+        B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
+
+        A = A_share_0 + A_share_1
+        B = B_share_0 + B_share_1
+
+        A = A.numpy()
+        B = B.numpy()
+
+        A, B, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+
+        A = A.copy()
+        B = B.copy()
+
+        out_numpy = mat_mult_single(A[0], B)
+        out_numpy = out_numpy[np.newaxis]
+        out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
+        C = torch.from_numpy(out_numpy)
+
+        # C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+
+        C_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=C.shape, prf=self.crypto_assets.prf_12_torch)
+        C_share_0 = C - C_share_1
+
+        self.network_assets.sender_02.put(C_share_0)
+
+        return C_share_0
+
+class SecureConv2DCryptoProvider_V2(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
 
@@ -37,7 +78,6 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.network_assets.sender_02.put(C_share_0)
 
         return C_share_0
-
 
 class ShareConvertCryptoProvider(SecureModule):
     def __init__(self, crypto_assets, network_assets):
@@ -166,12 +206,12 @@ if __name__ == "__main__":
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
     image_shape = (1, 3, 192, 256)
 
-    port_01 = 12454
-    port_10 = 12455
-    port_02 = 12456
-    port_20 = 12457
-    port_12 = 12458
-    port_21 = 12459
+    port_01 = 12464
+    port_10 = 12465
+    port_02 = 12466
+    port_20 = 12467
+    port_12 = 12468
+    port_21 = 12469
 
 
     prf_01_seed = 0
@@ -267,7 +307,8 @@ if __name__ == "__main__":
     time.sleep(5)
     print("Start")
     image = dummy_I
-    out = model.backbone.stem(image)
+    out = model.decode_head(model.backbone(image))
+
 
     assert False
 
