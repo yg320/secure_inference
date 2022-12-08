@@ -145,7 +145,7 @@ class SecureReLUCryptoProvider(SecureModule):
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share_np = X_share.numpy().astype(np.uint64)
+        X_share_np = X_share.numpy().astype(self.dtype)
         X_share_np = self.DReLU(X_share_np)
         self.mult(X_share_np.shape)
         return X_share
@@ -166,12 +166,12 @@ if __name__ == "__main__":
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
     image_shape = (1, 3, 192, 256)
 
-    port_01 = 12444
-    port_10 = 12445
-    port_02 = 12446
-    port_20 = 12447
-    port_12 = 12448
-    port_21 = 12449
+    port_01 = 12454
+    port_10 = 12455
+    port_02 = 12456
+    port_20 = 12457
+    port_12 = 12458
+    port_21 = 12459
 
 
     prf_01_seed = 0
@@ -266,23 +266,8 @@ if __name__ == "__main__":
     import time
     time.sleep(5)
     print("Start")
-    # out_0 = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(dummy_I)))
     image = dummy_I
-
-    # out = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image)))))
-    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(out))
-
-    # xx = model.backbone.maxpool(model.backbone.stem(image))
-    # yy = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(xx)))
-    # yy = model.backbone.layer1[0].bn2(model.backbone.layer1[0].conv2(yy))
-    # yy = yy + xx
-    #
-    # out = model.backbone.layer1[0].relu_2(yy)
-    # out = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(image)))
-    out = model.decode_head(model.backbone(image))
-
-    # model.backbone(dummy_I)
-
+    out = model.backbone.stem(image)
 
     assert False
 

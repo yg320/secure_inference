@@ -42,12 +42,10 @@ class SecureConv2DServer(SecureModule):
         E = E_share_client + E_share
         F = F_share_client + F_share
 
+        new_weight = self.W_share - F
         out = \
-            torch.conv2d(E, self.W_share - F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
+            torch.conv2d(E, new_weight, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
             torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        # E.shape
-        # tmp_0 = fftconvolve(E.numpy(), F.numpy(), mode=).shape
-        # tmp_1 = torch.conv2d(E, F).shape
 
         C_share = self.crypto_assets.get_random_tensor_over_L(shape=out.shape, prf=self.crypto_assets.prf_12_torch)
 
@@ -173,10 +171,10 @@ class SecureReLUServer(SecureModule):
         self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share = X_share.numpy().astype(np.uint64)
+        X_share = X_share.numpy().astype(self.dtype)
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0)
-        return torch.from_numpy(relu_0.astype(np.int64))
+        return torch.from_numpy(relu_0.astype(self.signed_type))
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     if bn_module:
@@ -239,15 +237,15 @@ if __name__ == "__main__":
         checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
     )
     # model_baseline.decode_head._forward_feature = aspp_head_secure_forward
-    desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0)))
+    # desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0)))
     # input.mean(dim=[2,3], keepdims=True)
     #
-    port_01 = 12444
-    port_10 = 12445
-    port_02 = 12446
-    port_20 = 12447
-    port_12 = 12448
-    port_21 = 12449
+    port_01 = 12454
+    port_10 = 12455
+    port_02 = 12456
+    port_20 = 12457
+    port_12 = 12458
+    port_21 = 12459
 
 
     prf_01_seed = 0
@@ -312,7 +310,6 @@ if __name__ == "__main__":
             if cur_res_layer[block].downsample:
                 cur_res_layer[block].downsample = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].downsample[0], cur_res_layer[block].downsample[1])
 
-
     model.decode_head.image_pool[1].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.image_pool[1].conv, model.decode_head.image_pool[1].bn)
     model.decode_head.image_pool[1].bn = torch.nn.Identity()
     model.decode_head.image_pool[1].activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
@@ -336,25 +333,13 @@ if __name__ == "__main__":
     time.sleep(5)
     print("Start")
 
-    # out_1 = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(I1)))
     image = I1
-    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image))))
-    # out = model.backbone.layer1[0].relu_1(out)
-    # out = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image)))))
-    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(out))
-
-    # out = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(image)))
-
-    out = model.decode_head(model.backbone(image))    # xx = model.backbone.maxpool(model.backbone.stem(image))
-    # yy = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(xx)))
-    # yy = model.backbone.layer1[0].bn2(model.backbone.layer1[0].conv2(yy))
-    # yy = yy + xx
-    # out = model.backbone.layer1[0].relu_2(yy)
-
+    out = model.backbone.stem(image)
     out_0 = network_assets.receiver_01.get()
 
-    # desired_out = model_baseline.backbone.layer1(model_baseline.backbone.maxpool(model_baseline.backbone.stem(torch.load("/home/yakir/tmp/data.pt"))))
     X = (torch.from_numpy(out_0) + out)
-    X = X.to(torch.float32) / 10000
+    X = X.to(torch.float32) / crypto_assets.trunc
+
+    desired_out = model_baseline.backbone.stem(torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0))
     print((X-desired_out).abs().max())
     assert False

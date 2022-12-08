@@ -175,10 +175,10 @@ class SecureReLUClient(SecureModule):
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share = X_share.numpy().astype(np.uint64)
+        X_share = X_share.numpy().astype(self.dtype)
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0)
-        return torch.from_numpy(relu_0.astype(np.int64))
+        return torch.from_numpy(relu_0.astype(self.signed_type))
 
 
 def build_secure_conv(crypto_assets, network_assets, module):
@@ -198,12 +198,12 @@ if __name__ == "__main__":
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 
-    port_01 = 12444
-    port_10 = 12445
-    port_02 = 12446
-    port_20 = 12447
-    port_12 = 12448
-    port_21 = 12449
+    port_01 = 12454
+    port_10 = 12455
+    port_02 = 12456
+    port_20 = 12457
+    port_12 = 12458
+    port_21 = 12459
 
 
     prf_01_seed = 0
@@ -295,29 +295,14 @@ if __name__ == "__main__":
 
 
 
-    I = (torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0) * 10000).to(crypto_assets.torch_dtype)
+    I = (torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)
     I1 = crypto_assets.get_random_tensor_over_L(I.shape, prf=crypto_assets.prf_01_torch)
     I0 = I - I1
     import time
     time.sleep(5)
     print("Start")
-    # out_0 = model.backbone.layer1(model.backbone.maxpool(model.backbone.stem(I0)))
     image = I0
-    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image))))
-    # out = model.backbone.layer1[0].relu_1(out)
 
-    # xx = model.backbone.maxpool(model.backbone.stem(image))
-    # yy = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(xx)))
-    # yy = model.backbone.layer1[0].bn2(model.backbone.layer1[0].conv2(yy))
-    # yy = yy + xx
-    #
-    # out = model.backbone.layer1[0].relu_2(yy)
-    # out = model.backbone.layer1[0].relu_1(model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(model.backbone.maxpool(model.backbone.stem(image)))))
-    # out = model.backbone.layer1[0].bn1(model.backbone.layer1[0].conv1(out))
-
-    # out = model.backbone.layer1[0](model.backbone.maxpool(model.backbone.stem(image)))
-    # out = model.backbone.layer1[0](model.backbone.maxpool(model.backbone.stem(image)))
-    out = model.decode_head(model.backbone(image))
+    out = model.backbone.stem(image)
     network_assets.sender_01.put(out)
-    # torch.load("/home/yakir/tmp/data.pt")
     assert False

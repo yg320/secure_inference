@@ -11,6 +11,15 @@ num_bit_to_dtype = {
     64: np.ulonglong
 }
 
+num_bit_to_sign_dtype = {
+    32: np.int32,
+    64: np.int64
+}
+
+num_bit_to_torch_dtype = {
+    32: torch.int32,
+    64: torch.int64
+}
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -36,6 +45,9 @@ class NetworkAssets:
             self.sender_01.start()
 
 
+NUM_BITS = 32
+TRUNC = 10000
+
 class CryptoAssets:
     def __init__(self, prf_01_numpy, prf_02_numpy, prf_12_numpy, prf_01_torch, prf_02_torch, prf_12_torch):
 
@@ -49,8 +61,8 @@ class CryptoAssets:
         self.private_prf_numpy = np.random.default_rng(seed=31243)
         self.private_prf_torch = torch.Generator().manual_seed(31243)
 
-        self.torch_dtype = torch.int64
-        self.trunc = 10000
+        self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
+        self.trunc = TRUNC
 
     def get_random_tensor_over_L(self, shape, prf):
         return torch.randint(
@@ -71,13 +83,14 @@ class SecureModule(torch.nn.Module):
         self.crypto_assets = crypto_assets
         self.network_assets = network_assets
 
-        self.trunc = 10000
-        self.torch_dtype = torch.int64
-        self.num_bits = 64
-        self.dtype = num_bit_to_dtype[self.num_bits]
+        self.trunc = TRUNC
+        self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
+        self.dtype = num_bit_to_dtype[NUM_BITS]
+
         self.min_val = np.iinfo(self.dtype).min
         self.max_val = np.iinfo(self.dtype).max
-        self.L_minus_1 = 2 ** self.num_bits - 1
+        self.L_minus_1 = 2 ** NUM_BITS - 1
+        self.signed_type = num_bit_to_sign_dtype[NUM_BITS]
 
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
