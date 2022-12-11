@@ -130,21 +130,35 @@ class PrivateCompareServer(SecureModule):
         super(PrivateCompareServer, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_1, r, beta):
-
-        orig_shape = list(r.shape)
+        t0 = time.time()
 
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
-        u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
+        # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
 
         t = r + self.crypto_assets.numpy_dtype(1)
         party = self.crypto_assets.numpy_dtype(1)
+        t1 = time.time()
+
         r_bits = decompose(r)
         t_bits = decompose(t)
 
+        t2 = time.time()
         c_bits_1 = get_c(x_bits_1, r_bits, t_bits, beta, party)
-
-        d_bits_1 = (s * c_bits_1) % P
+        t3 = time.time()
+        xxx = (s * c_bits_1).astype(np.int32)
+        t4 = time.time()
+        d_bits_1 = (xxx % P).astype(np.uint8)
+        t5 = time.time()
         d_bits_1 = self.crypto_assets.prf_01_numpy.permutation(d_bits_1, axis=-1)
+        t6 = time.time()
+        print("================")
+        print(t1 - t0)
+        print(t2 - t1)
+        print(t3 - t2)
+        print(t4 - t3)
+        print(t5 - t4)
+        print(t6 - t5)
+        print("================")
         self.network_assets.sender_12.put(d_bits_1)
 
 
@@ -165,12 +179,15 @@ class ShareConvertServer(SecureModule):
 
         self.network_assets.sender_12.put(a_tild_1)
 
-        x_bits_1 = self.network_assets.receiver_12.get()
-        delta_1 = self.network_assets.receiver_12.get()
+        x_bits_1 = self.network_assets.receiver_12.get().astype(np.uint64)
+        delta_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
 
+        # self.network_assets.sender_12.put(r-1)
+        # self.network_assets.sender_12.put(eta_pp)
         self.private_compare(x_bits_1, r - 1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
 
+        time0 = time.time()
         t0 = eta_pp * eta_p_1
         t1 = self.add_mode_L_minus_one(t0, t0)
         eta_1 = self.sub_mode_L_minus_one(eta_p_1, t1)
@@ -179,7 +196,7 @@ class ShareConvertServer(SecureModule):
         theta_1 = self.add_mode_L_minus_one(beta_1, t0)
 
         y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-
+        time1 = time.time()
         return y_1
 
 
@@ -215,9 +232,9 @@ class SecureMSBServer(SecureModule):
 
     def forward(self, a_1):
         beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_1.shape, dtype=self.dtype)
+        x_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
 
-        x_bits_1 = self.network_assets.receiver_12.get()
-        x_1 = self.network_assets.receiver_12.get()
+        x_bits_1 = self.network_assets.receiver_12.get().astype(np.uint64)
         x_bit_0_1 = self.network_assets.receiver_12.get()
 
         y_1 = self.add_mode_L_minus_one(a_1, a_1)
@@ -229,6 +246,8 @@ class SecureMSBServer(SecureModule):
 
         r = self.add_mode_L_minus_one(r_0, r_1)
 
+        # self.network_assets.sender_12.put(r)
+        # self.network_assets.sender_12.put(beta)
         self.private_compare(x_bits_1, r, beta)
 
         beta_p_1 = self.network_assets.receiver_12.get()
@@ -422,6 +441,7 @@ if __name__ == "__main__":
 
     image = I1
     # out = model.decode_head(model.backbone(image))
-    out = model.backbone.stem(image)
+    out = model.backbone.layer1(model.backbone.stem(image))
+
     network_assets.sender_01.put(out)
 

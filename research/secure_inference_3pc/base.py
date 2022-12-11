@@ -309,20 +309,36 @@ def mat_mult_single(a, b):
 
 
 def get_c(x_bits, r_bits, t_bits, beta, j):
+    t0 = time.time()
     x_bits = x_bits.astype(np.int32)
     r_bits = r_bits.astype(np.int32)
     t_bits = t_bits.astype(np.int32)
     beta = beta.astype(np.int32)
     j = j.astype(np.int32)
-    one = np.int32(1)
-    two = np.int32(2)
     beta = beta[..., np.newaxis]
-    multiplexer_bits = r_bits * (one-beta) + t_bits * beta
-    w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
-    rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
+    t1 = time.time()
 
-    zzz = j + (one - two*beta) * (j * multiplexer_bits - x_bits)
-    return ((rrr + zzz) % P).astype(np.uint64)
+    multiplexer_bits = r_bits * (1 - beta) + t_bits * beta
+    t2 = time.time()
+    w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
+    t3 = time.time()
+    rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
+    t4 = time.time()
+    zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
+    t5 = time.time()
+    ret = rrr + zzz
+    t6 = time.time()
+    if j == 1:
+        print("**************************************")
+        print("get_c ", t1 - t0)
+        print("get_c ", t2 - t1)
+        print("get_c ", t3 - t2)
+        print("get_c ", t4 - t3)
+        print("get_c ", t5 - t4)
+        print("get_c ", t6 - t5)
+        print("**************************************")
+
+    return ret
 
 # def get_c_case_0(x_bits, r_bits, j):
 #     x_bits = x_bits.astype(np.int32)

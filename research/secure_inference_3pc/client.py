@@ -51,7 +51,7 @@ class SecureConv2DClient(SecureModule):
         E = E.copy()
         self.W_share = self.W_share.copy()
 
-        print(f"SecureConv2DClient extras finished - {time.time() - t1}")
+        # print(f"SecureConv2DClient extras finished - {time.time() - t1}")
 
         out_numpy = mat_mult(X_share[0], F, E[0], self.W_share)
         out_numpy = out_numpy[np.newaxis]
@@ -118,8 +118,10 @@ class PrivateCompareClient(SecureModule):
 
     def forward(self, x_bits_0, r, beta):
 
+        if np.any(r == np.iinfo(r.dtype).max):
+            assert False
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
-        u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
+        # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
 
         t = r + self.crypto_assets.numpy_dtype(1)
         party = self.crypto_assets.numpy_dtype(0)
@@ -127,8 +129,9 @@ class PrivateCompareClient(SecureModule):
         t_bits = decompose(t)
 
         c_bits_0 = get_c(x_bits_0, r_bits, t_bits, beta, party)
+        xxx = (s * c_bits_0).astype(np.int32)
+        d_bits_0 = (xxx % P).astype(np.uint8)
 
-        d_bits_0 = (s * c_bits_0) % P
         d_bits_0 = self.crypto_assets.prf_01_numpy.permutation(d_bits_0, axis=-1)
         self.network_assets.sender_02.put(d_bits_0)
 
@@ -153,12 +156,12 @@ class ShareConvertClient(SecureModule):
         beta_0 = (a_tild_0 < a_0).astype(self.dtype)
         self.network_assets.sender_02.put(a_tild_0)
 
-        x_bits_0 = self.network_assets.receiver_02.get()
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=self.dtype)
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
 
-        eta_p_0 = self.network_assets.receiver_02.get()
+        eta_p_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val, size=a_0.shape, dtype=self.dtype)
 
         t0 = eta_pp * eta_p_0
         t1 = self.add_mode_L_minus_one(t0, t0)
@@ -213,7 +216,7 @@ class SecureMSBClient(SecureModule):
 
         beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
 
-        x_bits_0 = self.network_assets.receiver_02.get()
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=self.dtype)
         x_0 = self.network_assets.receiver_02.get()
         x_bit_0_0 = self.network_assets.receiver_02.get()
 
@@ -389,7 +392,7 @@ if __name__ == "__main__":
     print("Start")
     image = I0
     t0 = time.time()
-    out_0 = model.backbone.stem(image)
+    out_0 = model.backbone.layer1(model.backbone.stem(image))
     out_1 = network_assets.receiver_01.get()
 
     out = (torch.from_numpy(out_1) + out_0)
@@ -400,7 +403,7 @@ if __name__ == "__main__":
         gpu_id=None,
         checkpoint_path=model_path
     )
-    desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0))
+    desired_out = model_baseline.backbone.layer1(model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0)))
     print((out - desired_out).abs().max())
     assert False
 

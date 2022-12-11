@@ -3,8 +3,8 @@ from research.communication.utils import Sender, Receiver
 import numpy as np
 import time
 
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult_single, Addresses, P, sub_mode_p, decompose
-
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, \
+    post_conv, mat_mult_single, Addresses, P, sub_mode_p, decompose
 
 from research.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
@@ -20,10 +20,11 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
-
-        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
+        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
+                                                                prf=self.crypto_assets.prf_12_torch)
         B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
-        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
+        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
+                                                                prf=self.crypto_assets.prf_02_torch)
         B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
 
         A = A_share_0 + A_share_1
@@ -32,7 +33,9 @@ class SecureConv2DCryptoProvider(SecureModule):
         A = A.numpy()
         B = B.numpy()
 
-        A, B, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+        A, B, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, bias=None, stride=self.stride,
+                                                                               padding=self.padding,
+                                                                               dilation=self.dilation, groups=1)
 
         A = A.copy()
         B = B.copy()
@@ -51,6 +54,7 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         return C_share_0
 
+
 class SecureConv2DCryptoProvider_V2(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
@@ -61,10 +65,11 @@ class SecureConv2DCryptoProvider_V2(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
-
-        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
+        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
+                                                                prf=self.crypto_assets.prf_12_torch)
         B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
-        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
+        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
+                                                                prf=self.crypto_assets.prf_02_torch)
         B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
 
         A = A_share_0 + A_share_1
@@ -93,13 +98,13 @@ class PrivateCompareCryptoProvider(SecureModule):
 
         return beta_p
 
+
 class ShareConvertCryptoProvider(SecureModule):
     def __init__(self, crypto_assets, network_assets):
         super(ShareConvertCryptoProvider, self).__init__(crypto_assets, network_assets)
         self.private_compare = PrivateCompareCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, size):
-
         a_tild_0 = self.network_assets.receiver_02.get()
         a_tild_1 = self.network_assets.receiver_12.get()
 
@@ -107,26 +112,26 @@ class ShareConvertCryptoProvider(SecureModule):
 
         x_bits = decompose(x)
 
-        x_bits_0 = self.crypto_assets.private_prf_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
-
 
         delta = (x < a_tild_0).astype(self.dtype)
 
-        delta_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
-        delta_1 = self.sub_mode_L_minus_one(delta, delta_0)
+        delta_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        delta_0 = self.sub_mode_L_minus_one(delta, delta_1)
 
-        self.network_assets.sender_02.put(x_bits_0)
         self.network_assets.sender_02.put(delta_0)
-        self.network_assets.sender_12.put(x_bits_1)
-        self.network_assets.sender_12.put(delta_1)
+        self.network_assets.sender_12.put(x_bits_1.astype(np.uint8))
+
+        # r = self.network_assets.receiver_12.get()
+        # eta_p = self.network_assets.receiver_12.get()
+        # eta_p = eta_p ^ (x > r)
 
         eta_p = self.private_compare()
 
-        eta_p_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        eta_p_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
         eta_p_1 = self.sub_mode_L_minus_one(eta_p, eta_p_0)
 
-        self.network_assets.sender_02.put(eta_p_0)
         self.network_assets.sender_12.put(eta_p_1)
 
         return
@@ -137,12 +142,16 @@ class SecureMultiplicationCryptoProvider(SecureModule):
         super(SecureMultiplicationCryptoProvider, self).__init__(crypto_assets, network_assets)
 
     def forward(self, shape):
-
-        A_share_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=shape, dtype=self.dtype)
-        B_share_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=shape, dtype=self.dtype)
-        C_share_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=shape, dtype=self.dtype)
-        A_share_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=shape, dtype=self.dtype)
-        B_share_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=shape, dtype=self.dtype)
+        A_share_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=shape,
+                                                             dtype=self.dtype)
+        B_share_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=shape,
+                                                             dtype=self.dtype)
+        C_share_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=shape,
+                                                             dtype=self.dtype)
+        A_share_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=shape,
+                                                             dtype=self.dtype)
+        B_share_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=shape,
+                                                             dtype=self.dtype)
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
@@ -163,27 +172,30 @@ class SecureMSBCryptoProvider(SecureModule):
 
         x_bits = decompose(x)
 
-        x_bits_0 = self.crypto_assets.private_prf_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
-        x_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
-        x_1 = self.sub_mode_L_minus_one(x, x_0)
+        x_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        x_0 = self.sub_mode_L_minus_one(x, x_1)
 
         x_bit0 = x % 2
-        x_bit_0_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val + 1, size=size, dtype=self.dtype)
+        x_bit_0_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val + 1, size=size,
+                                                                  dtype=self.dtype)
         x_bit_0_1 = x_bit0 - x_bit_0_0
 
-        self.network_assets.sender_02.put(x_bits_0)
         self.network_assets.sender_02.put(x_0)
         self.network_assets.sender_02.put(x_bit_0_0)
 
-        self.network_assets.sender_12.put(x_bits_1)
-        self.network_assets.sender_12.put(x_1)
+        self.network_assets.sender_12.put(x_bits_1.astype(np.uint8))
         self.network_assets.sender_12.put(x_bit_0_1)
 
+        # r = self.network_assets.receiver_12.get()
+        # beta = self.network_assets.receiver_12.get()
+        # beta_p = beta ^ (x > r)
         beta_p = self.private_compare()
 
-        beta_p_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val + 1, size=size, dtype=self.dtype)
+        beta_p_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val + 1, size=size,
+                                                                 dtype=self.dtype)
         beta_p_1 = beta_p - beta_p_0
 
         self.network_assets.sender_02.put(beta_p_0)
@@ -219,6 +231,7 @@ class SecureReLUCryptoProvider(SecureModule):
         self.mult(X_share_np.shape)
         return X_share
 
+
 def build_secure_conv(crypto_assets, network_assets, conv_module):
     return SecureConv2DCryptoProvider(
         W_shape=conv_module.weight.shape,
@@ -228,11 +241,13 @@ def build_secure_conv(crypto_assets, network_assets, conv_module):
         crypto_assets=crypto_assets,
         network_assets=network_assets
     )
-if __name__ == "__main__":
 
+
+if __name__ == "__main__":
 
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+
     image_shape = (1, 3, 192, 256)
 
     addresses = Addresses()
@@ -242,8 +257,6 @@ if __name__ == "__main__":
     port_20 = addresses.port_20
     port_12 = addresses.port_12
     port_21 = addresses.port_21
-
-
 
     prf_01_seed = 0
     prf_02_seed = 1
@@ -287,15 +300,18 @@ if __name__ == "__main__":
         checkpoint_path=None
     )
 
-    model.backbone.stem[0] = build_secure_conv(crypto_assets=crypto_assets, network_assets=network_assets, conv_module=model.backbone.stem[0])
+    model.backbone.stem[0] = build_secure_conv(crypto_assets=crypto_assets, network_assets=network_assets,
+                                               conv_module=model.backbone.stem[0])
     model.backbone.stem[1] = torch.nn.Identity()
     model.backbone.stem[2] = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
 
-    model.backbone.stem[3] = build_secure_conv(crypto_assets=crypto_assets, network_assets=network_assets, conv_module=model.backbone.stem[3])
+    model.backbone.stem[3] = build_secure_conv(crypto_assets=crypto_assets, network_assets=network_assets,
+                                               conv_module=model.backbone.stem[3])
     model.backbone.stem[4] = torch.nn.Identity()
     model.backbone.stem[5] = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
 
-    model.backbone.stem[6] = build_secure_conv(crypto_assets=crypto_assets, network_assets=network_assets, conv_module=model.backbone.stem[6])
+    model.backbone.stem[6] = build_secure_conv(crypto_assets=crypto_assets, network_assets=network_assets,
+                                               conv_module=model.backbone.stem[6])
     model.backbone.stem[7] = torch.nn.Identity()
     model.backbone.stem[8] = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
 
@@ -304,27 +320,36 @@ if __name__ == "__main__":
             cur_res_layer = getattr(model.backbone, f"layer{layer}")
             cur_res_layer[block].conv1 = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].conv1)
             cur_res_layer[block].bn1 = torch.nn.Identity()
-            cur_res_layer[block].relu_1 = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
+            cur_res_layer[block].relu_1 = SecureReLUCryptoProvider(crypto_assets=crypto_assets,
+                                                                   network_assets=network_assets)
 
             cur_res_layer[block].conv2 = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].conv2)
             cur_res_layer[block].bn2 = torch.nn.Identity()
-            cur_res_layer[block].relu_2 = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
+            cur_res_layer[block].relu_2 = SecureReLUCryptoProvider(crypto_assets=crypto_assets,
+                                                                   network_assets=network_assets)
 
             if cur_res_layer[block].downsample:
-                cur_res_layer[block].downsample = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].downsample[0])
+                cur_res_layer[block].downsample = build_secure_conv(crypto_assets, network_assets,
+                                                                    cur_res_layer[block].downsample[0])
 
-    model.decode_head.image_pool[1].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.image_pool[1].conv)
+    model.decode_head.image_pool[1].conv = build_secure_conv(crypto_assets, network_assets,
+                                                             model.decode_head.image_pool[1].conv)
     model.decode_head.image_pool[1].bn = torch.nn.Identity()
-    model.decode_head.image_pool[1].activate = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
+    model.decode_head.image_pool[1].activate = SecureReLUCryptoProvider(crypto_assets=crypto_assets,
+                                                                        network_assets=network_assets)
 
     for i in range(4):
-        model.decode_head.aspp_modules[i].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.aspp_modules[i].conv)
+        model.decode_head.aspp_modules[i].conv = build_secure_conv(crypto_assets, network_assets,
+                                                                   model.decode_head.aspp_modules[i].conv)
         model.decode_head.aspp_modules[i].bn = torch.nn.Identity()
-        model.decode_head.aspp_modules[i].activate = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
+        model.decode_head.aspp_modules[i].activate = SecureReLUCryptoProvider(crypto_assets=crypto_assets,
+                                                                              network_assets=network_assets)
 
-    model.decode_head.bottleneck.conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.bottleneck.conv)
+    model.decode_head.bottleneck.conv = build_secure_conv(crypto_assets, network_assets,
+                                                          model.decode_head.bottleneck.conv)
     model.decode_head.bottleneck.bn = torch.nn.Identity()
-    model.decode_head.bottleneck.activate = SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
+    model.decode_head.bottleneck.activate = SecureReLUCryptoProvider(crypto_assets=crypto_assets,
+                                                                     network_assets=network_assets)
 
     model.decode_head.conv_seg = build_secure_conv(crypto_assets, network_assets, model.decode_head.conv_seg)
     model.decode_head.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
@@ -335,12 +360,10 @@ if __name__ == "__main__":
     )
 
     import time
+
     time.sleep(5)
     print("Start")
     image = dummy_I
-    out = model.backbone.stem(image)
-
+    out = model.backbone.layer1(model.backbone.stem(image))
 
     assert False
-
-
