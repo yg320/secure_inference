@@ -21,6 +21,15 @@ num_bit_to_torch_dtype = {
     64: torch.int64
 }
 
+class Addresses:
+    def __init__(self):
+        self.port_01 = 12474
+        self.port_10 = 12475
+        self.port_02 = 12476
+        self.port_20 = 12477
+        self.port_12 = 12478
+        self.port_21 = 12479
+
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
         # TODO: transfer only port
@@ -47,6 +56,21 @@ class NetworkAssets:
 
 NUM_BITS = 64
 TRUNC = 10000
+dtype = num_bit_to_dtype[NUM_BITS]
+powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis]
+moduli = (2 ** powers)
+P = 67
+def decompose(value):
+    orig_shape = list(value.shape)
+    value_bits = (value.reshape(-1, 1) & moduli) >> powers
+    return value_bits.reshape(orig_shape + [NUM_BITS])
+
+def sub_mode_p(x, y):
+    mask = y > x
+    ret = x - y
+    ret_2 = x + (P - y)
+    ret[mask] = ret_2[mask]
+    return ret
 
 class CryptoAssets:
     def __init__(self, prf_01_numpy, prf_02_numpy, prf_12_numpy, prf_01_torch, prf_02_torch, prf_12_torch):
@@ -61,9 +85,11 @@ class CryptoAssets:
         self.private_prf_numpy = np.random.default_rng(seed=31243)
         self.private_prf_torch = torch.Generator().manual_seed(31243)
 
+        self.numpy_dtype = num_bit_to_dtype[NUM_BITS]
         self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
         self.trunc = TRUNC
 
+        self.numpy_max_val = np.iinfo(self.numpy_dtype).max
     def get_random_tensor_over_L(self, shape, prf):
         return torch.randint(
             low=torch.iinfo(self.torch_dtype).min // 2,
@@ -174,7 +200,7 @@ def pre_conv(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1
     # Apply padding to the input
     if padding != (0, 0):
         padding_mode = "constant"
-        input = np.pad(input, ((0,0), (0, 0), (padding[1], padding[1]), (padding[0], padding[0])), mode='constant')
+        input = np.pad(input, ((0, 0), (0, 0), (padding[1], padding[1]), (padding[0], padding[0])), mode='constant')
         # Update shape after padding
         nb_rows_in += 2 * padding[0]
         nb_cols_in += 2 * padding[1]
@@ -280,3 +306,30 @@ def mat_mult_single(a, b):
             for j in range(b.shape[1]):
                 res[i,j] += a[i,k] * b[k,j]
     return res
+
+
+
+def get_c_case_0(x_bits, r_bits, j):
+    w = (((x_bits + j * r_bits) % P) + ((dtype(P) - ((dtype(2) * r_bits * x_bits) % P)) % P))
+    rrr = sub_mode_p(w[..., ::-1].cumsum(axis=-1)[..., ::-1] % P, w)
+    a = dtype((((j * r_bits + j) % P) + ((P - x_bits) % P)) % P)
+    return (a+rrr) % P
+
+def get_c_case_1(x_bits, t_bits, j):
+    a = x_bits + j * t_bits
+    b = (dtype(2) * t_bits * x_bits) % P
+    c = P - b
+    w = (a + c) % P
+    rrr = sub_mode_p(w[..., ::-1].cumsum(axis=-1)[..., ::-1] % P, w)
+
+    f = (P - j * t_bits + x_bits) % P
+
+    h = (f + j) % P
+    a = dtype(h)
+
+    return (a+rrr) % P
+
+def get_c_case_2(u, j):
+    c = (P + 1 - j) * (u + 1) + (P-j) * u
+    c[..., 0] = u[...,0] * (P-1) ** j
+    return c % P
