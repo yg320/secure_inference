@@ -308,26 +308,43 @@ def mat_mult_single(a, b):
     return res
 
 
+def get_c(x_bits, r_bits, t_bits, beta, j):
+    x_bits = x_bits.astype(np.int32)
+    r_bits = r_bits.astype(np.int32)
+    t_bits = t_bits.astype(np.int32)
+    beta = beta.astype(np.int32)
+    j = j.astype(np.int32)
+    one = np.int32(1)
+    two = np.int32(2)
+    beta = beta[..., np.newaxis]
+    multiplexer_bits = r_bits * (one-beta) + t_bits * beta
+    w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
+    rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
 
-def get_c_case_0(x_bits, r_bits, j):
-    w = (((x_bits + j * r_bits) % P) + ((dtype(P) - ((dtype(2) * r_bits * x_bits) % P)) % P))
-    rrr = sub_mode_p(w[..., ::-1].cumsum(axis=-1)[..., ::-1] % P, w)
-    a = dtype((((j * r_bits + j) % P) + ((P - x_bits) % P)) % P)
-    return (a+rrr) % P
+    zzz = j + (one - two*beta) * (j * multiplexer_bits - x_bits)
+    return ((rrr + zzz) % P).astype(np.uint64)
 
-def get_c_case_1(x_bits, t_bits, j):
-    a = x_bits + j * t_bits
-    b = (dtype(2) * t_bits * x_bits) % P
-    c = P - b
-    w = (a + c) % P
-    rrr = sub_mode_p(w[..., ::-1].cumsum(axis=-1)[..., ::-1] % P, w)
-
-    f = (P - j * t_bits + x_bits) % P
-
-    h = (f + j) % P
-    a = dtype(h)
-
-    return (a+rrr) % P
+# def get_c_case_0(x_bits, r_bits, j):
+#     x_bits = x_bits.astype(np.int32)
+#     r_bits = r_bits.astype(np.int32)
+#     j = j.astype(np.int32)
+#
+#     w = x_bits + j * r_bits - 2 * r_bits * x_bits
+#     rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
+#     zzz = j + j * r_bits  - x_bits
+#     return ((rrr + zzz) % P).astype(np.uint64)
+#
+#
+# def get_c_case_1(x_bits, t_bits, j):
+#     x_bits = x_bits.astype(np.int32)
+#     t_bits = t_bits.astype(np.int32)
+#     j = j.astype(np.int32)
+#
+#     w = x_bits + j * t_bits - 2 * t_bits * x_bits
+#     rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
+#     zzz = j - j * t_bits + x_bits
+#
+#     return (zzz+rrr) % P
 
 def get_c_case_2(u, j):
     c = (P + 1 - j) * (u + 1) + (P-j) * u

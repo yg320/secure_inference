@@ -2,7 +2,7 @@ import torch
 from research.communication.utils import Sender, Receiver
 import time
 import numpy as np
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult, Addresses, decompose, P, get_c_case_1, get_c_case_0, get_c_case_2
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult, Addresses, decompose, P, get_c, get_c_case_2
 from scipy.signal import fftconvolve
 
 from research.communication.utils import Sender, Receiver
@@ -130,6 +130,9 @@ class PrivateCompareServer(SecureModule):
         super(PrivateCompareServer, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_1, r, beta):
+
+        orig_shape = list(r.shape)
+
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
         u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
 
@@ -138,17 +141,7 @@ class PrivateCompareServer(SecureModule):
         r_bits = decompose(r)
         t_bits = decompose(t)
 
-        c_bits_case_0_1 = get_c_case_0(x_bits_1, r_bits, party)
-        c_bits_case_1_1 = get_c_case_1(x_bits_1, t_bits, party)
-        c_bits_case_2_1 = get_c_case_2(u, party)
-
-        c_bits_1 = c_bits_case_0_1
-
-        c_bits_1[np.logical_and(beta == 1, r != self.crypto_assets.numpy_max_val)] = \
-            c_bits_case_1_1[np.logical_and(beta == 1, r != self.crypto_assets.numpy_max_val)]
-
-        c_bits_1[np.logical_and(beta == 1, r == self.crypto_assets.numpy_max_val)] = \
-            c_bits_case_2_1[np.logical_and(beta == 1, r == self.crypto_assets.numpy_max_val)]
+        c_bits_1 = get_c(x_bits_1, r_bits, t_bits, beta, party)
 
         d_bits_1 = (s * c_bits_1) % P
         d_bits_1 = self.crypto_assets.prf_01_numpy.permutation(d_bits_1, axis=-1)

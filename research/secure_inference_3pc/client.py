@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from research.communication.utils import Sender, Receiver
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c_case_0, get_c_case_1, get_c_case_2, P
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c, P
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -126,17 +126,7 @@ class PrivateCompareClient(SecureModule):
         r_bits = decompose(r)
         t_bits = decompose(t)
 
-        c_bits_case_0_0 = get_c_case_0(x_bits_0, r_bits, party)
-        c_bits_case_1_0 = get_c_case_1(x_bits_0, t_bits, party)
-        c_bits_case_2_0 = get_c_case_2(u, party)
-
-        c_bits_0 = c_bits_case_0_0
-
-        c_bits_0[np.logical_and(beta == 1, r != self.crypto_assets.numpy_max_val)] = \
-            c_bits_case_1_0[np.logical_and(beta == 1, r != self.crypto_assets.numpy_max_val)]
-
-        c_bits_0[np.logical_and(beta == 1, r == self.crypto_assets.numpy_max_val)] = \
-            c_bits_case_2_0[np.logical_and(beta == 1, r == self.crypto_assets.numpy_max_val)]
+        c_bits_0 = get_c(x_bits_0, r_bits, t_bits, beta, party)
 
         d_bits_0 = (s * c_bits_0) % P
         d_bits_0 = self.crypto_assets.prf_01_numpy.permutation(d_bits_0, axis=-1)
