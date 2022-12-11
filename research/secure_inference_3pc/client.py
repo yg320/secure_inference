@@ -2,7 +2,11 @@ import torch
 import numpy as np
 
 from research.communication.utils import Sender, Receiver
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c_case_0, get_c_case_1, get_c_case_2, P
+
+from research.distortion.utils import get_model
+from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+
 
 class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
@@ -14,11 +18,9 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
-        print(f"SecureConv2DClient start ({X_share.shape}, {self.W_share.shape})")
         t0 = time.time()
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
-        # assert X_share.shape[2] == X_share.shape[3]
 
         A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
         B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_02_torch)
@@ -35,9 +37,7 @@ class SecureConv2DClient(SecureModule):
 
         E = E_share_server + E_share
         F = F_share_server + F_share
-        print(f"SecureConv2DClient computation start ({X_share.shape}, {self.W_share.shape})")
         t1 = time.time()
-
         X_share = X_share.numpy()
         F = F.numpy()
         E = E.numpy()
@@ -51,6 +51,8 @@ class SecureConv2DClient(SecureModule):
         E = E.copy()
         self.W_share = self.W_share.copy()
 
+        print(f"SecureConv2DClient extras finished - {time.time() - t1}")
+
         out_numpy = mat_mult(X_share[0], F, E[0], self.W_share)
         out_numpy = out_numpy[np.newaxis]
         out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
@@ -61,10 +63,10 @@ class SecureConv2DClient(SecureModule):
         #     torch.conv2d(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
         #     C_share
         out = out // self.trunc
-        print(f"SecureConv2DClient computation finished - {time.time() - t1}")
         print(f"SecureConv2DClient finished - {time.time() - t0}")
 
         return out
+
 
 class SecureConv2DClient_V2(SecureModule):
     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
@@ -115,8 +117,6 @@ class ShareConvertClient(SecureModule):
         super(ShareConvertClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        print("ShareConvertClient start")
-        cur_time = time.time()
 
         eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
 
@@ -147,8 +147,6 @@ class ShareConvertClient(SecureModule):
 
         y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
 
-        print(f"ShareConvertClient finished - {time.time() - cur_time}")
-
         return y_0
 
 
@@ -157,7 +155,6 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
-        print("SecureMultiplicationClient start")
         cur_time = time.time()
 
         A_share = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
@@ -176,7 +173,6 @@ class SecureMultiplicationClient(SecureModule):
         F = F_share_server + F_share
 
         out = X_share * F + Y_share * E + C_share
-        print(f"SecureMultiplicationClient finished - {time.time() - cur_time}")
 
         return out
 
@@ -187,7 +183,6 @@ class SecureMSBClient(SecureModule):
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        print("SecureMSBClient start")
         cur_time = time.time()
 
         beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
@@ -211,7 +206,6 @@ class SecureMSBClient(SecureModule):
         theta_0 = self.mult(gamma_0, delta_0)
         alpha_0 = gamma_0 + delta_0 - 2 * theta_0
 
-        print(f"SecureMSBClient finished - {time.time() - cur_time}")
         return alpha_0
 
 
@@ -236,9 +230,12 @@ class SecureReLUClient(SecureModule):
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
+        t0 = time.time()
         X_share = X_share.numpy().astype(self.dtype)
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0)
+        print(f"SecureReLUClient finished - {time.time() - t0}")
+
         return torch.from_numpy(relu_0.astype(self.signed_type))
 
 
@@ -254,18 +251,20 @@ def build_secure_conv(crypto_assets, network_assets, module):
         network_assets=network_assets
     )
 
+
 if __name__ == "__main__":
 
-    from research.distortion.utils import get_model
-    from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
+    image_path = "/home/yakir/tmp/image_0.pt"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
 
-    port_01 = 12464
-    port_10 = 12465
-    port_02 = 12466
-    port_20 = 12467
-    port_12 = 12468
-    port_21 = 12469
-
+    addresses = Addresses()
+    port_01 = addresses.port_01
+    port_10 = addresses.port_10
+    port_02 = addresses.port_02
+    port_20 = addresses.port_20
+    port_12 = addresses.port_12
+    port_21 = addresses.port_21
 
     prf_01_seed = 0
     prf_02_seed = 1
@@ -304,7 +303,7 @@ if __name__ == "__main__":
     )
 
     model = get_model(
-        config="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py",
+        config=config_path,
         gpu_id=None,
         checkpoint_path=None
     )
@@ -354,9 +353,7 @@ if __name__ == "__main__":
     model.decode_head.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
 
 
-
-
-    I = (torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)
+    I = (torch.load(image_path).unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)
     I1 = crypto_assets.get_random_tensor_over_L(I.shape, prf=crypto_assets.prf_01_torch)
     I0 = I - I1
     import time
@@ -364,7 +361,32 @@ if __name__ == "__main__":
     print("Start")
     image = I0
     t0 = time.time()
-    out = model.decode_head(model.backbone(image))
-    print(time.time() - t0)
-    network_assets.sender_01.put(out)
+    out_0 = model.backbone.stem(image)
+    out_1 = network_assets.receiver_01.get()
+
+    out = (torch.from_numpy(out_1) + out_0)
+    out = out.to(torch.float32) / crypto_assets.trunc
+
+    model_baseline = get_model(
+        config=config_path,
+        gpu_id=None,
+        checkpoint_path=model_path
+    )
+    desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0))
+    print((out - desired_out).abs().max())
     assert False
+
+   # sudo apt-get update
+   # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
+   # sudo apt-get install bzip2
+   # bash Anaconda3-2019.03-Linux-x86_64.sh
+   # conda create -n open-mmlab python=3.7 -y
+   # exit
+   # conda create -n open-mmlab python=3.7 -y
+   # conda activate open-mmlab
+   # conda install pytorch=1.6.0 torchvision cudatoolkit=10.1 -c pytorch
+   # pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu101/torch1.6.0/index.html
+   # pip install mmsegmentation
+   # sudo apt-get install ffmpeg libsm6 libxext6  -y
+   # conda install numba
+   # https://stackoverflow.com/questions/62436205/connecting-aws-ec2-instance-using-python-socket

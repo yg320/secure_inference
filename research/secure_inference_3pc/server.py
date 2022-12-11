@@ -2,7 +2,7 @@ import torch
 from research.communication.utils import Sender, Receiver
 import time
 import numpy as np
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult, Addresses, decompose, P, get_c_case_1, get_c_case_0, get_c_case_2
 from scipy.signal import fftconvolve
 
 from research.communication.utils import Sender, Receiver
@@ -193,7 +193,7 @@ class SecureMSBServer(SecureModule):
     def forward(self, a_1):
         beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_1.shape, dtype=self.dtype)
 
-        x_1 =       self.network_assets.receiver_12.get()
+        x_1 = self.network_assets.receiver_12.get()
         x_bit_0_1 = self.network_assets.receiver_12.get()
 
         y_1 = self.add_mode_L_minus_one(a_1, a_1)
@@ -208,7 +208,7 @@ class SecureMSBServer(SecureModule):
         self.network_assets.sender_12.put(r)
         self.network_assets.sender_12.put(beta)
 
-        # execute_secure_compare
+
         beta_p_1 = self.network_assets.receiver_12.get()
 
         gamma_1 = beta_p_1 + (1 * beta) - (2 * beta * beta_p_1)
@@ -293,28 +293,24 @@ if __name__ == "__main__":
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
+    image_path = "/home/yakir/tmp/image_0.pt"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
+
     image_shape = (1, 3, 192, 256)
-    model_baseline = get_model(
-        config="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py",
-        gpu_id=None,
-        checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
-    )
 
     model = get_model(
-        config="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py",
+        config=config_path,
         gpu_id=None,
-        checkpoint_path="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
+        checkpoint_path=model_path
     )
-    # model_baseline.decode_head._forward_feature = aspp_head_secure_forward
-    # desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0)))
-    # input.mean(dim=[2,3], keepdims=True)
-    #
-    port_01 = 12464
-    port_10 = 12465
-    port_02 = 12466
-    port_20 = 12467
-    port_12 = 12468
-    port_21 = 12469
+    addresses = Addresses()
+    port_01 = addresses.port_01
+    port_10 = addresses.port_10
+    port_02 = addresses.port_02
+    port_20 = addresses.port_20
+    port_12 = addresses.port_12
+    port_21 = addresses.port_21
 
 
     prf_01_seed = 0
@@ -403,12 +399,7 @@ if __name__ == "__main__":
     print("Start")
 
     image = I1
-    out = model.decode_head(model.backbone(image))
-    out_0 = network_assets.receiver_01.get()
+    # out = model.decode_head(model.backbone(image))
+    out = model.backbone.stem(image)
+    network_assets.sender_01.put(out)
 
-    X = (torch.from_numpy(out_0) + out)
-    X = X.to(torch.float32) / crypto_assets.trunc
-
-    desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load("/home/yakir/tmp/image_0.pt").unsqueeze(0)))
-    print((X-desired_out).abs().max())
-    assert False

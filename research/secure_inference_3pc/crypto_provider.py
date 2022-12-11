@@ -3,7 +3,7 @@ from research.communication.utils import Sender, Receiver
 import numpy as np
 import time
 
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult_single
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult_single, Addresses, P, sub_mode_p, decompose
 
 
 from research.communication.utils import Sender, Receiver
@@ -134,9 +134,9 @@ class SecureMSBCryptoProvider(SecureModule):
     def __init__(self, crypto_assets, network_assets):
         super(SecureMSBCryptoProvider, self).__init__(crypto_assets, network_assets)
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
-
     def forward(self, size):
         x = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+
         x_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
         x_1 = self.sub_mode_L_minus_one(x, x_0)
 
@@ -152,8 +152,9 @@ class SecureMSBCryptoProvider(SecureModule):
 
         r =    self.network_assets.receiver_12.get()
         beta = self.network_assets.receiver_12.get()
-
         beta_p = beta ^ (x > r)
+
+
         beta_p_0 = self.crypto_assets.private_prf_numpy.integers(self.min_val, self.max_val + 1, size=size, dtype=self.dtype)
         beta_p_1 = beta_p - beta_p_0
 
@@ -206,12 +207,14 @@ if __name__ == "__main__":
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
     image_shape = (1, 3, 192, 256)
 
-    port_01 = 12464
-    port_10 = 12465
-    port_02 = 12466
-    port_20 = 12467
-    port_12 = 12468
-    port_21 = 12469
+    addresses = Addresses()
+    port_01 = addresses.port_01
+    port_10 = addresses.port_10
+    port_02 = addresses.port_02
+    port_20 = addresses.port_20
+    port_12 = addresses.port_12
+    port_21 = addresses.port_21
+
 
 
     prf_01_seed = 0
@@ -307,7 +310,7 @@ if __name__ == "__main__":
     time.sleep(5)
     print("Start")
     image = dummy_I
-    out = model.decode_head(model.backbone(image))
+    out = model.backbone.stem(image)
 
 
     assert False
