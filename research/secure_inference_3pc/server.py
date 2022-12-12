@@ -304,31 +304,14 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     )
 
 
-def aspp_head_secure_forward(self, inputs):
-    """Forward function for feature maps before classifying each pixel with
-    ``self.cls_seg`` fc.
-
-    Args:
-        inputs (list[Tensor]): List of multi-level img features.
-
-    Returns:
-        feats (Tensor): A tensor of shape (batch_size, self.channels,
-            H, W) which is feature map for last layer of decoder head.
-    """
-    x = self._transform_inputs(inputs)
-
-    aspp_outs = [
-        torch.ones_like(x) * x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
-    ]
-    aspp_outs.extend(self.aspp_modules(x))
-    aspp_outs = torch.cat(aspp_outs, dim=1)
-    feats = self.bottleneck(aspp_outs)
-    return feats
+def build_secure_relu(crypto_assets, network_assets):
+    return SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
 
 if __name__ == "__main__":
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
     from research.pipeline.backbones.secure_aspphead import SecureASPPHead
+    from research.secure_inference_3pc.resnet_converter import securify_model
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
@@ -386,49 +369,7 @@ if __name__ == "__main__":
         receiver_12=receiver_12
     )
 
-    model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
-    model.backbone.stem[1] = torch.nn.Identity()
-    model.backbone.stem[2] = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-    model.backbone.stem[3] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[3], model.backbone.stem[4])
-    model.backbone.stem[4] = torch.nn.Identity()
-    model.backbone.stem[5] = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-    model.backbone.stem[6] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[6], model.backbone.stem[7])
-    model.backbone.stem[7] = torch.nn.Identity()
-    model.backbone.stem[8] = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-    for layer in [1, 2, 3, 4]:
-        for block in [0, 1]:
-            cur_res_layer = getattr(model.backbone, f"layer{layer}")
-            cur_res_layer[block].conv1 = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].conv1, cur_res_layer[block].bn1)
-            cur_res_layer[block].bn1 = torch.nn.Identity()
-            cur_res_layer[block].relu_1 = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-            cur_res_layer[block].conv2 = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].conv2, cur_res_layer[block].bn2)
-            cur_res_layer[block].bn2 = torch.nn.Identity()
-            cur_res_layer[block].relu_2 = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-            if cur_res_layer[block].downsample:
-                cur_res_layer[block].downsample = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].downsample[0], cur_res_layer[block].downsample[1])
-
-    model.decode_head.image_pool[1].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.image_pool[1].conv, model.decode_head.image_pool[1].bn)
-    model.decode_head.image_pool[1].bn = torch.nn.Identity()
-    model.decode_head.image_pool[1].activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-    for i in range(4):
-        model.decode_head.aspp_modules[i].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.aspp_modules[i].conv, model.decode_head.aspp_modules[i].bn)
-        model.decode_head.aspp_modules[i].bn = torch.nn.Identity()
-        model.decode_head.aspp_modules[i].activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-    model.decode_head.bottleneck.conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.bottleneck.conv, model.decode_head.bottleneck.bn)
-    model.decode_head.bottleneck.bn = torch.nn.Identity()
-    model.decode_head.bottleneck.activate = SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
-
-    model.decode_head.conv_seg = build_secure_conv(crypto_assets, network_assets, model.decode_head.conv_seg, None)
-    model.decode_head.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
-
-
+    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
 
     I1 = crypto_assets.get_random_tensor_over_L(image_shape, prf=crypto_assets.prf_01_torch)
     import time
