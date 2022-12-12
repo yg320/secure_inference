@@ -21,6 +21,7 @@ num_bit_to_torch_dtype = {
     64: torch.int64
 }
 
+
 class Addresses:
     def __init__(self):
         self.port_01 = 12484
@@ -61,9 +62,28 @@ powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis][:,::-
 moduli = (2 ** powers)
 P = 67
 
-def decompose(value):
+min_org_shit = -283206
+max_org_shit = 287469
+org_shit = (np.arange(min_org_shit, max_org_shit + 1) % P).astype(np.uint8)
+
+
+def module_67(xxx):
+    return org_shit[xxx.reshape(-1) - min_org_shit].reshape(xxx.shape)
+
+#     orig_shape = list(value.shape)
+#     value = value.reshape(-1, 1)
+#     r_shift = value >> powers
+#
+#     value_bits = np.zeros(shape=(value.shape[0], 64), dtype=np.int8)
+#     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
+#     return value_bits.reshape(orig_shape + [NUM_BITS])
+
+def decompose(value, out=None, out_mask=None):
     orig_shape = list(value.shape)
-    value_bits = ((value.reshape(-1, 1) >> powers) & 1).astype(np.int8)
+    value = value.reshape(-1, 1)
+    r_shift = value >> powers
+    value_bits = np.zeros(shape=(value.shape[0], 64), dtype=np.int8)
+    np.bitwise_and(r_shift, np.int8(1), out=value_bits)
     return value_bits.reshape(orig_shape + [NUM_BITS])
 
 #
@@ -324,12 +344,12 @@ def mat_mult_single(a, b):
     return res
 
 
-def get_c(x_bits, r_bits, t_bits, beta, j):
+def get_c(x_bits, multiplexer_bits, beta, j):
     t0 = time.time()
     beta = beta[..., np.newaxis]
     t1 = time.time()
 
-    multiplexer_bits = r_bits * (1 - beta) + t_bits * beta
+    # multiplexer_bits = r_bits * (1 - beta) + t_bits * beta
     t2 = time.time()
     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
     t3 = time.time()
@@ -344,16 +364,16 @@ def get_c(x_bits, r_bits, t_bits, beta, j):
     t6 = time.time()
     ret = rrr + zzz.astype(np.int32)
     t7 = time.time()
-    if j == 1:
-        print("**************************************")
-        print("get_c ", t1 - t0)
-        print("get_c ", t2 - t1)
-        print("get_c ", t3 - t2)
-        print("get_c ", t4 - t3)
-        print("get_c ", t5 - t4)
-        print("get_c ", t6 - t5)
-        print("get_c ", t7 - t6)
-        print("**************************************")
+    # if j == 1:
+    #     print("**************************************")
+    #     print("get_c ", t1 - t0)
+    #     print("get_c ", t2 - t1)
+    #     print("get_c ", t3 - t2)
+    #     print("get_c ", t4 - t3)
+    #     print("get_c ", t5 - t4)
+    #     print("get_c ", t6 - t5)
+    #     print("get_c ", t7 - t6)
+    #     print("**************************************")
 
     return ret
 

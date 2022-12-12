@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from research.communication.utils import Sender, Receiver
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c, P
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c, P, module_67
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -122,15 +122,12 @@ class PrivateCompareClient(SecureModule):
             assert False
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=np.int32)
         # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
+        r[beta] += 1
+        bits = decompose(r)
 
-        t = r + self.crypto_assets.numpy_dtype(1)
-        party = np.int8(0)
-        r_bits = decompose(r)
-        t_bits = decompose(t)
-
-        c_bits_0 = get_c(x_bits_0, r_bits, t_bits, beta, party)
-        xxx = (s * c_bits_0).astype(np.int32)
-        d_bits_0 = (xxx % P).astype(np.uint8)
+        c_bits_0 = get_c(x_bits_0, bits, beta, np.int8(0))
+        np.multiply(s, c_bits_0, out=s)
+        d_bits_0 = module_67(s)
 
         d_bits_0 = self.crypto_assets.prf_01_numpy.permutation(d_bits_0, axis=-1)
         self.network_assets.sender_02.put(d_bits_0)
@@ -226,13 +223,14 @@ class SecureMSBClient(SecureModule):
         self.network_assets.sender_01.put(r_0)
         r = self.add_mode_L_minus_one(r_0, r_1)
 
+        r_mode_2 = r % 2
         self.private_compare(x_bits_0, r, beta)
         # execute_secure_compare
         beta = beta.astype(self.dtype)
         beta_p_0 = self.network_assets.receiver_02.get()
 
         gamma_0 = beta_p_0 + (0 * beta) - (2 * beta * beta_p_0)
-        delta_0 = x_bit_0_0 + (0 * (r % 2)) - (2 * (r % 2) * x_bit_0_0)
+        delta_0 = x_bit_0_0 - (2 * r_mode_2 * x_bit_0_0)
 
         theta_0 = self.mult(gamma_0, delta_0)
         alpha_0 = gamma_0 + delta_0 - 2 * theta_0
@@ -393,10 +391,10 @@ if __name__ == "__main__":
     print("Start")
     image = I0
     t0 = time.time()
-    # out_0 = model.backbone.layer1(model.backbone.stem(image))
-    out_0 = model.backbone.stem(image)
+    out_0 = model.decode_head(model.backbone(image))
+    # out_0 = model.backbone.stem(image)
     out_1 = network_assets.receiver_01.get()
-
+    print(time.time() - t0)
     out = (torch.from_numpy(out_1) + out_0)
     out = out.to(torch.float32) / crypto_assets.trunc
 
@@ -405,8 +403,8 @@ if __name__ == "__main__":
         gpu_id=None,
         checkpoint_path=model_path
     )
-    # desired_out = model_baseline.backbone.layer1(model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0)))
-    desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0))
+    desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load(image_path).unsqueeze(0)))
+    # desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0))
     print((out - desired_out).abs().max())
     assert False
 

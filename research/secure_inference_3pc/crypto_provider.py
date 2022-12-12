@@ -366,7 +366,7 @@ if __name__ == "__main__":
     time.sleep(5)
     print("Start")
     image = dummy_I
-    # out = model.backbone.layer1(model.backbone.stem(image))
-    out = model.backbone.stem(image)
+    out = model.decode_head(model.backbone(image))
+    # out = model.backbone.stem(image)
 
     assert False
