@@ -222,10 +222,11 @@ class SecureReLUCryptoProvider(SecureModule):
 
     def forward(self, X_share):
         shape = X_share.shape
-        X_share_np = X_share.numpy().astype(self.dtype).flatten()
+        X_share = X_share.numpy()
+        X_share_np = X_share.astype(self.dtype).flatten()
         X_share_np = self.DReLU(X_share_np)
         self.mult(X_share_np.shape)
-        return X_share
+        return torch.from_numpy(X_share)
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module):
@@ -243,8 +244,10 @@ if __name__ == "__main__":
 
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+    from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 
     image_shape = (1, 3, 192, 256)
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
 
     addresses = Addresses()
     port_01 = addresses.port_01
@@ -291,7 +294,7 @@ if __name__ == "__main__":
     )
 
     model = get_model(
-        config="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py",
+        config=config_path,
         gpu_id=None,
         checkpoint_path=None
     )

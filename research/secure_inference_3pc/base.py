@@ -24,12 +24,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 12484
-        self.port_10 = 12485
-        self.port_02 = 12486
-        self.port_20 = 12487
-        self.port_12 = 12488
-        self.port_21 = 12489
+        self.port_01 = 12524
+        self.port_10 = 12525
+        self.port_02 = 12526
+        self.port_20 = 12527
+        self.port_12 = 12528
+        self.port_21 = 12529
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):

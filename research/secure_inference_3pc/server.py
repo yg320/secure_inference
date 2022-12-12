@@ -14,6 +14,8 @@ class SecureConv2DServer(SecureModule):
 
         self.W_share = W.numpy()
         self.bias = bias
+        if self.bias is not None:
+            self.bias = self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3).numpy()
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
@@ -52,12 +54,11 @@ class SecureConv2DServer(SecureModule):
         C_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
 
         out = out_numpy + C_share
-        out = torch.from_numpy(out)
 
         out = out // self.trunc
         if self.bias is not None:
-            out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
-        return out
+            out = out + self.bias
+        return torch.from_numpy(out)
 
 #
 # class SecureConv2DServer_V2(SecureModule):
@@ -273,10 +274,12 @@ class SecureReLUServer(SecureModule):
 
     def forward(self, X_share):
         shape = X_share.shape
-        X_share = X_share.numpy().astype(self.dtype).flatten()
+        X_share = X_share.numpy()
+        X_share = X_share.astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-        return torch.from_numpy(relu_0.astype(self.signed_type))
+        ret = relu_0.astype(self.signed_type)
+        return torch.from_numpy(ret)
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     if bn_module:
@@ -325,8 +328,9 @@ def aspp_head_secure_forward(self, inputs):
 if __name__ == "__main__":
     from research.distortion.utils import get_model
     from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+    from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
 

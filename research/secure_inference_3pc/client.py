@@ -6,6 +6,7 @@ from research.secure_inference_3pc.base import SecureModule, NetworkAssets, Cryp
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 
 
 class SecureConv2DClient(SecureModule):
@@ -18,7 +19,7 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
-        X_share = X_share.numpy().astype(np.int64)
+        X_share = X_share.numpy()
         t0 = time.time()
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
@@ -46,12 +47,10 @@ class SecureConv2DClient(SecureModule):
         out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
         out_numpy = out_numpy + C_share
 
-        out = torch.from_numpy(out_numpy)
-
-        out = out // self.trunc
+        out = out_numpy // self.trunc
         print(f"SecureConv2DClient finished - {time.time() - t0}")
 
-        return out
+        return torch.from_numpy(out)
 
 
 # class SecureConv2DClient_V2(SecureModule):
@@ -247,12 +246,13 @@ class SecureReLUClient(SecureModule):
     def forward(self, X_share):
         t0 = time.time()
         shape = X_share.shape
-        X_share = X_share.numpy().astype(self.dtype).flatten()
+        X_share = X_share.numpy()
+        X_share = X_share.astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0).reshape(shape)
         print(f"SecureReLUClient finished - {time.time() - t0}")
-
-        return torch.from_numpy(relu_0.astype(self.signed_type))
+        ret = relu_0.astype(self.signed_type)
+        return torch.from_numpy(ret)
 
 
 def build_secure_conv(crypto_assets, network_assets, module):
@@ -271,6 +271,7 @@ def build_secure_conv(crypto_assets, network_assets, module):
 if __name__ == "__main__":
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
+    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
 
@@ -319,7 +320,7 @@ if __name__ == "__main__":
     )
 
     model = get_model(
-        config=config_path,
+        config=secure_config_path,
         gpu_id=None,
         checkpoint_path=None
     )
