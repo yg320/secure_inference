@@ -276,8 +276,8 @@ def pre_conv(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1
     weight_reshaped = weight.reshape(nb_channels_out // groups, -1).T
 
     return (
-        im_reshaped,
-        weight_reshaped,
+        im_reshaped.copy(),
+        weight_reshaped.copy(),
         batch_size,
         nb_channels_out,
         nb_rows_out,

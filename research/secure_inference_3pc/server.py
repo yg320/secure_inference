@@ -12,117 +12,99 @@ class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W
+        self.W_share = W.numpy()
         self.bias = bias
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
 
     def forward(self, X_share):
+        X_share = X_share.numpy()
 
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
         assert self.W_share.shape[1] == X_share.shape[1]
         assert self.stride[0] == self.stride[1]
 
-        A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
-        B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_12_torch)
+        A_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
+        B_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
 
         E_share = X_share - A_share
         F_share = self.W_share - B_share
 
         self.network_assets.sender_01.put(E_share)
-        E_share_client = torch.from_numpy(self.network_assets.receiver_01.get())
+        E_share_client = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(F_share)
-        F_share_client = torch.from_numpy(self.network_assets.receiver_01.get())
+        F_share_client = self.network_assets.receiver_01.get()
 
         E = E_share_client + E_share
         F = F_share_client + F_share
 
         new_weight = self.W_share - F
 
-        # t0 = time.time()
-        new_weight_numpy = new_weight.numpy()
-        E_numpy = E.numpy()
-        X_share_numpy = X_share.numpy()
-        F_numpy = F.numpy()
+        E_numpy, new_weight_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(E, new_weight, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+        X_share_numpy, F_numpy, _, _, _, _ = pre_conv(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
 
-        E_numpy, new_weight_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(E_numpy, new_weight_numpy, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        X_share_numpy, F_numpy, _, _, _, _ = pre_conv(X_share_numpy, F_numpy, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        E_numpy = E_numpy.copy()
-        new_weight_numpy = new_weight_numpy.copy()
-        X_share_numpy = X_share_numpy.copy()
-        F_numpy = F_numpy.copy()
         out_numpy = mat_mult(E_numpy[0], new_weight_numpy, X_share_numpy[0], F_numpy)
         out_numpy = out_numpy[np.newaxis]
         out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
-        out = torch.from_numpy(out_numpy)
-        # time_numpy = (time.time() - t0)
-        #
-        # t0 = time.time()
-        # out = \
-        #     torch.conv2d(E, new_weight, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-        #     torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        # time_torch = (time.time() - t0)
-        # print('=====================================================')
-        # print(time_torch, time_numpy, time_torch/time_numpy)
-        # print((out_numpy - out).abs().max())
-        # print('=====================================================')
 
-        C_share = self.crypto_assets.get_random_tensor_over_L(shape=out.shape, prf=self.crypto_assets.prf_12_torch)
+        C_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
 
-        out = out + C_share
+        out = out_numpy + C_share
+        out = torch.from_numpy(out)
+
         out = out // self.trunc
         if self.bias is not None:
             out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
         return out
 
-
-class SecureConv2DServer_V2(SecureModule):
-    def __init__(self, W, bias, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
-        super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
-
-        self.W_share = W
-        self.bias = bias
-        self.stride = stride
-        self.dilation = dilation
-        self.padding = padding
-
-    def forward(self, X_share):
-
-        assert self.W_share.shape[2] == self.W_share.shape[3]
-        if self.W_share.shape[1] != X_share.shape[1]:
-            print('fds')
-        assert self.W_share.shape[1] == X_share.shape[1]
-        # assert X_share.shape[2] == X_share.shape[3]
-        assert self.stride[0] == self.stride[1]
-
-        A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
-        B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_12_torch)
-
-        E_share = X_share - A_share
-        F_share = self.W_share - B_share
-
-        self.network_assets.sender_01.put(E_share)
-        E_share_client = torch.from_numpy(self.network_assets.receiver_01.get())
-        self.network_assets.sender_01.put(F_share)
-        F_share_client = torch.from_numpy(self.network_assets.receiver_01.get())
-
-        E = E_share_client + E_share
-        F = F_share_client + F_share
-
-        new_weight = self.W_share - F
-        out = \
-            torch.conv2d(E, new_weight, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-            torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-
-        C_share = self.crypto_assets.get_random_tensor_over_L(shape=out.shape, prf=self.crypto_assets.prf_12_torch)
-
-        out = out + C_share
-        out = out // self.trunc
-        if self.bias is not None:
-            out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
-        return out
+#
+# class SecureConv2DServer_V2(SecureModule):
+#     def __init__(self, W, bias, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+#         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
+#
+#         self.W_share = W
+#         self.bias = bias
+#         self.stride = stride
+#         self.dilation = dilation
+#         self.padding = padding
+#
+#     def forward(self, X_share):
+#
+#         assert self.W_share.shape[2] == self.W_share.shape[3]
+#         if self.W_share.shape[1] != X_share.shape[1]:
+#             print('fds')
+#         assert self.W_share.shape[1] == X_share.shape[1]
+#         # assert X_share.shape[2] == X_share.shape[3]
+#         assert self.stride[0] == self.stride[1]
+#
+#         A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_12_torch)
+#         B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_12_torch)
+#
+#         E_share = X_share - A_share
+#         F_share = self.W_share - B_share
+#
+#         self.network_assets.sender_01.put(E_share)
+#         E_share_client = torch.from_numpy(self.network_assets.receiver_01.get())
+#         self.network_assets.sender_01.put(F_share)
+#         F_share_client = torch.from_numpy(self.network_assets.receiver_01.get())
+#
+#         E = E_share_client + E_share
+#         F = F_share_client + F_share
+#
+#         new_weight = self.W_share - F
+#         out = \
+#             torch.conv2d(E, new_weight, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
+#             torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+#
+#         C_share = self.crypto_assets.get_random_tensor_over_L(shape=out.shape, prf=self.crypto_assets.prf_12_torch)
+#
+#         out = out + C_share
+#         out = out // self.trunc
+#         if self.bias is not None:
+#             out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
+#         return out
 
 
 

@@ -12,105 +12,91 @@ class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W
+        self.W_share = W.numpy()
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
 
     def forward(self, X_share):
+        X_share = X_share.numpy().astype(np.int64)
         t0 = time.time()
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
 
-        A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
-        B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_02_torch)
-
-        C_share = torch.from_numpy(self.network_assets.receiver_02.get())
+        A_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
+        B_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
+        C_share = self.network_assets.receiver_02.get()
 
         E_share = X_share - A_share
         F_share = self.W_share - B_share
 
-        E_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
+        E_share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(E_share)
-        F_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
+        F_share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(F_share)
 
         E = E_share_server + E_share
         F = F_share_server + F_share
-        t1 = time.time()
-        X_share = X_share.numpy()
-        F = F.numpy()
-        E = E.numpy()
-        self.W_share = self.W_share.numpy()
 
         X_share, F, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
         E, self.W_share, _, _, _, _ = pre_conv(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
 
-        X_share = X_share.copy()
-        F = F.copy()
-        E = E.copy()
-        self.W_share = self.W_share.copy()
-
-        # print(f"SecureConv2DClient extras finished - {time.time() - t1}")
-
         out_numpy = mat_mult(X_share[0], F, E[0], self.W_share)
         out_numpy = out_numpy[np.newaxis]
         out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
+        out_numpy = out_numpy + C_share
+
         out = torch.from_numpy(out_numpy)
-        out = out + C_share
-        # out = \
-        #     torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-        #     torch.conv2d(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-        #     C_share
+
         out = out // self.trunc
         print(f"SecureConv2DClient finished - {time.time() - t0}")
 
         return out
 
 
-class SecureConv2DClient_V2(SecureModule):
-    def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
-        super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
-
-        self.W_share = W
-        self.stride = stride
-        self.dilation = dilation
-        self.padding = padding
-
-    def forward(self, X_share):
-        print(f"SecureConv2DClient start ({X_share.shape}, {self.W_share.shape})")
-        t0 = time.time()
-        assert self.W_share.shape[2] == self.W_share.shape[3]
-        assert self.W_share.shape[1] == X_share.shape[1]
-        # assert X_share.shape[2] == X_share.shape[3]
-
-        A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
-        B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_02_torch)
-
-        C_share = torch.from_numpy(self.network_assets.receiver_02.get())
-
-        E_share = X_share - A_share
-        F_share = self.W_share - B_share
-
-        E_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
-        self.network_assets.sender_01.put(E_share)
-        F_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
-        self.network_assets.sender_01.put(F_share)
-
-        E = E_share_server + E_share
-        F = F_share_server + F_share
-        print(f"SecureConv2DClient computation start ({X_share.shape}, {self.W_share.shape})")
-        t1 = time.time()
-        out = \
-            torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-            torch.conv2d(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-            C_share
-        out = out // self.trunc
-        print(f"SecureConv2DClient computation finished - {time.time() - t1}")
-        print(f"SecureConv2DClient finished - {time.time() - t0}")
-
-        return out
-
+# class SecureConv2DClient_V2(SecureModule):
+#     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
+#         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
+#
+#         self.W_share = W
+#         self.stride = stride
+#         self.dilation = dilation
+#         self.padding = padding
+#
+#     def forward(self, X_share):
+#         print(f"SecureConv2DClient start ({X_share.shape}, {self.W_share.shape})")
+#         t0 = time.time()
+#         assert self.W_share.shape[2] == self.W_share.shape[3]
+#         assert self.W_share.shape[1] == X_share.shape[1]
+#         # assert X_share.shape[2] == X_share.shape[3]
+#
+#         A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
+#         B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_02_torch)
+#
+#         C_share = torch.from_numpy(self.network_assets.receiver_02.get())
+#
+#         E_share = X_share - A_share
+#         F_share = self.W_share - B_share
+#
+#         E_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
+#         self.network_assets.sender_01.put(E_share)
+#         F_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
+#         self.network_assets.sender_01.put(F_share)
+#
+#         E = E_share_server + E_share
+#         F = F_share_server + F_share
+#         print(f"SecureConv2DClient computation start ({X_share.shape}, {self.W_share.shape})")
+#         t1 = time.time()
+#         out = \
+#             torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
+#             torch.conv2d(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
+#             C_share
+#         out = out // self.trunc
+#         print(f"SecureConv2DClient computation finished - {time.time() - t1}")
+#         print(f"SecureConv2DClient finished - {time.time() - t0}")
+#
+#         return out
+#
 
 class PrivateCompareClient(SecureModule):
     def __init__(self, crypto_assets, network_assets):

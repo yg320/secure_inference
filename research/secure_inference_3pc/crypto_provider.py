@@ -20,69 +20,63 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
-        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
-                                                                prf=self.crypto_assets.prf_12_torch)
-        B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
-        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
-                                                                prf=self.crypto_assets.prf_02_torch)
-        B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
+        X_share = X_share.numpy()
+
+        A_share_0 = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
+        B_share_0 = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_shape, dtype=np.int64)
+        A_share_1 = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
+        B_share_1 = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_shape, dtype=np.int64)
+
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
-
-        A = A.numpy()
-        B = B.numpy()
 
         A, B, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, bias=None, stride=self.stride,
                                                                                padding=self.padding,
                                                                                dilation=self.dilation, groups=1)
 
-        A = A.copy()
-        B = B.copy()
-
         out_numpy = mat_mult_single(A[0], B)
         out_numpy = out_numpy[np.newaxis]
         out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
-        C = torch.from_numpy(out_numpy)
+        C = out_numpy
 
         # C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-
-        C_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=C.shape, prf=self.crypto_assets.prf_12_torch)
+        C_share_1 = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
         C_share_0 = C - C_share_1
 
         self.network_assets.sender_02.put(C_share_0)
 
-        return C_share_0
+        return torch.from_numpy(C_share_0)
 
 
-class SecureConv2DCryptoProvider_V2(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
-        super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
-
-        self.W_shape = W_shape
-        self.stride = stride
-        self.dilation = dilation
-        self.padding = padding
-
-    def forward(self, X_share):
-        A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
-                                                                prf=self.crypto_assets.prf_12_torch)
-        B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
-        A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
-                                                                prf=self.crypto_assets.prf_02_torch)
-        B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
-
-        A = A_share_0 + A_share_1
-        B = B_share_0 + B_share_1
-
-        C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-
-        C_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=C.shape, prf=self.crypto_assets.prf_12_torch)
-        C_share_0 = C - C_share_1
-
-        self.network_assets.sender_02.put(C_share_0)
-
-        return C_share_0
+# class SecureConv2DCryptoProvider_V2(SecureModule):
+#     def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+#         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
+#
+#         self.W_shape = W_shape
+#         self.stride = stride
+#         self.dilation = dilation
+#         self.padding = padding
+#
+#     def forward(self, X_share):
+#         A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
+#                                                                 prf=self.crypto_assets.prf_12_torch)
+#         B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
+#         A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
+#                                                                 prf=self.crypto_assets.prf_02_torch)
+#         B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
+#
+#         A = A_share_0 + A_share_1
+#         B = B_share_0 + B_share_1
+#
+#         C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+#
+#         C_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=C.shape, prf=self.crypto_assets.prf_12_torch)
+#         C_share_0 = C - C_share_1
+#
+#         self.network_assets.sender_02.put(C_share_0)
+#
+#         return C_share_0
 
 
 class PrivateCompareCryptoProvider(SecureModule):
