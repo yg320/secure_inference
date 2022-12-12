@@ -352,7 +352,6 @@ if __name__ == "__main__":
             if cur_res_layer[block].downsample:
                 cur_res_layer[block].downsample = build_secure_conv(crypto_assets, network_assets, cur_res_layer[block].downsample[0])
 
-
     model.decode_head.image_pool[1].conv = build_secure_conv(crypto_assets, network_assets, model.decode_head.image_pool[1].conv)
     model.decode_head.image_pool[1].bn = torch.nn.Identity()
     model.decode_head.image_pool[1].activate = SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
