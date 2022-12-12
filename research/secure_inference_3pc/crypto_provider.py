@@ -113,6 +113,7 @@ class ShareConvertCryptoProvider(SecureModule):
         x_bits = decompose(x)
 
         x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
+        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=np.int32)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
         delta = (x < a_tild_0).astype(self.dtype)
@@ -172,6 +173,7 @@ class SecureMSBCryptoProvider(SecureModule):
 
         x_bits = decompose(x)
 
+        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=np.int32)
         x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
@@ -226,7 +228,8 @@ class SecureReLUCryptoProvider(SecureModule):
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share_np = X_share.numpy().astype(self.dtype)
+        shape = X_share.shape
+        X_share_np = X_share.numpy().astype(self.dtype).flatten()
         X_share_np = self.DReLU(X_share_np)
         self.mult(X_share_np.shape)
         return X_share

@@ -124,6 +124,9 @@ class SecureConv2DServer_V2(SecureModule):
             out = out + self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3)
         return out
 
+min_org_shit = -283206
+max_org_shit = 287469
+org_shit = (np.arange(min_org_shit, max_org_shit + 1) % P).astype(np.uint8)
 
 class PrivateCompareServer(SecureModule):
     def __init__(self, crypto_assets, network_assets):
@@ -132,33 +135,46 @@ class PrivateCompareServer(SecureModule):
     def forward(self, x_bits_1, r, beta):
         t0 = time.time()
 
+        # s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=np.int32)
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
         # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
+        # t1 = time.time()
 
         t = r + self.crypto_assets.numpy_dtype(1)
         party = self.crypto_assets.numpy_dtype(1)
-        t1 = time.time()
+        # t2 = time.time()
 
         r_bits = decompose(r)
         t_bits = decompose(t)
 
-        t2 = time.time()
+        # t3 = time.time()
         c_bits_1 = get_c(x_bits_1, r_bits, t_bits, beta, party)
-        t3 = time.time()
+        # t4 = time.time()
         xxx = (s * c_bits_1).astype(np.int32)
-        t4 = time.time()
-        d_bits_1 = (xxx % P).astype(np.uint8)
-        t5 = time.time()
-        d_bits_1 = self.crypto_assets.prf_01_numpy.permutation(d_bits_1, axis=-1)
-        t6 = time.time()
-        print("================")
-        print(t1 - t0)
-        print(t2 - t1)
-        print(t3 - t2)
-        print(t4 - t3)
-        print(t5 - t4)
-        print(t6 - t5)
-        print("================")
+        # t5 = time.time()
+        d_bits_1_ = (xxx % P).astype(np.uint8)
+        # t6 = time.time()
+        # aaaa = xxx.reshape(-1) - min_org_shit
+        # t7 = time.time()
+
+        # d_bits_1_2 = org_shit[aaaa].reshape(xxx.shape)
+        # t8 = time.time()
+        d_bits_1 = self.crypto_assets.prf_01_numpy.permutation(d_bits_1_, axis=-1)
+        # t9 = time.time()
+        # assert np.all(d_bits_1_2 == d_bits_1_)
+        # assert xxx.min() >= min_org_shit
+        # assert xxx.max() <= max_org_shit
+        # print("================")
+        # print(t1 - t0)
+        # print(t2 - t1)
+        # print(t3 - t2)
+        # print(t4 - t3)
+        # print(t5 - t4)
+        # print(t6 - t5)
+        # print(t7 - t6)
+        # print(t8 - t7)
+        # print(t9 - t8)
+        # print("================")
         self.network_assets.sender_12.put(d_bits_1)
 
 
@@ -169,6 +185,7 @@ class ShareConvertServer(SecureModule):
 
     def forward(self, a_1):
         eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_1.shape, dtype=self.dtype)
+        # eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_1.shape, dtype=np.int32)
 
         r = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
         r_0 = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
@@ -180,6 +197,7 @@ class ShareConvertServer(SecureModule):
         self.network_assets.sender_12.put(a_tild_1)
 
         x_bits_1 = self.network_assets.receiver_12.get().astype(np.uint64)
+        # x_bits_1 = self.network_assets.receiver_12.get().astype(np.int32)
         delta_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
 
         # self.network_assets.sender_12.put(r-1)
@@ -235,6 +253,7 @@ class SecureMSBServer(SecureModule):
         x_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
 
         x_bits_1 = self.network_assets.receiver_12.get().astype(np.uint64)
+        # x_bits_1 = self.network_assets.receiver_12.get().astype(np.int32)
         x_bit_0_1 = self.network_assets.receiver_12.get()
 
         y_1 = self.add_mode_L_minus_one(a_1, a_1)
@@ -281,9 +300,10 @@ class SecureReLUServer(SecureModule):
         self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share = X_share.numpy().astype(self.dtype)
+        shape = X_share.shape
+        X_share = X_share.numpy().astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
-        relu_0 = self.mult(X_share, MSB_0)
+        relu_0 = self.mult(X_share, MSB_0).reshape(shape)
         return torch.from_numpy(relu_0.astype(self.signed_type))
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):

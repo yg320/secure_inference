@@ -120,6 +120,7 @@ class PrivateCompareClient(SecureModule):
 
         if np.any(r == np.iinfo(r.dtype).max):
             assert False
+        # s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=np.int32)
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
         # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
 
@@ -146,6 +147,7 @@ class ShareConvertClient(SecureModule):
     def forward(self, a_0):
 
         eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
+        # eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=np.int32)
 
         r = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
         r_0 = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
@@ -156,6 +158,7 @@ class ShareConvertClient(SecureModule):
         beta_0 = (a_tild_0 < a_0).astype(self.dtype)
         self.network_assets.sender_02.put(a_tild_0)
 
+        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=np.int32)
         x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=self.dtype)
         delta_0 = self.network_assets.receiver_02.get()
 
@@ -216,6 +219,7 @@ class SecureMSBClient(SecureModule):
 
         beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
 
+        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=np.int32)
         x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=self.dtype)
         x_0 = self.network_assets.receiver_02.get()
         x_bit_0_0 = self.network_assets.receiver_02.get()
@@ -262,9 +266,10 @@ class SecureReLUClient(SecureModule):
 
     def forward(self, X_share):
         t0 = time.time()
-        X_share = X_share.numpy().astype(self.dtype)
+        shape = X_share.shape
+        X_share = X_share.numpy().astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
-        relu_0 = self.mult(X_share, MSB_0)
+        relu_0 = self.mult(X_share, MSB_0).reshape(shape)
         print(f"SecureReLUClient finished - {time.time() - t0}")
 
         return torch.from_numpy(relu_0.astype(self.signed_type))

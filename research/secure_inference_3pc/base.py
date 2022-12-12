@@ -3,7 +3,7 @@ import numpy as np
 
 from research.communication.utils import Sender, Receiver
 import time
-
+from numba import njit, prange
 num_bit_to_dtype = {
     8: np.ubyte,
     16: np.ushort,
@@ -23,12 +23,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 12474
-        self.port_10 = 12475
-        self.port_02 = 12476
-        self.port_20 = 12477
-        self.port_12 = 12478
-        self.port_21 = 12479
+        self.port_01 = 12484
+        self.port_10 = 12485
+        self.port_02 = 12486
+        self.port_20 = 12487
+        self.port_12 = 12488
+        self.port_21 = 12489
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -60,11 +60,25 @@ dtype = num_bit_to_dtype[NUM_BITS]
 powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis]
 moduli = (2 ** powers)
 P = 67
+
 def decompose(value):
     orig_shape = list(value.shape)
-    value_bits = (value.reshape(-1, 1) & moduli) >> powers
+    value_bits = (value.reshape(-1, 1) >> powers) & 1
     return value_bits.reshape(orig_shape + [NUM_BITS])
 
+# def decompose(value):
+#     orig_shape = list(value.shape)
+#     value = value.reshape(-1, value.shape[3])
+#     value_bits = decompose_(value)
+#     return value_bits.reshape(orig_shape + [NUM_BITS])
+#
+# @njit(parallel=True)
+# def decompose_(value):
+#     out = np.zeros(shape=(value.shape[0], value.shape[1], 64), dtype=np.uint8)
+#     for i in range(value.shape[0]):
+#         for j in range(value.shape[1]):
+#             out[i,j] = (value[i,j] & moduli) >> powers
+#     return out
 def sub_mode_p(x, y):
     mask = y > x
     ret = x - y
@@ -282,7 +296,7 @@ def post_conv(bias, res, batch_size, nb_channels_out, nb_rows_out, nb_cols_out):
     return res
 
 
-from numba import njit, prange
+
 
 @njit(parallel=True)
 def mat_mult(a, b, c, d):
