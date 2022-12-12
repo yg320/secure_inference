@@ -7,7 +7,7 @@ from research.secure_inference_3pc.base import SecureModule, NetworkAssets, Cryp
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-
+import time
 
 class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
@@ -270,69 +270,12 @@ def build_secure_conv(crypto_assets, network_assets, module, bn_module):
 def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
 
-if __name__ == "__main__":
-    from research.secure_inference_3pc.resnet_converter import securify_model
-
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
-    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
-    image_path = "/home/yakir/tmp/image_0.pt"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
-
-    addresses = Addresses()
-    port_01 = addresses.port_01
-    port_10 = addresses.port_10
-    port_02 = addresses.port_02
-    port_20 = addresses.port_20
-    port_12 = addresses.port_12
-    port_21 = addresses.port_21
-
-    prf_01_seed = 0
-    prf_02_seed = 1
-    prf_12_seed = 2
-
-    sender_01 = Sender(port_01)
-    sender_02 = Sender(port_02)
-    sender_12 = None
-    receiver_01 = Receiver(port_10)
-    receiver_02 = Receiver(port_20)
-    receiver_12 = None
-
-    prf_01_numpy = np.random.default_rng(seed=prf_01_seed)
-    prf_02_numpy = np.random.default_rng(seed=prf_02_seed)
-    prf_12_numpy = None
-    prf_01_torch = torch.Generator().manual_seed(prf_01_seed)
-    prf_02_torch = torch.Generator().manual_seed(prf_02_seed)
-    prf_12_torch = None
-
-    crypto_assets = CryptoAssets(
-        prf_01_numpy=prf_01_numpy,
-        prf_02_numpy=prf_02_numpy,
-        prf_12_numpy=prf_12_numpy,
-        prf_01_torch=prf_01_torch,
-        prf_02_torch=prf_02_torch,
-        prf_12_torch=prf_12_torch,
-    )
-
-    network_assets = NetworkAssets(
-        sender_01=sender_01,
-        sender_02=sender_02,
-        sender_12=sender_12,
-        receiver_01=receiver_01,
-        receiver_02=receiver_02,
-        receiver_12=receiver_12
-    )
-
-    model = get_model(
-        config=secure_config_path,
-        gpu_id=None,
-        checkpoint_path=None
-    )
-
-    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
+def run_inference(model, image_path, crypto_assets, network_assets):
 
     I = (torch.load(image_path).unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)
     I1 = crypto_assets.get_random_tensor_over_L(I.shape, prf=crypto_assets.prf_01_torch)
     I0 = I - I1
+
     import time
     time.sleep(5)
     print("Start")
@@ -344,14 +287,53 @@ if __name__ == "__main__":
     print(time.time() - t0)
     out = (torch.from_numpy(out_1) + out_0)
     out = out.to(torch.float32) / crypto_assets.trunc
+    return out
 
-    model_baseline = get_model(
-        config=config_path,
-        gpu_id=None,
-        checkpoint_path=model_path
+if __name__ == "__main__":
+    from research.secure_inference_3pc.resnet_converter import securify_model
+
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
+    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
+    image_path = "/home/yakir/tmp/image_0.pt"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
+
+    addresses = Addresses()
+
+    prf_01_seed = 0
+    prf_02_seed = 1
+    prf_12_seed = 2
+
+    crypto_assets = CryptoAssets(
+        prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
+        prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
+        prf_12_numpy=None,
+        prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
+        prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
+        prf_12_torch=None,
     )
+
+    network_assets = NetworkAssets(
+        sender_01=Sender(addresses.port_01),
+        sender_02=Sender(addresses.port_02),
+        sender_12=None,
+        receiver_01=Receiver(addresses.port_10),
+        receiver_02=Receiver(addresses.port_20),
+        receiver_12=None
+    )
+
+    model = get_model(
+        config=secure_config_path,
+        gpu_id=None,
+        checkpoint_path=None
+    )
+
+    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
+
+    out = run_inference(model, image_path, crypto_assets, network_assets)
+
+
+    model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
     desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load(image_path).unsqueeze(0)))
-    # desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0))
     print((out - desired_out).abs().max())
     assert False
 

@@ -8,6 +8,11 @@ from scipy.signal import fftconvolve
 from research.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
 
+from research.distortion.utils import get_model
+from research.pipeline.backbones.secure_resnet import AvgPoolResNet
+from research.pipeline.backbones.secure_aspphead import SecureASPPHead
+from research.secure_inference_3pc.resnet_converter import securify_model
+
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
@@ -307,11 +312,21 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
 def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
 
+def run_inference(model, image_shape, crypto_assets, network_assets):
+    I1 = crypto_assets.get_random_tensor_over_L(image_shape, prf=crypto_assets.prf_01_torch)
+    import time
+    time.sleep(5)
+    print("Start")
+
+    image = I1
+    # out = model.decode_head(model.backbone(image))
+    out = model.decode_head(model.backbone(image))
+    # out = model.backbone.stem(image)
+
+    network_assets.sender_01.put(out)
+
+
 if __name__ == "__main__":
-    from research.distortion.utils import get_model
-    from research.pipeline.backbones.secure_resnet import AvgPoolResNet
-    from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-    from research.secure_inference_3pc.resnet_converter import securify_model
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
@@ -325,61 +340,30 @@ if __name__ == "__main__":
         checkpoint_path=model_path
     )
     addresses = Addresses()
-    port_01 = addresses.port_01
-    port_10 = addresses.port_10
-    port_02 = addresses.port_02
-    port_20 = addresses.port_20
-    port_12 = addresses.port_12
-    port_21 = addresses.port_21
-
 
     prf_01_seed = 0
     prf_02_seed = 1
     prf_12_seed = 2
 
-    sender_01 = Sender(port_10)
-    sender_02 = None
-    sender_12 = Sender(port_12)
-    receiver_01 = Receiver(port_01)
-    receiver_02 = None
-    receiver_12 = Receiver(port_21)
-
-    prf_01_numpy = np.random.default_rng(seed=prf_01_seed)
-    prf_02_numpy = None
-    prf_12_numpy = np.random.default_rng(seed=prf_12_seed)
-    prf_01_torch = torch.Generator().manual_seed(prf_01_seed)
-    prf_02_torch = None
-    prf_12_torch = torch.Generator().manual_seed(prf_12_seed)
-
     crypto_assets = CryptoAssets(
-        prf_01_numpy=prf_01_numpy,
-        prf_02_numpy=prf_02_numpy,
-        prf_12_numpy=prf_12_numpy,
-        prf_01_torch=prf_01_torch,
-        prf_02_torch=prf_02_torch,
-        prf_12_torch=prf_12_torch,
+        prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
+        prf_02_numpy=None,
+        prf_12_numpy=np.random.default_rng(seed=prf_12_seed),
+        prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
+        prf_02_torch=None,
+        prf_12_torch=torch.Generator().manual_seed(prf_12_seed),
     )
 
     network_assets = NetworkAssets(
-        sender_01=sender_01,
-        sender_02=sender_02,
-        sender_12=sender_12,
-        receiver_01=receiver_01,
-        receiver_02=receiver_02,
-        receiver_12=receiver_12
+        sender_01=Sender(addresses.port_10),
+        sender_02=None,
+        sender_12=Sender(addresses.port_12),
+        receiver_01=Receiver(addresses.port_01),
+        receiver_02=None,
+        receiver_12=Receiver(addresses.port_21),
     )
 
     securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
 
-    I1 = crypto_assets.get_random_tensor_over_L(image_shape, prf=crypto_assets.prf_01_torch)
-    import time
-    time.sleep(5)
-    print("Start")
-
-    image = I1
-    # out = model.decode_head(model.backbone(image))
-    out = model.decode_head(model.backbone(image))
-    # out = model.backbone.stem(image)
-
-    network_assets.sender_01.put(out)
+    run_inference(model, image_shape, crypto_assets, network_assets)
 
