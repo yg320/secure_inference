@@ -57,14 +57,16 @@ class NetworkAssets:
 NUM_BITS = 64
 TRUNC = 10000
 dtype = num_bit_to_dtype[NUM_BITS]
-powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis]
+powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis][:,::-1]
 moduli = (2 ** powers)
 P = 67
 
 def decompose(value):
     orig_shape = list(value.shape)
-    value_bits = (value.reshape(-1, 1) >> powers) & 1
+    value_bits = ((value.reshape(-1, 1) >> powers) & 1).astype(np.int8)
     return value_bits.reshape(orig_shape + [NUM_BITS])
+
+#
 
 # def decompose(value):
 #     orig_shape = list(value.shape)
@@ -324,11 +326,6 @@ def mat_mult_single(a, b):
 
 def get_c(x_bits, r_bits, t_bits, beta, j):
     t0 = time.time()
-    x_bits = x_bits.astype(np.int32)
-    r_bits = r_bits.astype(np.int32)
-    t_bits = t_bits.astype(np.int32)
-    beta = beta.astype(np.int32)
-    j = j.astype(np.int32)
     beta = beta[..., np.newaxis]
     t1 = time.time()
 
@@ -336,12 +333,17 @@ def get_c(x_bits, r_bits, t_bits, beta, j):
     t2 = time.time()
     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
     t3 = time.time()
-    rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
+    w_cumsum = w.astype(np.int32)
     t4 = time.time()
-    zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
+    np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+    np.subtract(w_cumsum, w, out=w_cumsum)
+    rrr = w_cumsum
+    # rrr = w.cumsum(axis=-1) - w
     t5 = time.time()
-    ret = rrr + zzz
+    zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
     t6 = time.time()
+    ret = rrr + zzz.astype(np.int32)
+    t7 = time.time()
     if j == 1:
         print("**************************************")
         print("get_c ", t1 - t0)
@@ -350,6 +352,7 @@ def get_c(x_bits, r_bits, t_bits, beta, j):
         print("get_c ", t4 - t3)
         print("get_c ", t5 - t4)
         print("get_c ", t6 - t5)
+        print("get_c ", t7 - t6)
         print("**************************************")
 
     return ret

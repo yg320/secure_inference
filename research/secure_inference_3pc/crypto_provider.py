@@ -112,8 +112,7 @@ class ShareConvertCryptoProvider(SecureModule):
 
         x_bits = decompose(x)
 
-        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
-        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=np.int32)
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=np.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
         delta = (x < a_tild_0).astype(self.dtype)
@@ -122,7 +121,7 @@ class ShareConvertCryptoProvider(SecureModule):
         delta_0 = self.sub_mode_L_minus_one(delta, delta_1)
 
         self.network_assets.sender_02.put(delta_0)
-        self.network_assets.sender_12.put(x_bits_1.astype(np.uint8))
+        self.network_assets.sender_12.put(x_bits_1.astype(np.int8))
 
         # r = self.network_assets.receiver_12.get()
         # eta_p = self.network_assets.receiver_12.get()
@@ -174,7 +173,7 @@ class SecureMSBCryptoProvider(SecureModule):
         x_bits = decompose(x)
 
         # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=np.int32)
-        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=self.dtype)
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=x_bits.shape, dtype=np.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
         x_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
@@ -188,7 +187,7 @@ class SecureMSBCryptoProvider(SecureModule):
         self.network_assets.sender_02.put(x_0)
         self.network_assets.sender_02.put(x_bit_0_0)
 
-        self.network_assets.sender_12.put(x_bits_1.astype(np.uint8))
+        self.network_assets.sender_12.put(x_bits_1.astype(np.int8))
         self.network_assets.sender_12.put(x_bit_0_1)
 
         # r = self.network_assets.receiver_12.get()
@@ -367,6 +366,7 @@ if __name__ == "__main__":
     time.sleep(5)
     print("Start")
     image = dummy_I
-    out = model.backbone.layer1(model.backbone.stem(image))
+    # out = model.backbone.layer1(model.backbone.stem(image))
+    out = model.backbone.stem(image)
 
     assert False

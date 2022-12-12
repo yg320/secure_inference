@@ -120,12 +120,11 @@ class PrivateCompareClient(SecureModule):
 
         if np.any(r == np.iinfo(r.dtype).max):
             assert False
-        # s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=np.int32)
-        s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
+        s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=np.int32)
         # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
 
         t = r + self.crypto_assets.numpy_dtype(1)
-        party = self.crypto_assets.numpy_dtype(0)
+        party = np.int8(0)
         r_bits = decompose(r)
         t_bits = decompose(t)
 
@@ -146,8 +145,7 @@ class ShareConvertClient(SecureModule):
 
     def forward(self, a_0):
 
-        eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
-        # eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=np.int32)
+        eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=np.int8)
 
         r = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
         r_0 = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
@@ -158,14 +156,13 @@ class ShareConvertClient(SecureModule):
         beta_0 = (a_tild_0 < a_0).astype(self.dtype)
         self.network_assets.sender_02.put(a_tild_0)
 
-        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=np.int32)
-        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=self.dtype)
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=np.int8)
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
 
         eta_p_0 = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val, size=a_0.shape, dtype=self.dtype)
-
+        eta_pp = eta_pp.astype(self.dtype)
         t0 = eta_pp * eta_p_0
         t1 = self.add_mode_L_minus_one(t0, t0)
         t2 = self.sub_mode_L_minus_one(eta_pp, t1)
@@ -217,10 +214,9 @@ class SecureMSBClient(SecureModule):
     def forward(self, a_0):
         cur_time = time.time()
 
-        beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=self.dtype)
+        beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=np.int8)
 
-        # x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=np.int32)
-        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=self.dtype)
+        x_bits_0 = self.crypto_assets.prf_02_numpy.integers(0, P, size=list(a_0.shape) + [64], dtype=np.int8)
         x_0 = self.network_assets.receiver_02.get()
         x_bit_0_0 = self.network_assets.receiver_02.get()
 
@@ -232,7 +228,7 @@ class SecureMSBClient(SecureModule):
 
         self.private_compare(x_bits_0, r, beta)
         # execute_secure_compare
-
+        beta = beta.astype(self.dtype)
         beta_p_0 = self.network_assets.receiver_02.get()
 
         gamma_0 = beta_p_0 + (0 * beta) - (2 * beta * beta_p_0)
@@ -397,7 +393,8 @@ if __name__ == "__main__":
     print("Start")
     image = I0
     t0 = time.time()
-    out_0 = model.backbone.layer1(model.backbone.stem(image))
+    # out_0 = model.backbone.layer1(model.backbone.stem(image))
+    out_0 = model.backbone.stem(image)
     out_1 = network_assets.receiver_01.get()
 
     out = (torch.from_numpy(out_1) + out_0)
@@ -408,7 +405,8 @@ if __name__ == "__main__":
         gpu_id=None,
         checkpoint_path=model_path
     )
-    desired_out = model_baseline.backbone.layer1(model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0)))
+    # desired_out = model_baseline.backbone.layer1(model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0)))
+    desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0))
     print((out - desired_out).abs().max())
     assert False
 
