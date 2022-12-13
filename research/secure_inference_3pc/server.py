@@ -2,7 +2,7 @@ import torch
 from research.communication.utils import Sender, Receiver
 import time
 import numpy as np
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult, Addresses, decompose, P, get_c, get_c_case_2, module_67
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult, Addresses, decompose, P, get_c, get_c_case_2, module_67, DepthToSpace, SpaceToDepth
 from scipy.signal import fftconvolve
 
 from research.communication.utils import Sender, Receiver
@@ -320,10 +320,69 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
 
     image = I1
     # out = model.decode_head(model.backbone(image))
-    out = model.decode_head(model.backbone(image))
+    out = model.backbone.stem(image)
     # out = model.backbone.stem(image)
 
     network_assets.sender_01.put(out)
+
+
+class SecureBlockReLUServer(SecureModule):
+
+    def __init__(self, crypto_assets, network_assets, block_sizes):
+        super(SecureBlockReLUServer, self).__init__(crypto_assets, network_assets)
+        self.block_sizes = np.array(block_sizes)
+        self.DReLU = SecureDReLUServer(crypto_assets, network_assets)
+        self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
+
+        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
+        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+
+    def forward(self, activation):
+        # network_assets.sender_01.put(activation)
+
+        activation = activation.numpy()#.astype(np.uint64)
+        reshaped_inputs = []
+        mean_tensors = []
+        channels = []
+        orig_shapes = []
+
+        for block_size in self.active_block_sizes:
+
+            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
+            cur_input = activation[:, cur_channels]
+
+            reshaped_input = SpaceToDepth(block_size)(cur_input)
+            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
+
+            channels.append(cur_channels)
+            reshaped_inputs.append(reshaped_input)
+            orig_shapes.append(mean_tensor.shape)
+            mean_tensors.append(mean_tensor.flatten())
+
+        cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
+        mean_tensors = np.concatenate(mean_tensors)
+        # network_assets.sender_01.put(mean_tensors)
+        # sign_tensors = self.DReLU((np.int64(2)*mean_tensors).view(np.uint64))
+        sign_tensors = self.DReLU(mean_tensors.astype(np.uint64))
+        # network_assets.sender_01.put(mean_tensors)
+        # network_assets.sender_01.put(sign_tensors)
+        relu_map = np.ones_like(activation)
+        for i in range(len(self.active_block_sizes)):
+            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i+1])].reshape(orig_shapes[i])
+            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1)).astype(relu_map.dtype)
+            # activation[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(reshaped_inputs[i])
+
+        # network_assets.sender_01.put(activation)
+        # network_assets.sender_01.put(relu_map)
+
+        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels].astype(np.uint64), activation[:, ~self.is_identity_channels].astype(np.uint64)).astype(np.int64)
+        activation = activation.astype(np.int64)
+        # network_assets.sender_01.put(activation)
+        # network_assets.sender_01.put(sign_tensors)
+
+        return torch.from_numpy(activation)
+
+
 
 
 if __name__ == "__main__":
@@ -332,7 +391,7 @@ if __name__ == "__main__":
     image_path = "/home/yakir/tmp/image_0.pt"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
 
-    image_shape = (1, 3, 192, 256)
+    image_shape = (1, 3, 192, 192)
 
     model = get_model(
         config=config_path,
@@ -364,6 +423,13 @@ if __name__ == "__main__":
     )
 
     securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
+
+    import pickle
+    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_96x96/ResNet18/block_size_spec.pickle"
+    block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+    # model.backbone.stem[2] = SecureBlockReLUServer(crypto_assets, network_assets, block_sizes['stem_2'])
+    # model.backbone.stem[5] = SecureBlockReLUServer(crypto_assets, network_assets, block_sizes['stem_5'])
+    model.backbone.stem[8] = SecureBlockReLUServer(crypto_assets, network_assets, block_sizes['stem_8'])
 
     run_inference(model, image_shape, crypto_assets, network_assets)
 

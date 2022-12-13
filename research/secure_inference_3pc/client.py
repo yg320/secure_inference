@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from research.communication.utils import Sender, Receiver
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c, P, module_67
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c, P, module_67, DepthToSpace, SpaceToDepth
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -254,6 +254,77 @@ class SecureReLUClient(SecureModule):
         ret = relu_0.astype(self.signed_type)
         return torch.from_numpy(ret)
 
+from research.secure_inference_3pc.secure_block_relu import BlockReLU_V1
+from research.bReLU import BlockRelu
+
+class SecureBlockReLUClient(SecureModule):
+
+    def __init__(self, crypto_assets, network_assets, block_sizes):
+        super(SecureBlockReLUClient, self).__init__(crypto_assets, network_assets)
+        self.block_sizes = np.array(block_sizes)
+        self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
+        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
+
+        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
+        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+
+    def forward(self, activation):
+        # activation_server = network_assets.receiver_01.get()
+        # activation_original = activation + activation_server
+        # [ 0, 33, 38, 62]
+        # desired_out, desired_mean_tensors, desired_sign_tensors, desired_relu_map_before, desired_activation_before = BlockReLU_V1(self.block_sizes)(activation_original)
+        # desired_out = BlockRelu(self.block_sizes)(activation_original.to(torch.float64)/10000)
+
+        activation = activation.numpy()#.astype(np.uint64)
+        reshaped_inputs = []
+        mean_tensors = []
+        channels = []
+        orig_shapes = []
+
+        for block_size in self.active_block_sizes:
+
+            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
+            cur_input = activation[:, cur_channels]
+            # reshaped_input[0,1,38,31]
+            reshaped_input = SpaceToDepth(block_size)(cur_input)
+            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
+
+            channels.append(cur_channels)
+            reshaped_inputs.append(reshaped_input)
+            orig_shapes.append(mean_tensor.shape)
+            mean_tensors.append(mean_tensor.flatten())
+
+        cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
+        mean_tensors = np.concatenate(mean_tensors)
+        # mean_tensors_server = network_assets.receiver_01.get()
+        # sign_tensors = self.DReLU((np.int64(2)*mean_tensors).view(np.uint64))
+        sign_tensors = self.DReLU(mean_tensors.astype(np.uint64))
+
+        relu_map = np.ones_like(activation)
+        for i in range(len(self.active_block_sizes)):
+            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i+1])].reshape(orig_shapes[i])
+            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1)).astype(relu_map.dtype)
+
+        # activation_server_before = network_assets.receiver_01.get()
+        # relu_map_server_before = network_assets.receiver_01.get()
+
+        # activation_before = (activation_server_before + activation)[:, ~self.is_identity_channels]
+        # desired_activation_before = desired_activation_before[:, ~self.is_identity_channels]
+
+        # relu_map_before = (relu_map_server_before + relu_map)[:, ~self.is_identity_channels]
+        # desired_relu_map_before = desired_relu_map_before[:, ~self.is_identity_channels]
+        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels].astype(np.uint64), activation[:, ~self.is_identity_channels].astype(np.uint64)).astype(np.int64)
+        activation = activation.astype(np.int64)
+        # activation_server = network_assets.receiver_01.get()
+        # sign_tensors_server = network_assets.receiver_01.get()
+        # out_real = activation_server + activation
+        # mean_tensors_real = mean_tensors_server + mean_tensors
+        # sign_tensors_real = sign_tensors_server + sign_tensors
+        return torch.from_numpy(activation)
+
+
+
+
 
 def build_secure_conv(crypto_assets, network_assets, module, bn_module):
     return SecureConv2DClient(
@@ -272,7 +343,7 @@ def build_secure_relu(crypto_assets, network_assets):
 
 def run_inference(model, image_path, crypto_assets, network_assets):
 
-    I = (torch.load(image_path).unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)
+    I = (torch.load(image_path).unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)[:,:,:192,:192]
     I1 = crypto_assets.get_random_tensor_over_L(I.shape, prf=crypto_assets.prf_01_torch)
     I0 = I - I1
 
@@ -281,7 +352,7 @@ def run_inference(model, image_path, crypto_assets, network_assets):
     print("Start")
     image = I0
     t0 = time.time()
-    out_0 = model.decode_head(model.backbone(image))
+    out_0 = model.backbone.stem(image)
     # out_0 = model.backbone.stem(image)
     out_1 = network_assets.receiver_01.get()
     print(time.time() - t0)
@@ -329,11 +400,21 @@ if __name__ == "__main__":
 
     securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
 
+    import pickle
+    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_96x96/ResNet18/block_size_spec.pickle"
+    block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+    # model.backbone.stem[2] = SecureBlockReLUClient(crypto_assets, network_assets, block_sizes['stem_2'])
+    # model.backbone.stem[5] = SecureBlockReLUClient(crypto_assets, network_assets, block_sizes['stem_5'])
+    model.backbone.stem[8] = SecureBlockReLUClient(crypto_assets, network_assets, block_sizes['stem_8'])
+
     out = run_inference(model, image_path, crypto_assets, network_assets)
 
-
+    from research.bReLU import BlockRelu
     model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
-    desired_out = model_baseline.decode_head(model_baseline.backbone(torch.load(image_path).unsqueeze(0)))
+    # model_baseline.backbone.stem[2] = BlockReLU_V1(block_sizes['stem_2'])
+    # model_baseline.backbone.stem[5] = BlockReLU_V1(block_sizes['stem_5'])
+    model_baseline.backbone.stem[8] = BlockReLU_V1(block_sizes['stem_8'])
+    desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0)[:,:,:192,:192])
     print((out - desired_out).abs().max())
     assert False
 

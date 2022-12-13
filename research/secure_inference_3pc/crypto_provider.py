@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, \
-    post_conv, mat_mult_single, Addresses, P, sub_mode_p, decompose
+    post_conv, mat_mult_single, Addresses, P, sub_mode_p, decompose, DepthToSpace, SpaceToDepth
 
 from research.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
@@ -233,6 +233,38 @@ class SecureReLUCryptoProvider(SecureModule):
         return torch.from_numpy(X_share)
 
 
+class SecureBlockReLUCryptoProvider(SecureModule):
+
+    def __init__(self, crypto_assets, network_assets, block_sizes):
+        super(SecureBlockReLUCryptoProvider, self).__init__(crypto_assets, network_assets)
+        self.block_sizes = np.array(block_sizes)
+        self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
+        self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+
+        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
+        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+
+    def forward(self, activation):
+        activation = activation.numpy()#.astype(np.uint64)
+        mean_tensors = []
+
+        for block_size in self.active_block_sizes:
+
+            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
+            cur_input = activation[:, cur_channels]
+
+            reshaped_input = SpaceToDepth(block_size)(cur_input)
+            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
+
+            mean_tensors.append(mean_tensor.flatten())
+
+        mean_tensors = np.concatenate(mean_tensors)
+        self.DReLU(mean_tensors.astype(np.uint64))
+        self.mult(activation[:, ~self.is_identity_channels].shape)
+        activation = activation.astype(np.int64)
+        return torch.from_numpy(activation)
+
+
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     return SecureConv2DCryptoProvider(
         W_shape=conv_module.weight.shape,
@@ -258,12 +290,13 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
     time.sleep(5)
     print("Start")
     image = dummy_I
-    _ = model.decode_head(model.backbone(image))
+    _ = model.backbone.stem(image)
+
 
 
 if __name__ == "__main__":
 
-    image_shape = (1, 3, 192, 256)
+    image_shape = (1, 3, 192, 192)
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
 
     addresses = Addresses()
@@ -296,5 +329,12 @@ if __name__ == "__main__":
         checkpoint_path=None
     )
     securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
+
+    import pickle
+    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_96x96/ResNet18/block_size_spec.pickle"
+    block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+    # model.backbone.stem[2] = SecureBlockReLUCryptoProvider(crypto_assets, network_assets, block_sizes['stem_2'])
+    # model.backbone.stem[5] = SecureBlockReLUCryptoProvider(crypto_assets, network_assets, block_sizes['stem_5'])
+    model.backbone.stem[8] = SecureBlockReLUCryptoProvider(crypto_assets, network_assets, block_sizes['stem_8'])
 
     run_inference(model, image_shape, crypto_assets, network_assets)

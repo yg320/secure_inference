@@ -24,12 +24,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 12524
-        self.port_10 = 12525
-        self.port_02 = 12526
-        self.port_20 = 12527
-        self.port_12 = 12528
-        self.port_21 = 12529
+        self.port_01 = 12584
+        self.port_10 = 12585
+        self.port_02 = 12586
+        self.port_20 = 12587
+        self.port_12 = 12588
+        self.port_21 = 12589
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -403,3 +403,34 @@ def get_c_case_2(u, j):
     c = (P + 1 - j) * (u + 1) + (P-j) * u
     c[..., 0] = u[...,0] * (P-1) ** j
     return c % P
+
+import torch.nn as nn
+
+class DepthToSpace(nn.Module):
+
+    def __init__(self, block_size):
+        super().__init__()
+        self.block_size = block_size
+
+    def forward(self, x):
+        N, C, H, W, _ = x.shape
+        # print(N, C, H, W, self.block_size)
+        x = x.reshape(N, C, H, W, self.block_size[0], self.block_size[1])
+        x = x.transpose(0, 1, 2, 4, 3, 5)#.contiguous()
+        x = x.reshape(N, C, H * self.block_size[0], W * self.block_size[1])
+        return x
+
+
+class SpaceToDepth(nn.Module):
+
+    def __init__(self, block_size):
+        super().__init__()
+        self.block_size = block_size
+
+    def forward(self, x):
+        N, C, H, W = x.shape
+        # print(N, C, H, W, self.block_size)
+        x = x.reshape(N, C, H // self.block_size[0], self.block_size[0], W // self.block_size[1], self.block_size[1])
+        x = x.transpose(0, 1, 2, 4, 3, 5)#.contiguous()
+        x = x.reshape(N, C, H // self.block_size[0], W // self.block_size[1], self.block_size[0] * self.block_size[1])
+        return x
