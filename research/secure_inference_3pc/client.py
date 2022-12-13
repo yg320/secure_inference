@@ -19,7 +19,9 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
+
         X_share = X_share.numpy()
+        assert X_share.dtype == self.signed_type
         t0 = time.time()
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
@@ -165,6 +167,9 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
+        assert X_share.dtype == self.dtype
+        assert Y_share.dtype == self.dtype
+
         cur_time = time.time()
 
         A_share = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
@@ -231,7 +236,8 @@ class SecureDReLUClient(SecureModule):
         self.msb = SecureMSBClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X0_converted = self.share_convert(X_share)
+        assert X_share.dtype == self.dtype
+        X0_converted = self.share_convert(self.dtype(2) * X_share)
         MSB_0 = self.msb(X0_converted)
         return -MSB_0
 
@@ -270,12 +276,10 @@ class SecureBlockReLUClient(SecureModule):
 
     def forward(self, activation):
         # activation_server = network_assets.receiver_01.get()
-        # activation_original = activation + activation_server
-        # [ 0, 33, 38, 62]
-        # desired_out, desired_mean_tensors, desired_sign_tensors, desired_relu_map_before, desired_activation_before = BlockReLU_V1(self.block_sizes)(activation_original)
-        # desired_out = BlockRelu(self.block_sizes)(activation_original.to(torch.float64)/10000)
 
-        activation = activation.numpy()#.astype(np.uint64)
+        activation = activation.numpy()
+        # desired_out = BlockReLU_V1(self.block_sizes)(activation + activation_server)
+        assert activation.dtype == self.signed_type
         reshaped_inputs = []
         mean_tensors = []
         channels = []
@@ -287,6 +291,7 @@ class SecureBlockReLUClient(SecureModule):
             cur_input = activation[:, cur_channels]
             # reshaped_input[0,1,38,31]
             reshaped_input = SpaceToDepth(block_size)(cur_input)
+            assert reshaped_input.dtype == self.signed_type
             mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
 
             channels.append(cur_channels)
@@ -296,30 +301,19 @@ class SecureBlockReLUClient(SecureModule):
 
         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = np.concatenate(mean_tensors)
-        # mean_tensors_server = network_assets.receiver_01.get()
-        # sign_tensors = self.DReLU((np.int64(2)*mean_tensors).view(np.uint64))
-        sign_tensors = self.DReLU(mean_tensors.astype(np.uint64))
+        assert mean_tensors.dtype == self.signed_type
+        activation = activation.astype(self.dtype)
+        sign_tensors = self.DReLU(mean_tensors.astype(self.dtype))
 
         relu_map = np.ones_like(activation)
         for i in range(len(self.active_block_sizes)):
             sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i+1])].reshape(orig_shapes[i])
-            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1)).astype(relu_map.dtype)
+            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
 
-        # activation_server_before = network_assets.receiver_01.get()
-        # relu_map_server_before = network_assets.receiver_01.get()
-
-        # activation_before = (activation_server_before + activation)[:, ~self.is_identity_channels]
-        # desired_activation_before = desired_activation_before[:, ~self.is_identity_channels]
-
-        # relu_map_before = (relu_map_server_before + relu_map)[:, ~self.is_identity_channels]
-        # desired_relu_map_before = desired_relu_map_before[:, ~self.is_identity_channels]
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels].astype(np.uint64), activation[:, ~self.is_identity_channels].astype(np.uint64)).astype(np.int64)
-        activation = activation.astype(np.int64)
-        # activation_server = network_assets.receiver_01.get()
-        # sign_tensors_server = network_assets.receiver_01.get()
-        # out_real = activation_server + activation
-        # mean_tensors_real = mean_tensors_server + mean_tensors
-        # sign_tensors_real = sign_tensors_server + sign_tensors
+        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
+        activation = activation.astype(self.signed_type)
+        # real_out = network_assets.receiver_01.get() + activation
+        # assert np.all(real_out == desired_out.numpy())
         return torch.from_numpy(activation)
 
 
@@ -352,8 +346,7 @@ def run_inference(model, image_path, crypto_assets, network_assets):
     print("Start")
     image = I0
     t0 = time.time()
-    out_0 = model.backbone.stem(image)
-    # out_0 = model.backbone.stem(image)
+    out_0 = model.decode_head(model.backbone(image))
     out_1 = network_assets.receiver_01.get()
     print(time.time() - t0)
     out = (torch.from_numpy(out_1) + out_0)
@@ -366,7 +359,8 @@ if __name__ == "__main__":
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/knapsack_0.15_192x192_2x16_finetune_80k_v2/iter_80000.pth"
+    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
 
     addresses = Addresses()
 
@@ -401,21 +395,31 @@ if __name__ == "__main__":
     securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
 
     import pickle
-    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_96x96/ResNet18/block_size_spec.pickle"
-    block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-    # model.backbone.stem[2] = SecureBlockReLUClient(crypto_assets, network_assets, block_sizes['stem_2'])
-    # model.backbone.stem[5] = SecureBlockReLUClient(crypto_assets, network_assets, block_sizes['stem_5'])
-    model.backbone.stem[8] = SecureBlockReLUClient(crypto_assets, network_assets, block_sizes['stem_8'])
+    from research.distortion.utils import ArchUtilsFactory
+    from functools import partial
+
+    SecureBlockReLUClient_partial = partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets)
+    layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+    arch_utils = ArchUtilsFactory()('AvgPoolResNet')
+    arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=SecureBlockReLUClient_partial)
 
     out = run_inference(model, image_path, crypto_assets, network_assets)
 
     from research.bReLU import BlockRelu
     model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
+    arch_utils.set_bReLU_layers(model_baseline, layer_name_to_block_sizes, block_relu_class=BlockRelu)
+
+
     # model_baseline.backbone.stem[2] = BlockReLU_V1(block_sizes['stem_2'])
     # model_baseline.backbone.stem[5] = BlockReLU_V1(block_sizes['stem_5'])
-    model_baseline.backbone.stem[8] = BlockReLU_V1(block_sizes['stem_8'])
-    desired_out = model_baseline.backbone.stem(torch.load(image_path).unsqueeze(0)[:,:,:192,:192])
-    print((out - desired_out).abs().max())
+    # model_baseline.backbone.stem[8] = BlockReLU_V1(block_sizes['stem_8'])
+    im = torch.load(image_path).unsqueeze(0)[:,:,:192,:192]
+    desired_out = model_baseline.decode_head(model_baseline.backbone(im))
+    print('fds')
+    import matplotlib
+    matplotlib.use("TkAgg")
+    from matplotlib import pyplot as plt
+    print(np.abs((out - desired_out.detach()).numpy()).max())
     assert False
 
    # sudo apt-get update

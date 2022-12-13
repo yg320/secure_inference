@@ -51,8 +51,16 @@ class BlockReLU_V1(nn.Module):
         return a*b
 
     def forward(self, activation):
+        if type(activation) == torch.Tensor:
+            activation = activation.clone()
+        else:
+            activation = activation.copy()
+        is_normal_inference = type(activation) == torch.Tensor
+        if is_normal_inference:
+            activation = activation.detach().numpy()
+        # else:
+        #     assert activation.dtype == np.int64
 
-        activation = activation.detach().numpy()
         reshaped_inputs = []
         mean_tensors = []
         channels = []
@@ -73,32 +81,56 @@ class BlockReLU_V1(nn.Module):
 
         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = np.concatenate(mean_tensors)
+
+        # activation = activation.astype(np.ulonglong)
+        # sign_tensors = self.DReLU(mean_tensors.astype(np.ulonglong))
+
         sign_tensors = self.DReLU(mean_tensors)
 
         relu_map = np.ones_like(activation)
         for i in range(len(self.active_block_sizes)):
             sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i+1])].reshape(orig_shapes[i])
-            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1)).astype(relu_map.dtype)
-            # activation[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(reshaped_inputs[i])
+            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
         desired_relu_map_before = relu_map.copy()
         desired_activation_before = activation.copy()
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
-        return torch.from_numpy(activation)#, mean_tensors, sign_tensors, desired_relu_map_before, desired_activation_before
+        return torch.from_numpy(activation)
+        #, mean_tensors, sign_tensors, desired_relu_map_before, desired_activation_before
+
 
 
 
 if __name__ == "__main__":
     relu_spec_file ="/home/yakir/Data2/assets_v4/distortions/ade_20k_96x96/ResNet18/block_size_spec.pickle"
     block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-    data = pickle.load(open("/home/yakir/image.pickle", 'rb')).cpu()
+    # data = pickle.load(open("/home/yakir/image.pickle", 'rb')).cpu()
+    #
+    # x = torch.from_numpy(np.random.random(size=(1,32, 192, 192)))
 
-    x = torch.from_numpy(np.random.random(size=(1,32, 192, 192)))
-    br_1 = BlockReLU_V1(block_sizes['stem_2'], 'stem_2')
-    br_0 = BlockRelu(block_sizes['stem_2'])
+    activation_numpy = np.load("/home/yakir/activation_numpy.npy")
+    activation_torch = np.load("/home/yakir/activation_torch.npy")
 
-    out_0 = br_0(x)
-    out_1 = br_1((x*10000).to(torch.int64)).to(torch.float64) / 10000
+    br_1 = BlockReLU_V1(block_sizes['stem_8'][43:44])
 
-    print((out_0 - out_1).abs().max())
+    activation_numpy_float = activation_numpy.astype(np.float32) / 10000
+    # activation_numpy_out = torch.from_numpy(activation_numpy_float)
 
-    print("fds")
+    # print((np.abs(activation_torch - activation_numpy_float)).max())
+    activation_numpy_float = activation_numpy_float[:,43:44, 52:53, 78:84]
+    activation_torch = activation_torch[:,43:44, 52:53, 78:84]
+    print(np.abs(activation_numpy_float - activation_torch).max())
+
+    out_numpy = br_1(activation_numpy_float)#.to(torch.float32) #/ 10000
+    out_torch = br_1(activation_torch)
+
+    print((out_numpy - out_torch).abs().max())
+
+    print("dsa")
+    # br_0 = BlockRelu(block_sizes['stem_2'])
+    #
+    # out_0 = br_0(x)
+    # out_1 = br_1((x*10000).to(torch.int64)).to(torch.float64) / 10000
+    #
+    # print((out_0 - out_1).abs().max())
+    #
+    # print("fds")
