@@ -104,6 +104,7 @@ if __name__ == "__main__":
     # parser.add_argument('--output_path', type=str, default=None)
     # parser.add_argument('--params_name', type=str, default=None)
 
+
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--gpu_id', type=int, default=0)
     parser.add_argument('--params_name', type=str, default="ResNet18_Params_192x192")
