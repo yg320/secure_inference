@@ -24,12 +24,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 12834
-        self.port_10 = 12835
-        self.port_02 = 12836
-        self.port_20 = 12837
-        self.port_12 = 12838
-        self.port_21 = 12839
+        self.port_01 = 12924
+        self.port_10 = 12925
+        self.port_02 = 12926
+        self.port_20 = 12927
+        self.port_12 = 12928
+        self.port_21 = 12929
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -238,29 +238,63 @@ class SecureModule(torch.nn.Module):
 
 def fuse_conv_bn(conv_module, batch_norm_module):
     # TODO: this was copied from somewhere
-    fusedconv = torch.nn.Conv2d(
-        conv_module.in_channels,
-        conv_module.out_channels,
-        kernel_size=conv_module.kernel_size,
-        stride=conv_module.stride,
-        padding=conv_module.padding,
-        bias=True
-    )
-    fusedconv.weight.requires_grad = False
-    fusedconv.bias.requires_grad = False
-    w_conv = conv_module.weight.clone().view(conv_module.out_channels, -1)
-    w_bn = torch.diag(
-        batch_norm_module.weight.div(torch.sqrt(batch_norm_module.eps + batch_norm_module.running_var)))
-    fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
-    if conv_module.bias is not None:
-        b_conv = conv_module.bias
-    else:
-        b_conv = torch.zeros(conv_module.weight.size(0))
-    b_bn = batch_norm_module.bias - batch_norm_module.weight.mul(batch_norm_module.running_mean).div(
-        torch.sqrt(batch_norm_module.running_var + batch_norm_module.eps))
-    fusedconv.bias.copy_(torch.matmul(w_bn, b_conv) + b_bn)
+    if conv_module.groups > 1:
+        assert conv_module.in_channels == conv_module.out_channels == conv_module.groups
+        assert conv_module.bias is None
 
-    W, B = fusedconv.weight, fusedconv.bias
+        Ws = []
+        Bs = []
+        for i in range(conv_module.groups):
+            fusedconv = torch.nn.Conv2d(
+                1,
+                1,
+                kernel_size=conv_module.kernel_size,
+                stride=conv_module.stride,
+                padding=conv_module.padding,
+                bias=True
+            )
+            fusedconv.weight.requires_grad = False
+            fusedconv.bias.requires_grad = False
+            w_conv = conv_module.weight[i:i+1].clone().view(1, -1)
+            w_bn = torch.diag(
+                batch_norm_module.weight[i:i+1].div(torch.sqrt(batch_norm_module.eps + batch_norm_module.running_var[i:i+1])))
+            fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
+            b_bn = batch_norm_module.bias - batch_norm_module.weight.mul(batch_norm_module.running_mean).div(
+                torch.sqrt(batch_norm_module.running_var + batch_norm_module.eps))
+
+            fusedconv.bias.copy_(b_bn[i:i+1])
+
+            W, B = fusedconv.weight, fusedconv.bias
+            Ws.append(W)
+            Bs.append(B)
+        W = torch.cat(Ws, dim=0)
+        B = torch.cat(Bs, dim=0)
+        return W, B
+    else:
+
+        fusedconv = torch.nn.Conv2d(
+            conv_module.in_channels,
+            conv_module.out_channels,
+            kernel_size=conv_module.kernel_size,
+            stride=conv_module.stride,
+            padding=conv_module.padding,
+            bias=True
+        )
+        fusedconv.weight.requires_grad = False
+        fusedconv.bias.requires_grad = False
+        w_conv = conv_module.weight.clone().view(conv_module.out_channels, -1)
+        w_bn = torch.diag(
+            batch_norm_module.weight.div(torch.sqrt(batch_norm_module.eps + batch_norm_module.running_var)))
+        fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
+        if conv_module.bias is not None:
+            b_conv = conv_module.bias
+        else:
+            b_conv = torch.zeros(conv_module.weight.size(0))
+        b_bn = batch_norm_module.bias - batch_norm_module.weight.mul(batch_norm_module.running_mean).div(
+            torch.sqrt(batch_norm_module.running_var + batch_norm_module.eps))
+        fusedconv.bias.copy_(torch.matmul(w_bn, b_conv) + b_bn)
+
+        W, B = fusedconv.weight, fusedconv.bias
 
     return W, B
 

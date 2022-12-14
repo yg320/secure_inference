@@ -4,7 +4,8 @@ import numpy as np
 from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
     SpaceToDepth, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
-from research.secure_inference_3pc.resnet_converter import securify_model
+from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
+from functools import partial
 
 from research.distortion.utils import get_model
 from research.distortion.utils import ArchUtilsFactory
@@ -15,13 +16,14 @@ import time
 
 
 class SecureConv2DClient(SecureModule):
-    def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
+    def __init__(self, W, stride, dilation, padding, groups, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
         self.W_share = W.numpy()
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
+        self.groups = groups
 
     def forward(self, X_share):
         t0 = time.time()
@@ -29,7 +31,7 @@ class SecureConv2DClient(SecureModule):
         X_share = X_share.numpy()
         assert X_share.dtype == self.signed_type
         assert self.W_share.shape[2] == self.W_share.shape[3]
-        assert self.W_share.shape[1] == X_share.shape[1]
+        assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
 
         A_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max,
                                                            size=X_share.shape, dtype=np.int64)
@@ -49,7 +51,7 @@ class SecureConv2DClient(SecureModule):
         E = E_share_server + E_share
         F = F_share_server + F_share
 
-        out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation)
+        out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
 
         out_numpy = out_numpy + C_share
 
@@ -279,14 +281,16 @@ class SecureBlockReLUClient(SecureModule):
         return torch.from_numpy(activation)
 
 
-def build_secure_conv(crypto_assets, network_assets, module, bn_module):
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
+    # assert module.groups == 1
     return SecureConv2DClient(
         W=crypto_assets.get_random_tensor_over_L(
-            shape=module.weight.shape,
+            shape=conv_module.weight.shape,
             prf=crypto_assets.prf_01_torch),
-        stride=module.stride,
-        dilation=module.dilation,
-        padding=module.padding,
+        stride=conv_module.stride,
+        dilation=conv_module.dilation,
+        padding=conv_module.padding,
+        groups=conv_module.groups,
         crypto_assets=crypto_assets,
         network_assets=network_assets
     )
@@ -316,11 +320,11 @@ def run_inference(model, image_path, crypto_assets, network_assets):
 
 if __name__ == "__main__":
 
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
-    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
+    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/knapsack_0.15_192x192_2x16_finetune_80k_v2/iter_80000.pth"
-    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
+    relu_spec_file = None# "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
     image_shape = (1, 3, 192, 192)
 
     model = get_model(
@@ -331,15 +335,17 @@ if __name__ == "__main__":
 
     compile_numba_funcs()
     crypto_assets, network_assets = get_assets(0)
-    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=SecureBlockReLUClient, relu_spec_file=relu_spec_file)
+
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
+    securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=None, relu_spec_file=relu_spec_file)
     out = run_inference(model, image_path, crypto_assets, network_assets)
-    #
-    #
+
     import pickle
     from research.bReLU import BlockRelu
 
     model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
-    ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
+    # ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
 
     im = torch.load(image_path).unsqueeze(0)[:, :, :192, :192]
     desired_out = model_baseline.decode_head(model_baseline.backbone(im))

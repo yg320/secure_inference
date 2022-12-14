@@ -179,6 +179,32 @@ def numba_double_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilati
     return res
 
 
+
+@njit(parallel=True)
+def numba_double_separable_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
+    stride_row, stride_col = stride
+    dilation_row, dilation_col = dilation
+    res = np.zeros((B.shape[0], nb_rows_out, nb_cols_out), dtype=np.int64)
+
+    for out_channel in prange(B.shape[0]):
+        for i in range(res.shape[1]):
+            for j in range(res.shape[2]):
+                for k_0 in range(3):
+                    for k_1 in range(3):
+                        x = stride_row * i + k_0 * dilation_row
+                        y = stride_col * j + k_1 * dilation_col
+
+                        res[out_channel, i, j] += \
+                            B[out_channel, 0, k_0, k_1] * \
+                            A[0, out_channel, x, y]
+
+                        res[out_channel, i, j] += \
+                            D[out_channel, 0, k_0, k_1] * \
+                            C[0, out_channel, x, y]
+
+    return res
+
+
 @njit(parallel=True)
 def numba_single_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
@@ -200,6 +226,29 @@ def numba_single_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
 
 
     return res
+
+
+@njit(parallel=True)
+def numba_single_separable_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
+    stride_row, stride_col = stride
+    dilation_row, dilation_col = dilation
+    res = np.zeros((B.shape[0], nb_rows_out, nb_cols_out), dtype=np.int64)
+
+    for out_channel in prange(B.shape[0]):
+        for i in range(res.shape[1]):
+            for j in range(res.shape[2]):
+                for k_0 in range(3):
+                    for k_1 in range(3):
+                        x = stride_row * i + k_0 * dilation_row
+                        y = stride_col * j + k_1 * dilation_col
+
+                        res[out_channel, i, j] += \
+                            B[out_channel, 0, k_0, k_1] * \
+                            A[0, out_channel, x, y]
+
+
+    return res
+
 
 
 @njit(parallel=True)
@@ -293,7 +342,7 @@ def numba_single_conv2d(A, B, nb_rows_out, nb_cols_out, stride, dilation):
     return res
 
 
-def double_conv_2d(A, B, C, D, padding, stride, dilation):
+def double_conv_2d(A, B, C, D, padding, stride, dilation, groups=1):
     nb_rows_in = A.shape[2]
     nb_cols_in = A.shape[3]
     nb_rows_kernel = B.shape[2]
@@ -309,7 +358,11 @@ def double_conv_2d(A, B, C, D, padding, stride, dilation):
     C_ = np.pad(C, ((0, 0), (0, 0), padding, padding), mode='constant')
 
     if B.shape[2] == B.shape[3] == 3:
-        out = numba_double_conv2d_3x3(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
+        if groups == 1:
+            out = numba_double_conv2d_3x3(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
+        else:
+            out = numba_double_separable_conv2d_3x3(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
+
     elif B.shape[2] == B.shape[3] == 1:
         out = numba_double_conv2d_1x1(A_, B, C_, D, nb_rows_out, nb_cols_out, stride)
     else:
@@ -318,7 +371,7 @@ def double_conv_2d(A, B, C, D, padding, stride, dilation):
     return out[np.newaxis]
 
 
-def single_conv_2d(A, B, padding, stride, dilation):
+def single_conv_2d(A, B, padding, stride, dilation, groups=1):
     nb_rows_in = A.shape[2]
     nb_cols_in = A.shape[3]
     nb_rows_kernel = B.shape[2]
@@ -333,7 +386,10 @@ def single_conv_2d(A, B, padding, stride, dilation):
     A_ = np.pad(A, ((0, 0), (0, 0), padding, padding), mode='constant')
 
     if B.shape[2] == B.shape[3] == 3:
-        out = numba_single_conv2d_3x3(A_, B, nb_rows_out, nb_cols_out, stride, dilation)
+        if groups == 1:
+            out = numba_single_conv2d_3x3(A_, B, nb_rows_out, nb_cols_out, stride, dilation)
+        else:
+            out = numba_single_separable_conv2d_3x3(A_, B, nb_rows_out, nb_cols_out, stride, dilation)
     elif B.shape[2] == B.shape[3] == 1:
         out = numba_single_conv2d_1x1(A_, B, nb_rows_out, nb_cols_out, stride)
     else:
@@ -360,18 +416,26 @@ def single_conv_2d_mat_mul(A, B, padding, stride, dilation):
 
     return E
 
-def conv_2d(A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), method=NUMBA_CONV):
-    if method == NUMBA_CONV:
-        if C is None:
-            return single_conv_2d(A, B, padding, stride, dilation)
+
+def conv_2d(A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1, method=NUMBA_CONV):
+    if groups == 1:
+        if method == NUMBA_CONV:
+            if C is None:
+                return single_conv_2d(A, B, padding, stride, dilation)
+            else:
+                return double_conv_2d(A, B, C, D, padding, stride, dilation)
         else:
-            return double_conv_2d(A, B, C, D, padding, stride, dilation)
+            if C is None:
+                return single_conv_2d_mat_mul(A, B, padding, stride, dilation)
+            else:
+                return double_conv_2d_mat_mul(A, B, C, D, padding, stride, dilation)
     else:
+        assert method == NUMBA_CONV
+        assert groups == B.shape[0]
         if C is None:
-            return single_conv_2d_mat_mul(A, B, padding, stride, dilation)
+            return single_conv_2d(A, B, padding, stride, dilation, groups=groups)
         else:
-            return double_conv_2d_mat_mul(A, B, C, D, padding, stride, dilation)
-    
+            return double_conv_2d(A, B, C, D, padding, stride, dilation, groups=groups)
 # TODO: put in init
 def compile_numba_funcs():
     in_channel = 512
@@ -390,8 +454,14 @@ def compile_numba_funcs():
     
     conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
     conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
+
+    conv_2d(A, B_3x3[:,:1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=1)
+    conv_2d(A, B_3x3[:,:1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=1)
+
     conv_2d(A, B_1x1, C, D_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
     conv_2d(A, B_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
+
+
     conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
     conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
     

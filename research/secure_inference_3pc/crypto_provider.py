@@ -8,16 +8,18 @@ from research.secure_inference_3pc.base import SecureModule, NetworkAssets, Cryp
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.secure_inference_3pc.resnet_converter import securify_model
+from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
+from functools import partial
 
 class SecureConv2DCryptoProvider(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
 
         self.W_shape = W_shape
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
+        self.groups = groups
 
     def forward(self, X_share):
         X_share = X_share.numpy()
@@ -31,7 +33,7 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
-        C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation)
+        C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
 
         # C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
         C_share_1 = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=C.shape, dtype=np.int64)
@@ -237,6 +239,7 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
         stride=conv_module.stride,
         dilation=conv_module.dilation,
         padding=conv_module.padding,
+        groups=conv_module.groups,
         crypto_assets=crypto_assets,
         network_assets=network_assets
     )
@@ -261,22 +264,25 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
 
 if __name__ == "__main__":
 
-    compile_numba_funcs()
-
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
-    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
+    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
+    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/knapsack_0.15_192x192_2x16_finetune_80k_v2/iter_80000.pth"
-    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
+    relu_spec_file = None# "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
     image_shape = (1, 3, 192, 192)
 
     model = get_model(
-        config=config_path,
+        config=secure_config_path,
         gpu_id=None,
         checkpoint_path=None
     )
 
     compile_numba_funcs()
     crypto_assets, network_assets = get_assets(2)
-    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=SecureBlockReLUCryptoProvider, relu_spec_file=relu_spec_file)
-    run_inference(model, image_shape, crypto_assets, network_assets)
+
+
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
+    securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=None, relu_spec_file=relu_spec_file)
+    out = run_inference(model, image_shape, crypto_assets, network_assets)
+
