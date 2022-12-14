@@ -2,7 +2,8 @@ import torch
 from research.communication.utils import Sender, Receiver
 import time
 import numpy as np
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, post_conv, mat_mult, Addresses, decompose, P, get_c, get_c_case_2, module_67, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, Addresses, decompose, P, get_c, get_c_case_2, module_67, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
 from scipy.signal import fftconvolve
 
 from research.communication.utils import Sender, Receiver
@@ -41,22 +42,21 @@ class SecureConv2DServer(SecureModule):
         E_share = X_share - A_share
         F_share = self.W_share - B_share
 
-        self.network_assets.sender_01.put(E_share)
-        E_share_client = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(F_share)
-        F_share_client = self.network_assets.receiver_01.get()
+
+        self.network_assets.sender_01.put(np.concatenate([E_share.flatten(), F_share.flatten()]))
+        share_client = self.network_assets.receiver_01.get()
+
+        E_share_client, F_share_client = \
+            share_client[:E_share.size].reshape(E_share.shape), \
+                share_client[E_share.size:].reshape(F_share.shape)
 
         E = E_share_client + E_share
         F = F_share_client + F_share
 
         new_weight = self.W_share - F
 
-        E_numpy, new_weight_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(E, new_weight, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        X_share_numpy, F_numpy, _, _, _, _ = pre_conv(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+        out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation)
 
-        out_numpy = mat_mult(E_numpy[0], new_weight_numpy, X_share_numpy[0], F_numpy)
-        out_numpy = out_numpy[np.newaxis]
-        out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
 
         C_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
 
@@ -138,8 +138,8 @@ class PrivateCompareServer(SecureModule):
         d_bits_1 = self.crypto_assets.prf_01_numpy.permutation(d_bits_1, axis=-1)
         t1 = time.time()
 
-        print("**********PrivateCompareServer***************")
-        print(t1 - t0)
+        # print("**********PrivateCompareServer***************")
+        # print(t1 - t0)
 
         self.network_assets.sender_12.put(d_bits_1)
 
@@ -179,8 +179,8 @@ class ShareConvertServer(SecureModule):
         y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
         t5 = time.time()
 
-        print("**********ShareConvertServer***************")
-        print(t5 - t4 + t3 - t2 + t1 - t0)
+        # print("**********ShareConvertServer***************")
+        # print(t5 - t4 + t3 - t2 + t1 - t0)
         return y_1
 
 
@@ -211,8 +211,8 @@ class SecureMultiplicationServer(SecureModule):
         out = - E * F + X_share * F + Y_share * E + C_share
         t3 = time.time()
 
-        print("**********SecureMultiplicationServer***************")
-        print(t3 - t2 + t1 - t0)
+        # print("**********SecureMultiplicationServer***************")
+        # print(t3 - t2 + t1 - t0)
         return out
 
 
@@ -258,8 +258,8 @@ class SecureMSBServer(SecureModule):
         t8 = time.time()
         alpha_1 = gamma_1 + delta_1 - 2 * theta_1
         t9 = time.time()
-        print("***************SecureMSBServer******************8")
-        print(t1 - t0 + t3 - t2 + t5 - t4 + t7 - t6 + t9 - t8)
+        # print("***************SecureMSBServer******************8")
+        # print(t1 - t0 + t3 - t2 + t5 - t4 + t7 - t6 + t9 - t8)
         return alpha_1
 
 
@@ -320,14 +320,11 @@ def build_secure_relu(crypto_assets, network_assets):
 
 def run_inference(model, image_shape, crypto_assets, network_assets):
     I1 = crypto_assets.get_random_tensor_over_L(image_shape, prf=crypto_assets.prf_01_torch)
-    import time
-    time.sleep(5)
+
     print("Start")
 
     image = I1
     out = model.decode_head(model.backbone(image))
-    # out = model.backbone.stem(image)
-    # out = model.backbone.stem(image)
 
     network_assets.sender_01.put(out)
 
@@ -391,6 +388,7 @@ class SecureBlockReLUServer(SecureModule):
 
 
 if __name__ == "__main__":
+    compile_numba_funcs()
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"

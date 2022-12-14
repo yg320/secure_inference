@@ -2,13 +2,14 @@ import torch
 import numpy as np
 
 from research.communication.utils import Sender, Receiver
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, pre_conv, mat_mult, post_conv, Addresses, decompose, get_c, P, module_67, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, Addresses, decompose, get_c, P, module_67, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 import time
-
+conv_tot_time = 0
 class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
@@ -19,10 +20,10 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
 
     def forward(self, X_share):
-
+        t0 = time.time()
+        global conv_tot_time
         X_share = X_share.numpy()
         assert X_share.dtype == self.signed_type
-        t0 = time.time()
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
 
@@ -33,24 +34,20 @@ class SecureConv2DClient(SecureModule):
         E_share = X_share - A_share
         F_share = self.W_share - B_share
 
-        E_share_server = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(E_share)
-        F_share_server = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(F_share)
+        share_server = self.network_assets.receiver_01.get()
+        self.network_assets.sender_01.put(np.concatenate([E_share.flatten(), F_share.flatten()]))
+        E_share_server, F_share_server = share_server[:E_share.size].reshape(E_share.shape), share_server[E_share.size:].reshape(F_share.shape)
 
         E = E_share_server + E_share
         F = F_share_server + F_share
 
-        X_share, F, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        E, self.W_share, _, _, _, _ = pre_conv(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+        out_numpy = conv_2d(X_share, F,  E, self.W_share, self.padding, self.stride, self.dilation)
 
-        out_numpy = mat_mult(X_share[0], F, E[0], self.W_share)
-        out_numpy = out_numpy[np.newaxis]
-        out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
+
         out_numpy = out_numpy + C_share
 
         out = out_numpy // self.trunc
-        print(f"SecureConv2DClient finished - {time.time() - t0}")
+        # print(f"SecureConv2DClient finished - {time.time() - t0} ({self.stride, self.dilation})")
 
         return torch.from_numpy(out)
 
@@ -256,7 +253,7 @@ class SecureReLUClient(SecureModule):
         X_share = X_share.astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-        print(f"SecureReLUClient finished - {time.time() - t0}")
+        # print(f"SecureReLUClient finished - {time.time() - t0}")
         ret = relu_0.astype(self.signed_type)
         return torch.from_numpy(ret)
 
@@ -275,6 +272,7 @@ class SecureBlockReLUClient(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
+        t0 = time.time()
         # activation_server = network_assets.receiver_01.get()
 
         activation = activation.numpy()
@@ -314,6 +312,7 @@ class SecureBlockReLUClient(SecureModule):
         activation = activation.astype(self.signed_type)
         # real_out = network_assets.receiver_01.get() + activation
         # assert np.all(real_out == desired_out.numpy())
+        # print(f"SecureBlockReLUClient finished - {time.time() - t0}")
         return torch.from_numpy(activation)
 
 
@@ -342,8 +341,6 @@ def run_inference(model, image_path, crypto_assets, network_assets):
     I0 = I - I1
 
     import time
-    time.sleep(5)
-    print("Start")
     image = I0
     t0 = time.time()
     out_0 = model.decode_head(model.backbone(image))
@@ -355,6 +352,8 @@ def run_inference(model, image_path, crypto_assets, network_assets):
 
 if __name__ == "__main__":
     from research.secure_inference_3pc.resnet_converter import securify_model
+
+    compile_numba_funcs()
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
@@ -409,13 +408,9 @@ if __name__ == "__main__":
     model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
     arch_utils.set_bReLU_layers(model_baseline, layer_name_to_block_sizes, block_relu_class=BlockRelu)
 
-
-    # model_baseline.backbone.stem[2] = BlockReLU_V1(block_sizes['stem_2'])
-    # model_baseline.backbone.stem[5] = BlockReLU_V1(block_sizes['stem_5'])
-    # model_baseline.backbone.stem[8] = BlockReLU_V1(block_sizes['stem_8'])
     im = torch.load(image_path).unsqueeze(0)[:,:,:192,:192]
     desired_out = model_baseline.decode_head(model_baseline.backbone(im))
-    print('fds')
+    # print('fds')
     import matplotlib
     matplotlib.use("TkAgg")
     from matplotlib import pyplot as plt
@@ -426,7 +421,6 @@ if __name__ == "__main__":
    # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
    # sudo apt-get install bzip2
    # bash Anaconda3-2019.03-Linux-x86_64.sh
-   # conda create -n open-mmlab python=3.7 -y
    # exit
    # conda create -n open-mmlab python=3.7 -y
    # conda activate open-mmlab

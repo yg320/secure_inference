@@ -3,9 +3,8 @@ from research.communication.utils import Sender, Receiver
 import numpy as np
 import time
 
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, pre_conv, \
-    post_conv, mat_mult_single, Addresses, P, sub_mode_p, decompose, DepthToSpace, SpaceToDepth
-
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, Addresses, P, sub_mode_p, decompose, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
 from research.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
 
@@ -35,18 +34,10 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
-
-        A, B, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, bias=None, stride=self.stride,
-                                                                               padding=self.padding,
-                                                                               dilation=self.dilation, groups=1)
-
-        out_numpy = mat_mult_single(A[0], B)
-        out_numpy = out_numpy[np.newaxis]
-        out_numpy = post_conv(None, out_numpy, batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
-        C = out_numpy
+        C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation)
 
         # C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-        C_share_1 = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
+        C_share_1 = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=C.shape, dtype=np.int64)
         C_share_0 = C - C_share_1
 
         self.network_assets.sender_02.put(C_share_0)
@@ -293,9 +284,6 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
         prf=crypto_assets.private_prf_torch
     )
 
-    import time
-
-    time.sleep(5)
     print("Start")
     image = dummy_I
     _ = model.decode_head(model.backbone(image))
@@ -303,6 +291,7 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
 
 
 if __name__ == "__main__":
+    compile_numba_funcs()
 
     image_shape = (1, 3, 192, 192)
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
