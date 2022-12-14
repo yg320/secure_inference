@@ -24,12 +24,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 12824
-        self.port_10 = 12825
-        self.port_02 = 12826
-        self.port_20 = 12827
-        self.port_12 = 12828
-        self.port_21 = 12829
+        self.port_01 = 12834
+        self.port_10 = 12835
+        self.port_02 = 12836
+        self.port_20 = 12837
+        self.port_12 = 12838
+        self.port_21 = 12839
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -53,6 +53,75 @@ class NetworkAssets:
             self.sender_02.start()
         if self.sender_01:
             self.sender_01.start()
+
+
+def get_assets(party):
+    prf_01_seed = 0
+    prf_02_seed = 1
+    prf_12_seed = 2
+    addresses = Addresses()
+
+    if party == 0:
+
+        crypto_assets = CryptoAssets(
+            prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
+            prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
+            prf_12_numpy=None,
+            prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
+            prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
+            prf_12_torch=None,
+        )
+
+        network_assets = NetworkAssets(
+            sender_01=Sender(addresses.port_01),
+            sender_02=Sender(addresses.port_02),
+            sender_12=None,
+            receiver_01=Receiver(addresses.port_10),
+            receiver_02=Receiver(addresses.port_20),
+            receiver_12=None
+        )
+
+    if party == 1:
+
+        crypto_assets = CryptoAssets(
+            prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
+            prf_02_numpy=None,
+            prf_12_numpy=np.random.default_rng(seed=prf_12_seed),
+            prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
+            prf_02_torch=None,
+            prf_12_torch=torch.Generator().manual_seed(prf_12_seed),
+        )
+
+        network_assets = NetworkAssets(
+            sender_01=Sender(addresses.port_10),
+            sender_02=None,
+            sender_12=Sender(addresses.port_12),
+            receiver_01=Receiver(addresses.port_01),
+            receiver_02=None,
+            receiver_12=Receiver(addresses.port_21),
+        )
+
+    if party == 2:
+
+        crypto_assets = CryptoAssets(
+            prf_01_numpy=None,
+            prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
+            prf_12_numpy=np.random.default_rng(seed=prf_12_seed),
+            prf_01_torch=None,
+            prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
+            prf_12_torch=torch.Generator().manual_seed(prf_12_seed),
+        )
+
+        network_assets = NetworkAssets(
+            sender_01=None,
+            sender_02=Sender(addresses.port_20),
+            sender_12=Sender(addresses.port_21),
+            receiver_01=None,
+            receiver_02=Receiver(addresses.port_02),
+            receiver_12=Receiver(addresses.port_12),
+        )
+
+    return crypto_assets, network_assets
 
 
 NUM_BITS = 64

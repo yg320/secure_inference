@@ -1,11 +1,8 @@
 import torch
-from research.communication.utils import Sender, Receiver
 import numpy as np
-import time
 
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, fuse_conv_bn, Addresses, P, sub_mode_p, decompose, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.base import P, sub_mode_p, decompose, SpaceToDepth, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
-from research.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
 
 from research.distortion.utils import get_model
@@ -43,36 +40,6 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.network_assets.sender_02.put(C_share_0)
 
         return torch.from_numpy(C_share_0)
-
-
-# class SecureConv2DCryptoProvider_V2(SecureModule):
-#     def __init__(self, W_shape, stride, dilation, padding, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
-#         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
-#
-#         self.W_shape = W_shape
-#         self.stride = stride
-#         self.dilation = dilation
-#         self.padding = padding
-#
-#     def forward(self, X_share):
-#         A_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
-#                                                                 prf=self.crypto_assets.prf_12_torch)
-#         B_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_12_torch)
-#         A_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape,
-#                                                                 prf=self.crypto_assets.prf_02_torch)
-#         B_share_0 = self.crypto_assets.get_random_tensor_over_L(shape=self.W_shape, prf=self.crypto_assets.prf_02_torch)
-#
-#         A = A_share_0 + A_share_1
-#         B = B_share_0 + B_share_1
-#
-#         C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
-#
-#         C_share_1 = self.crypto_assets.get_random_tensor_over_L(shape=C.shape, prf=self.crypto_assets.prf_12_torch)
-#         C_share_0 = C - C_share_1
-#
-#         self.network_assets.sender_02.put(C_share_0)
-#
-#         return C_share_0
 
 
 class PrivateCompareCryptoProvider(SecureModule):
@@ -274,6 +241,7 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
         network_assets=network_assets
     )
 
+
 def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
 
@@ -292,49 +260,23 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
 
 
 if __name__ == "__main__":
+
     compile_numba_funcs()
 
-    image_shape = (1, 3, 192, 192)
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
+    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
+    image_path = "/home/yakir/tmp/image_0.pt"
+    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/knapsack_0.15_192x192_2x16_finetune_80k_v2/iter_80000.pth"
     relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
-
-    addresses = Addresses()
-
-    prf_01_seed = 0
-    prf_02_seed = 1
-    prf_12_seed = 2
-
-    crypto_assets = CryptoAssets(
-        prf_01_numpy=None,
-        prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
-        prf_12_numpy=np.random.default_rng(seed=prf_12_seed),
-        prf_01_torch=None,
-        prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
-        prf_12_torch=torch.Generator().manual_seed(prf_12_seed),
-    )
-
-    network_assets = NetworkAssets(
-        sender_01=None,
-        sender_02=Sender(addresses.port_20),
-        sender_12=Sender(addresses.port_21),
-        receiver_01=None,
-        receiver_02=Receiver(addresses.port_02),
-        receiver_12=Receiver(addresses.port_12),
-    )
+    image_shape = (1, 3, 192, 192)
 
     model = get_model(
         config=config_path,
         gpu_id=None,
         checkpoint_path=None
     )
-    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
 
-    import pickle
-    from research.distortion.utils import ArchUtilsFactory
-    from functools import partial
-    SecureBlockReLUClient_partial = partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets)
-    layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-    arch_utils = ArchUtilsFactory()('AvgPoolResNet')
-    arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=SecureBlockReLUClient_partial)
-
+    compile_numba_funcs()
+    crypto_assets, network_assets = get_assets(2)
+    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=SecureBlockReLUCryptoProvider, relu_spec_file=relu_spec_file)
     run_inference(model, image_shape, crypto_assets, network_assets)

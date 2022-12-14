@@ -1,15 +1,19 @@
 import torch
 import numpy as np
 
-from research.communication.utils import Sender, Receiver
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets, Addresses, decompose, get_c, P, module_67, DepthToSpace, SpaceToDepth
+from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
+    SpaceToDepth, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
+from research.secure_inference_3pc.resnet_converter import securify_model
 
 from research.distortion.utils import get_model
+from research.distortion.utils import ArchUtilsFactory
+
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 import time
-conv_tot_time = 0
+
+
 class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
@@ -21,14 +25,16 @@ class SecureConv2DClient(SecureModule):
 
     def forward(self, X_share):
         t0 = time.time()
-        global conv_tot_time
+
         X_share = X_share.numpy()
         assert X_share.dtype == self.signed_type
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
 
-        A_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
-        B_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
+        A_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max,
+                                                           size=X_share.shape, dtype=np.int64)
+        B_share = self.crypto_assets.prf_02_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max,
+                                                           size=self.W_share.shape, dtype=np.int64)
         C_share = self.network_assets.receiver_02.get()
 
         E_share = X_share - A_share
@@ -36,72 +42,28 @@ class SecureConv2DClient(SecureModule):
 
         share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(np.concatenate([E_share.flatten(), F_share.flatten()]))
-        E_share_server, F_share_server = share_server[:E_share.size].reshape(E_share.shape), share_server[E_share.size:].reshape(F_share.shape)
+        E_share_server, F_share_server = share_server[:E_share.size].reshape(E_share.shape), share_server[
+                                                                                             E_share.size:].reshape(
+            F_share.shape)
 
         E = E_share_server + E_share
         F = F_share_server + F_share
 
-        out_numpy = conv_2d(X_share, F,  E, self.W_share, self.padding, self.stride, self.dilation)
-
+        out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation)
 
         out_numpy = out_numpy + C_share
 
         out = out_numpy // self.trunc
-        # print(f"SecureConv2DClient finished - {time.time() - t0} ({self.stride, self.dilation})")
+        print(f"SecureConv2DClient finished - {time.time() - t0}")
 
         return torch.from_numpy(out)
 
-
-# class SecureConv2DClient_V2(SecureModule):
-#     def __init__(self, W, stride, dilation, padding, crypto_assets, network_assets):
-#         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
-#
-#         self.W_share = W
-#         self.stride = stride
-#         self.dilation = dilation
-#         self.padding = padding
-#
-#     def forward(self, X_share):
-#         print(f"SecureConv2DClient start ({X_share.shape}, {self.W_share.shape})")
-#         t0 = time.time()
-#         assert self.W_share.shape[2] == self.W_share.shape[3]
-#         assert self.W_share.shape[1] == X_share.shape[1]
-#         # assert X_share.shape[2] == X_share.shape[3]
-#
-#         A_share = self.crypto_assets.get_random_tensor_over_L(shape=X_share.shape, prf=self.crypto_assets.prf_02_torch)
-#         B_share = self.crypto_assets.get_random_tensor_over_L(shape=self.W_share.shape, prf=self.crypto_assets.prf_02_torch)
-#
-#         C_share = torch.from_numpy(self.network_assets.receiver_02.get())
-#
-#         E_share = X_share - A_share
-#         F_share = self.W_share - B_share
-#
-#         E_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
-#         self.network_assets.sender_01.put(E_share)
-#         F_share_server = torch.from_numpy(self.network_assets.receiver_01.get())
-#         self.network_assets.sender_01.put(F_share)
-#
-#         E = E_share_server + E_share
-#         F = F_share_server + F_share
-#         print(f"SecureConv2DClient computation start ({X_share.shape}, {self.W_share.shape})")
-#         t1 = time.time()
-#         out = \
-#             torch.conv2d(X_share, F, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-#             torch.conv2d(E, self.W_share, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1) + \
-#             C_share
-#         out = out // self.trunc
-#         print(f"SecureConv2DClient computation finished - {time.time() - t1}")
-#         print(f"SecureConv2DClient finished - {time.time() - t0}")
-#
-#         return out
-#
 
 class PrivateCompareClient(SecureModule):
     def __init__(self, crypto_assets, network_assets):
         super(PrivateCompareClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_0, r, beta):
-
         if np.any(r == np.iinfo(r.dtype).max):
             assert False
         s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_0.shape, dtype=np.int32)
@@ -125,7 +87,6 @@ class ShareConvertClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-
         eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_0.shape, dtype=np.int8)
 
         r = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
@@ -169,8 +130,10 @@ class SecureMultiplicationClient(SecureModule):
 
         cur_time = time.time()
 
-        A_share = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
-        B_share = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
+        A_share = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape,
+                                                           dtype=self.dtype)
+        B_share = self.crypto_assets.prf_02_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape,
+                                                           dtype=self.dtype)
         C_share = self.network_assets.receiver_02.get()
 
         E_share = X_share - A_share
@@ -253,12 +216,10 @@ class SecureReLUClient(SecureModule):
         X_share = X_share.astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-        # print(f"SecureReLUClient finished - {time.time() - t0}")
+        print(f"SecureReLUClient finished - {time.time() - t0}")
         ret = relu_0.astype(self.signed_type)
         return torch.from_numpy(ret)
 
-from research.secure_inference_3pc.secure_block_relu import BlockReLU_V1
-from research.bReLU import BlockRelu
 
 class SecureBlockReLUClient(SecureModule):
 
@@ -268,7 +229,8 @@ class SecureBlockReLUClient(SecureModule):
         self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
-        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
+        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if
+                                   0 not in block_size]
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
@@ -284,7 +246,6 @@ class SecureBlockReLUClient(SecureModule):
         orig_shapes = []
 
         for block_size in self.active_block_sizes:
-
             cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
             cur_input = activation[:, cur_channels]
             # reshaped_input[0,1,38,31]
@@ -305,18 +266,17 @@ class SecureBlockReLUClient(SecureModule):
 
         relu_map = np.ones_like(activation)
         for i in range(len(self.active_block_sizes)):
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i+1])].reshape(orig_shapes[i])
-            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
+            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
+            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(
+                sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
 
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
+        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
+                                                              activation[:, ~self.is_identity_channels])
         activation = activation.astype(self.signed_type)
         # real_out = network_assets.receiver_01.get() + activation
         # assert np.all(real_out == desired_out.numpy())
-        # print(f"SecureBlockReLUClient finished - {time.time() - t0}")
+        print(f"SecureBlockReLUClient finished - {time.time() - t0}")
         return torch.from_numpy(activation)
-
-
-
 
 
 def build_secure_conv(crypto_assets, network_assets, module, bn_module):
@@ -331,12 +291,13 @@ def build_secure_conv(crypto_assets, network_assets, module, bn_module):
         network_assets=network_assets
     )
 
+
 def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
 
-def run_inference(model, image_path, crypto_assets, network_assets):
 
-    I = (torch.load(image_path).unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)[:,:,:192,:192]
+def run_inference(model, image_path, crypto_assets, network_assets):
+    I = (torch.load(image_path).unsqueeze(0) * crypto_assets.trunc).to(crypto_assets.torch_dtype)[:, :, :192, :192]
     I1 = crypto_assets.get_random_tensor_over_L(I.shape, prf=crypto_assets.prf_01_torch)
     I0 = I - I1
 
@@ -352,40 +313,15 @@ def run_inference(model, image_path, crypto_assets, network_assets):
     out = out.to(torch.float32) / crypto_assets.trunc
     return out
 
-if __name__ == "__main__":
-    from research.secure_inference_3pc.resnet_converter import securify_model
 
-    compile_numba_funcs()
+if __name__ == "__main__":
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16_secure.py"
     image_path = "/home/yakir/tmp/image_0.pt"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/knapsack_0.15_192x192_2x16_finetune_80k_v2/iter_80000.pth"
     relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
-
-    addresses = Addresses()
-
-    prf_01_seed = 0
-    prf_02_seed = 1
-    prf_12_seed = 2
-
-    crypto_assets = CryptoAssets(
-        prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
-        prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
-        prf_12_numpy=None,
-        prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
-        prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
-        prf_12_torch=None,
-    )
-
-    network_assets = NetworkAssets(
-        sender_01=Sender(addresses.port_01),
-        sender_02=Sender(addresses.port_02),
-        sender_12=None,
-        receiver_01=Receiver(addresses.port_10),
-        receiver_02=Receiver(addresses.port_20),
-        receiver_12=None
-    )
+    image_shape = (1, 3, 192, 192)
 
     model = get_model(
         config=secure_config_path,
@@ -393,42 +329,33 @@ if __name__ == "__main__":
         checkpoint_path=None
     )
 
-    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets)
-
-    import pickle
-    from research.distortion.utils import ArchUtilsFactory
-    from functools import partial
-
-    SecureBlockReLUClient_partial = partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets)
-    layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-    arch_utils = ArchUtilsFactory()('AvgPoolResNet')
-    arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=SecureBlockReLUClient_partial)
-
+    compile_numba_funcs()
+    crypto_assets, network_assets = get_assets(0)
+    securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=SecureBlockReLUClient, relu_spec_file=relu_spec_file)
     out = run_inference(model, image_path, crypto_assets, network_assets)
-
+    #
+    #
+    import pickle
     from research.bReLU import BlockRelu
-    model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
-    arch_utils.set_bReLU_layers(model_baseline, layer_name_to_block_sizes, block_relu_class=BlockRelu)
 
-    im = torch.load(image_path).unsqueeze(0)[:,:,:192,:192]
+    model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
+    ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
+
+    im = torch.load(image_path).unsqueeze(0)[:, :, :192, :192]
     desired_out = model_baseline.decode_head(model_baseline.backbone(im))
-    # print('fds')
-    import matplotlib
-    matplotlib.use("TkAgg")
-    from matplotlib import pyplot as plt
+
     print(np.abs((out - desired_out.detach()).numpy()).max())
 
-
-   # sudo apt-get update
-   # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
-   # sudo apt-get install bzip2
-   # bash Anaconda3-2019.03-Linux-x86_64.sh
-   # exit
-   # conda create -n open-mmlab python=3.7 -y
-   # conda activate open-mmlab
-   # conda install pytorch=1.6.0 torchvision cudatoolkit=10.1 -c pytorch
-   # pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu101/torch1.6.0/index.html
-   # pip install mmsegmentation
-   # sudo apt-get install ffmpeg libsm6 libxext6  -y
-   # conda install numba
-   # https://stackoverflow.com/questions/62436205/connecting-aws-ec2-instance-using-python-socket
+# sudo apt-get update
+# curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
+# sudo apt-get install bzip2
+# bash Anaconda3-2019.03-Linux-x86_64.sh
+# exit
+# conda create -n open-mmlab python=3.7 -y
+# conda activate open-mmlab
+# conda install pytorch=1.6.0 torchvision cudatoolkit=10.1 -c pytorch
+# pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu101/torch1.6.0/index.html
+# pip install mmsegmentation
+# sudo apt-get install ffmpeg libsm6 libxext6  -y
+# conda install numba
+# https://stackoverflow.com/questions/62436205/connecting-aws-ec2-instance-using-python-socket

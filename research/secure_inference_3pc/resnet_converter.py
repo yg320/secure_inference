@@ -1,6 +1,9 @@
 import torch
+import pickle
+from research.distortion.utils import ArchUtilsFactory
+from functools import partial
 
-def securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets):
+def securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=None, relu_spec_file=None):
     model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
     model.backbone.stem[1] = torch.nn.Identity()
     model.backbone.stem[2] = build_secure_relu(crypto_assets=crypto_assets, network_assets=network_assets)
@@ -43,4 +46,8 @@ def securify_model(model, build_secure_conv, build_secure_relu, crypto_assets, n
     model.decode_head.conv_seg = build_secure_conv(crypto_assets, network_assets, model.decode_head.conv_seg, None)
     model.decode_head.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
 
-
+    if relu_spec_file:
+        SecureBlockReLUClient_partial = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets)
+        layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+        arch_utils = ArchUtilsFactory()('AvgPoolResNet')
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=SecureBlockReLUClient_partial)
