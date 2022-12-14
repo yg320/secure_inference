@@ -4,7 +4,6 @@ import time
 from numba import njit, prange
 
 
-
 def pre_conv(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     """
     This is a block of local computation done at the beginning of the convolution. It
@@ -128,7 +127,6 @@ def post_conv(bias, res, batch_size, nb_channels_out, nb_rows_out, nb_cols_out):
     return res
 
 
-
 @njit(parallel=True)
 def mat_mult(A, B, C, D):
     assert A.shape[1] == B.shape[0]
@@ -141,9 +139,9 @@ def mat_mult(A, B, C, D):
                 res[i, j] += C[i, k] * D[k, j]
     return res
 
+
 @njit(parallel=True)
 def conv(A, B, C, D):
-
     res = np.zeros((B.shape[0], A.shape[2] - 2, A.shape[3] - 2), dtype=np.int64)
 
     for out_channel in prange(B.shape[0]):
@@ -174,23 +172,22 @@ def conv(A, B, C, D):
     return res
 
 
-
-
 for i in range(10):
     A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, 640, 24, 24))
     B = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(128, 640, 3, 3))
     C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, 640, 24, 24))
     D = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(128, 640, 3, 3))
 
+    padding = (0, 0)
+    stride = (2, 2)
     t0 = time.time()
-    A = np.pad(A, ((0, 0), (0, 0), (1, 1), (1, 1)), mode='constant')
-    C = np.pad(C, ((0, 0), (0, 0), (1, 1), (1, 1)), mode='constant')
-    res = conv(A, B, C, D)
+    A_padded = np.pad(A, ((0, 0), (0, 0), (1, 1), (1, 1)), mode='constant')
+    C_padded = np.pad(C, ((0, 0), (0, 0), (1, 1), (1, 1)), mode='constant')
+    res = conv(A_padded[:, :, ::2, ::2], B, C_padded[:, :, ::2, ::2], D)
     print(time.time() - t0)
+    A_, B_, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, padding=padding, stride=stride)
+    C_, D_, *_ = pre_conv(C, D, padding=padding, stride=stride)
+    E = mat_mult(A_[0], B_, C_[0], D_)
+    E = post_conv(None, E[np.newaxis], batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
 
-    # A, B, batch_size, nb_channels_out, nb_rows_out, nb_cols_out = pre_conv(A, B, padding=(1, 1))
-    # C, D, *_ = pre_conv(C, D, padding=(1, 1))
-    # E = mat_mult(A[0], B, C[0], D)
-    # E = post_conv(None, E[np.newaxis], batch_size, nb_channels_out, nb_rows_out, nb_cols_out)
-    #
-    # print(time.time() - t0)
+    print(time.time() - t0)

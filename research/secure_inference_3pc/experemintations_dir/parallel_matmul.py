@@ -5,7 +5,7 @@ from numba import njit, prange
 @njit(parallel=True)
 def mat_mult(A, B, C, D):
     assert A.shape[1] == B.shape[0]
-    res = np.zeros((A.shape[0], B.shape[1]), )
+    res = np.zeros((A.shape[0], B.shape[1]))
 
     for i in prange(A.shape[0]):
         for k in range(A.shape[1]):
@@ -16,8 +16,9 @@ def mat_mult(A, B, C, D):
 
 # torch.Size([1, 4096, 4608])
 # torch.Size([4608, 512])
-
-m, n, c = 4096, 4608, 512
+# (1, 576, 5760) (5760, 128)
+# m, n, c = 576, 4608, 512
+m , n, c = 576, 5760, 128
 A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(m, n))
 B = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(n, c))
 C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(m, n))
@@ -27,11 +28,15 @@ D = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(n, c
 # print(time.time() - t0)
 #
 # print(A.dtype)
-t0 = time.time()
-res = mat_mult(A, B, C, D)
-print(time.time() - t0)
+for _ in range(10):
+    A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(m, n))
+    B = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(n, c))
+    C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(m, n))
+    D = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(n, c))
+    t0 = time.time()
+    res = mat_mult(A, B, C, D)
+    print(time.time() - t0)
 
-# print("Start")
 # print(A.shape, A.dtype)
 # print(B.shape, B.dtype)
 # t0 = time.time()
