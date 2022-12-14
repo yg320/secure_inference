@@ -5,6 +5,7 @@ import time
 from threading import Thread
 import torch
 import queue
+import numpy as np
 
 def recv(socket):
     print("recv")
@@ -65,7 +66,7 @@ def send_recv(socket_a, socket_b, data):
     return recv_list[0]
 
 
-
+# Server
 class Receiver(Thread):
     def __init__(self, port):
         super(Receiver, self).__init__()
@@ -81,17 +82,19 @@ class Receiver(Thread):
         with NumpySocket() as s:
             s.bind(('', self.port))
             s.listen()
-            print(f"Listening To Port {self.port} at time {time.time()}")
-            while not self.is_done():
-                conn, addr = s.accept()
+            conn, addr = s.accept()
+            print(f"Accepted Connection port = {self.port}")
 
-                try:
-                    with conn:
-                        frame = conn.recv()
-                    self.numpy_arr_queue.put(frame)
-                finally:
-                    conn.close()
-        print("Quit Receiver")
+            while conn:
+                print(f"Recv from {self.port}")
+                frame = conn.recv()
+                conn.sendall(np.array([]))
+                if len(frame) == 0:
+                    return
+                print(f"Done Recv from {self.port}, {frame.flatten()[0]}, {frame.shape}")
+
+                self.numpy_arr_queue.put(frame)
+            print("Connection Done")
 
     def get(self):
         t0 = time.time()
@@ -102,109 +105,46 @@ class Receiver(Thread):
         # print("get: ", self.get_total_time)
         return arr
 
-    def is_done(self):
-        with self.lock:
-            return self.stop_running
 
-    def make_stop(self):
-        with self.lock:
-            self.stop_running = True
-# class Sender:
-#     def __init__(self, socket):
-#         self.numpy_arr_queue = queue.Queue()
-#         self.socket = socket
-#
-#     def put(self, arr):
-#         if type(arr) == torch.Tensor:
-#             arr = arr.numpy()
-#
-#         with NumpySocket() as s:
-#             s.connect(("localhost", self.socket))
-#             s.sendall(arr)
-#
-#     def start(self):
-#         pass
+# Client
 class Sender(Thread):
     def __init__(self, port):
         super(Sender, self).__init__()
         self.numpy_arr_queue = queue.Queue()
         self.port = port
-        self.lock = threading.Lock()
-        self.stop_running = False
         self.simulated_bandwidth = None #100000000  #bits/second
         self.put_tot_time = 0
         self.connected = False
 
     def run(self):
-        # with NumpySocket() as s:
-        #     while not self.connected:
-        #         self.connected = True
-        #         try:
-        #             s.connect(("localhost", self.port))
-        #         except ConnectionRefusedError:
-        #             time.sleep(0.01)
-        #             self.connected = False
-        #
-        #     while True:
-        #         data = self.numpy_arr_queue.get()
-        #         if type(data) == torch.Tensor:
-        #             data = data.numpy()
-        #         print(f"Sending Data to port - {self.port} at time {time.time()}")
-        #
-        #         data_sent = False
-        #         while not data_sent:
-        #             try:
-        #                 s.sendall(data)
-        #                 data_sent = True
-        #             except BrokenPipeError:
-        #                 time.sleep(0.1)
 
-
-        while True:
-            data = self.numpy_arr_queue.get()
-            if type(data) == torch.Tensor:
-                data = data.numpy()
-            with NumpySocket() as s:
-                if self.simulated_bandwidth:
-                    arr_size_bits = (data.size * data.itemsize) * 8
-                    send_time = arr_size_bits / self.simulated_bandwidth
-                    time.sleep(send_time)
-
-                connected = False
-                while not connected:
-                    try:
-                        s.connect(("localhost", self.port))
-                        connected = True
-                    except ConnectionRefusedError:
-                        time.sleep(0.01)
-
+        with NumpySocket() as s:
+            connected = False
+            while not connected:
+                try:
+                    s.connect(("localhost", self.port))
+                    connected = True
+                except ConnectionRefusedError:
+                    time.sleep(0.01)
+            print(f"Connected to port = {self.port}")
+            while True:
+                data = self.numpy_arr_queue.get()
+                if data is None:
+                    s.close()
+                    break
+                if type(data) == torch.Tensor:
+                    data = data.numpy()
+                print(f"Sending data to port = {self.port}, {data.flatten()[0]} {data.shape}")
                 s.sendall(data)
-        print("Quit Sender")
+                s.recv(1)
+                print(f"Done Sending data to port = {self.port}")
+            print("Connection Done")
 
     def put(self, arr):
         t0 = time.time()
         self.numpy_arr_queue.put(arr)
         t1 = time.time()
         self.put_tot_time += (t1-t0)
-        # print("====================")
-        # print("put: ", self.put_tot_time)
-
-    def is_done(self):
-        with self.lock:
-            return self.stop_running
-
-    def make_stop(self):
-        with self.lock:
-            self.stop_running = True
-
-# def send_v2(socket, data):
-#
-#     if type(data) == torch.Tensor:
-#         data = data.numpy()
-#
-#     with NumpySocket() as s:
-#         s.connect(("localhost", socket))
-#         s.sendall(data)
 
 
 if __name__ == "__main__":

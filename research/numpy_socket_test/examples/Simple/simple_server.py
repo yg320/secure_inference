@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import logging
+import time
 
 from research.numpy_socket_test.numpysocket.numpysocket import NumpySocket
 
@@ -14,7 +15,7 @@ with NumpySocket() as s:
     with conn:
         logger.info(f"connected: {addr}")
         frame = conn.recv()
-
+        print(time.time())
         logger.info("array received")
         logger.info(frame)
 

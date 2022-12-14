@@ -346,6 +346,8 @@ def run_inference(model, image_path, crypto_assets, network_assets):
     out_0 = model.decode_head(model.backbone(image))
     out_1 = network_assets.receiver_01.get()
     print(time.time() - t0)
+    network_assets.sender_01.put(None)
+    network_assets.sender_02.put(None)
     out = (torch.from_numpy(out_1) + out_0)
     out = out.to(torch.float32) / crypto_assets.trunc
     return out
@@ -415,7 +417,7 @@ if __name__ == "__main__":
     matplotlib.use("TkAgg")
     from matplotlib import pyplot as plt
     print(np.abs((out - desired_out.detach()).numpy()).max())
-    assert False
+
 
    # sudo apt-get update
    # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh

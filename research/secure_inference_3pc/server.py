@@ -327,7 +327,8 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
     out = model.decode_head(model.backbone(image))
 
     network_assets.sender_01.put(out)
-
+    network_assets.sender_01.put(None)
+    network_assets.sender_12.put(None)
 
 class SecureBlockReLUServer(SecureModule):
 

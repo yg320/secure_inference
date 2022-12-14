@@ -287,7 +287,8 @@ def run_inference(model, image_shape, crypto_assets, network_assets):
     print("Start")
     image = dummy_I
     _ = model.decode_head(model.backbone(image))
-
+    network_assets.sender_02.put(None)
+    network_assets.sender_12.put(None)
 
 
 if __name__ == "__main__":
