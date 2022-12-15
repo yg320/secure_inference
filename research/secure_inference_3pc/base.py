@@ -3,6 +3,8 @@ import numpy as np
 
 from research.secure_inference_3pc.communication.utils import Sender, Receiver
 import time
+from research.secure_inference_3pc.prf import MultiPartyPRFHandler
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from numba import njit, prange
 num_bit_to_dtype = {
     8: np.ubyte,
@@ -24,12 +26,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 12924
-        self.port_10 = 12925
-        self.port_02 = 12926
-        self.port_20 = 12927
-        self.port_12 = 12928
-        self.port_21 = 12929
+        self.port_01 = 13004
+        self.port_10 = 13005
+        self.port_02 = 13006
+        self.port_20 = 13007
+        self.port_12 = 13008
+        self.port_21 = 13009
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -56,22 +58,18 @@ class NetworkAssets:
 
 
 def get_assets(party):
-    prf_01_seed = 0
-    prf_02_seed = 1
-    prf_12_seed = 2
+
     addresses = Addresses()
 
     if party == 0:
-
-        crypto_assets = CryptoAssets(
-            prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
-            prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
-            prf_12_numpy=None,
-            prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
-            prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
-            prf_12_torch=None,
-        )
-
+        crypto_assets = MultiPartyPRFHandler({
+            (CLIENT, SERVER): 0,
+            (CLIENT, CRYPTO_PROVIDER): 1,
+            (SERVER, CRYPTO_PROVIDER): None,
+            CLIENT: 3,
+            SERVER: None,
+            CRYPTO_PROVIDER: None,
+        })
         network_assets = NetworkAssets(
             sender_01=Sender(addresses.port_01),
             sender_02=Sender(addresses.port_02),
@@ -82,16 +80,14 @@ def get_assets(party):
         )
 
     if party == 1:
-
-        crypto_assets = CryptoAssets(
-            prf_01_numpy=np.random.default_rng(seed=prf_01_seed),
-            prf_02_numpy=None,
-            prf_12_numpy=np.random.default_rng(seed=prf_12_seed),
-            prf_01_torch=torch.Generator().manual_seed(prf_01_seed),
-            prf_02_torch=None,
-            prf_12_torch=torch.Generator().manual_seed(prf_12_seed),
-        )
-
+        crypto_assets = MultiPartyPRFHandler({
+            (CLIENT, SERVER): 0,
+            (CLIENT, CRYPTO_PROVIDER): None,
+            (SERVER, CRYPTO_PROVIDER): 2,
+            CLIENT: None,
+            SERVER: 4,
+            CRYPTO_PROVIDER: None,
+        })
         network_assets = NetworkAssets(
             sender_01=Sender(addresses.port_10),
             sender_02=None,
@@ -103,14 +99,14 @@ def get_assets(party):
 
     if party == 2:
 
-        crypto_assets = CryptoAssets(
-            prf_01_numpy=None,
-            prf_02_numpy=np.random.default_rng(seed=prf_02_seed),
-            prf_12_numpy=np.random.default_rng(seed=prf_12_seed),
-            prf_01_torch=None,
-            prf_02_torch=torch.Generator().manual_seed(prf_02_seed),
-            prf_12_torch=torch.Generator().manual_seed(prf_12_seed),
-        )
+        crypto_assets = MultiPartyPRFHandler({
+            (CLIENT, SERVER): None,
+            (CLIENT, CRYPTO_PROVIDER): 1,
+            (SERVER, CRYPTO_PROVIDER): 2,
+            CLIENT: None,
+            SERVER: None,
+            CRYPTO_PROVIDER: 5,
+        })
 
         network_assets = NetworkAssets(
             sender_01=None,
@@ -211,7 +207,7 @@ class SecureModule(torch.nn.Module):
 
         super(SecureModule, self).__init__()
 
-        self.crypto_assets = crypto_assets
+        self.prf_handler = crypto_assets
         self.network_assets = network_assets
 
         self.trunc = TRUNC
@@ -393,5 +389,15 @@ class SpaceToDepth(nn.Module):
         return x
 
 
+class TypeConverter:
+    trunc = TRUNC
+    int_dtype = torch.int64
+    float_dtype = torch.float32
 
+    @staticmethod
+    def f2i(data):
+        return (data * TypeConverter.trunc).to(TypeConverter.int_dtype)
 
+    @staticmethod
+    def i2f(data):
+        return data.to(TypeConverter.float_dtype) / TypeConverter.trunc

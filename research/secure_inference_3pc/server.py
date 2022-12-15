@@ -1,12 +1,13 @@
 import torch
 import time
 import numpy as np
-from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets
+from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
 
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
 
 from research.distortion.utils import get_model
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
@@ -34,8 +35,8 @@ class SecureConv2DServer(SecureModule):
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
         assert self.stride[0] == self.stride[1]
 
-        A_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
-        B_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
 
         E_share = X_share - A_share
         F_share = self.W_share - B_share
@@ -56,7 +57,7 @@ class SecureConv2DServer(SecureModule):
         out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
 
-        C_share = self.crypto_assets.prf_12_numpy.integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
 
         out = out_numpy + C_share
 
@@ -73,8 +74,8 @@ class PrivateCompareServer(SecureModule):
     def forward(self, x_bits_1, r, beta):
         t0 = time.time()
 
-        s = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=np.int32)
-        # u = self.crypto_assets.prf_01_numpy.integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
+        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=np.int32)
+        # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
 
         r[beta] += 1
         bits = decompose(r)
@@ -85,7 +86,7 @@ class PrivateCompareServer(SecureModule):
 
         d_bits_1 = module_67(s)
 
-        d_bits_1 = self.crypto_assets.prf_01_numpy.permutation(d_bits_1, axis=-1)
+        d_bits_1 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_1, axis=-1)
         t1 = time.time()
 
         # print("**********PrivateCompareServer***************")
@@ -101,9 +102,9 @@ class ShareConvertServer(SecureModule):
 
     def forward(self, a_1):
         t0 = time.time()
-        eta_pp = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_1.shape, dtype=np.int8)
-        r = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
-        r_0 = self.crypto_assets.prf_01_numpy.integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
+        eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
+        r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
+        r_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
         r_1 = r - r_0
         a_tild_1 = a_1 + r_1
         beta_1 = (a_tild_1 < a_1).astype(self.dtype)
@@ -113,7 +114,7 @@ class ShareConvertServer(SecureModule):
         x_bits_1 = self.network_assets.receiver_12.get().astype(np.int8)
 
         t2 = time.time()
-        delta_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
+        delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
         t3 = time.time()
 
         self.private_compare(x_bits_1, r - 1, eta_pp)
@@ -143,9 +144,9 @@ class SecureMultiplicationServer(SecureModule):
         assert Y_share.dtype == self.dtype
 
         t0 = time.time()
-        A_share = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
-        B_share = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
-        C_share = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
         E_share = X_share - A_share
         F_share = Y_share - B_share
         t1 = time.time()
@@ -174,8 +175,8 @@ class SecureMSBServer(SecureModule):
 
     def forward(self, a_1):
         t0 = time.time()
-        beta = self.crypto_assets.prf_01_numpy.integers(0, 2, size=a_1.shape, dtype=np.int8)
-        x_1 = self.crypto_assets.prf_12_numpy.integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
+        beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
+        x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
         t1 = time.time()
 
         x_bits_1 = self.network_assets.receiver_12.get()
@@ -299,13 +300,14 @@ class SecureBlockReLUServer(SecureModule):
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     if bn_module:
         W, B = fuse_conv_bn(conv_module=conv_module, batch_norm_module=bn_module)
-        W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-        B = (B * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-        W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
+        W = TypeConverter.f2i(W)
+        B = TypeConverter.f2i(B)
+        W = W - crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=W.shape)
+
     else:
         W = conv_module.weight
-        W = (W * crypto_assets.trunc).to(crypto_assets.torch_dtype)
-        W = W - crypto_assets.get_random_tensor_over_L(W.shape, prf=crypto_assets.prf_01_torch)
+        W = TypeConverter.f2i(W)
+        W = W - crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=W.shape)
         B = None
 
     return SecureConv2DServer(
@@ -325,7 +327,7 @@ def build_secure_relu(crypto_assets, network_assets):
 
 
 def run_inference(model, image_shape, crypto_assets, network_assets):
-    I1 = crypto_assets.get_random_tensor_over_L(image_shape, prf=crypto_assets.prf_01_torch)
+    I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=image_shape)
 
     print("Start")
 
