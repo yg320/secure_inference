@@ -43,6 +43,8 @@ class ChannelDistortionHandler:
             channel_in_layer_index = channel_order_to_channel_in_layer_index[channel_order]
             channels_to_run[layer_name].append(channel_in_layer_index)
 
+        for layer_name in layer_names:
+            channels_to_run[layer_name].sort()
         os.makedirs(self.output_path, exist_ok=True)
 
         for layer_name in layer_names:
@@ -101,16 +103,16 @@ if __name__ == "__main__":
     # parser.add_argument('--output_path', type=str, default=None)
     # parser.add_argument('--params_name', type=str, default=None)
 
-    parser.add_argument('--batch_index', type=int, default=0)
-    parser.add_argument('--gpu_id', type=int, default=0)
-    parser.add_argument('--dataset', type=str, default="ade_20k_192x192")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/baseline_192x192_2x16.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/ADE_20K/resnet_18/steps_80k/baseline_192x192_2x16/iter_80000.pth")
+    parser.add_argument('--batch_index', type=int, default=1)
+    parser.add_argument('--gpu_id', type=int, default=1)
+    parser.add_argument('--dataset', type=str, default="ade_20k_256x256")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth")
     parser.add_argument('--iter', type=int, default=0)
     parser.add_argument('--block_size_spec_file_name', type=str, default=None)
     parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/channel_distortions")
-    parser.add_argument('--params_name', type=str, default="ResNet18_Params_192x192")
-    parser.add_argument('--batch_size', type=int, default=16)
+    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_1_Groups")
+    parser.add_argument('--batch_size', type=int, default=32)
 
     args = parser.parse_args()
 
@@ -124,7 +126,7 @@ if __name__ == "__main__":
     os.makedirs(output_path, exist_ok=True)
 
     iteration = args.iter
-    layer_names = params.LAYER_GROUPS[iteration]
+    layer_names = params.LAYER_NAMES
 
     if args.block_size_spec_file_name and os.path.exists(args.block_size_spec_file_name):
         baseline_block_size_spec = pickle.load(open(args.block_size_spec_file_name, 'rb'))
@@ -140,4 +142,4 @@ if __name__ == "__main__":
                                         batch_size=args.batch_size,
                                         baseline_block_size_spec=baseline_block_size_spec,
                                         seed=123,
-                                        num_channels_to_run=4000)
+                                        num_channels_to_run=sum([x[0] for x in params.LAYER_NAME_TO_DIMS.values()]))
