@@ -1,5 +1,4 @@
 import torch
-import time
 import numpy as np
 from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
@@ -72,7 +71,6 @@ class PrivateCompareServer(SecureModule):
         super(PrivateCompareServer, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_1, r, beta):
-        t0 = time.time()
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=np.int32)
         # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
@@ -87,10 +85,6 @@ class PrivateCompareServer(SecureModule):
         d_bits_1 = module_67(s)
 
         d_bits_1 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_1, axis=-1)
-        t1 = time.time()
-
-        # print("**********PrivateCompareServer***************")
-        # print(t1 - t0)
 
         self.network_assets.sender_12.put(d_bits_1)
 
@@ -101,26 +95,23 @@ class ShareConvertServer(SecureModule):
         self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
 
     def forward(self, a_1):
-        t0 = time.time()
+
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
         r_1 = r - r_0
         a_tild_1 = a_1 + r_1
         beta_1 = (a_tild_1 < a_1).astype(self.dtype)
-        t1 = time.time()
+
 
         self.network_assets.sender_12.put(a_tild_1)
         x_bits_1 = self.network_assets.receiver_12.get().astype(np.int8)
 
-        t2 = time.time()
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
-        t3 = time.time()
 
         self.private_compare(x_bits_1, r - 1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
 
-        t4 = time.time()
         eta_pp = eta_pp.astype(self.dtype)
         t00 = eta_pp * eta_p_1
         t11 = self.add_mode_L_minus_one(t00, t00)
@@ -128,10 +119,7 @@ class ShareConvertServer(SecureModule):
         t00 = self.add_mode_L_minus_one(delta_1, eta_1)
         theta_1 = self.add_mode_L_minus_one(beta_1, t00)
         y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-        t5 = time.time()
 
-        # print("**********ShareConvertServer***************")
-        # print(t5 - t4 + t3 - t2 + t1 - t0)
         return y_1
 
 
@@ -143,27 +131,21 @@ class SecureMultiplicationServer(SecureModule):
         assert X_share.dtype == self.dtype
         assert Y_share.dtype == self.dtype
 
-        t0 = time.time()
         A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
         B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
         E_share = X_share - A_share
         F_share = Y_share - B_share
-        t1 = time.time()
 
         self.network_assets.sender_01.put(E_share)
         E_share_client = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(F_share)
         F_share_client = self.network_assets.receiver_01.get()
 
-        t2 = time.time()
         E = E_share_client + E_share
         F = F_share_client + F_share
         out = - E * F + X_share * F + Y_share * E + C_share
-        t3 = time.time()
 
-        # print("**********SecureMultiplicationServer***************")
-        # print(t3 - t2 + t1 - t0)
         return out
 
 
@@ -174,43 +156,32 @@ class SecureMSBServer(SecureModule):
         self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
 
     def forward(self, a_1):
-        t0 = time.time()
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
-        t1 = time.time()
 
         x_bits_1 = self.network_assets.receiver_12.get()
         x_bit_0_1 = self.network_assets.receiver_12.get()
 
-        t2 = time.time()
         y_1 = self.add_mode_L_minus_one(a_1, a_1)
         r_1 = self.add_mode_L_minus_one(x_1, y_1)
-        t3 = time.time()
 
         self.network_assets.sender_01.put(r_1)
         r_0 = self.network_assets.receiver_01.get()
 
-        t4 = time.time()
         r = self.add_mode_L_minus_one(r_0, r_1)
-        t5 = time.time()
         r_mod_2 = r % 2
         self.private_compare(x_bits_1, r, beta)
 
         beta_p_1 = self.network_assets.receiver_12.get()
 
-        t6 = time.time()
         beta = beta.astype(self.dtype)
         gamma_1 = beta_p_1 + (1 * beta) - (2 * beta * beta_p_1)
         delta_1 = x_bit_0_1 + r_mod_2 - (2 * r_mod_2 * x_bit_0_1)
-        t7 = time.time()
 
         theta_1 = self.mult(gamma_1, delta_1)
 
-        t8 = time.time()
         alpha_1 = gamma_1 + delta_1 - 2 * theta_1
-        t9 = time.time()
-        # print("***************SecureMSBServer******************8")
-        # print(t1 - t0 + t3 - t2 + t5 - t4 + t7 - t6 + t9 - t8)
+
         return alpha_1
 
 

@@ -14,7 +14,6 @@ from research.distortion.utils import ArchUtilsFactory
 
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-import time
 
 
 class SecureConv2DClient(SecureModule):
@@ -159,7 +158,6 @@ class SecureMSBClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        cur_time = time.time()
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
@@ -210,13 +208,11 @@ class SecureReLUClient(SecureModule):
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        t0 = time.time()
         shape = X_share.shape
         X_share = X_share.numpy()
         X_share = X_share.astype(self.dtype).flatten()
         MSB_0 = self.DReLU(X_share)
         relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-        print(f"SecureReLUClient finished - {time.time() - t0}")
         ret = relu_0.astype(self.signed_type)
         return torch.from_numpy(ret)
 
@@ -234,7 +230,6 @@ class SecureBlockReLUClient(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
-        t0 = time.time()
         # activation_server = network_assets.receiver_01.get()
 
         activation = activation.numpy()
@@ -275,7 +270,6 @@ class SecureBlockReLUClient(SecureModule):
         activation = activation.astype(self.signed_type)
         # real_out = network_assets.receiver_01.get() + activation
         # assert np.all(real_out == desired_out.numpy())
-        print(f"SecureBlockReLUClient finished - {time.time() - t0}")
         return torch.from_numpy(activation)
 
 
@@ -304,10 +298,8 @@ def run_inference(model, image_path, crypto_assets, network_assets):
 
     import time
     image = I0
-    t0 = time.time()
     out_0 = model.decode_head(model.backbone(image))
     out_1 = network_assets.receiver_01.get()
-    print(time.time() - t0)
     network_assets.sender_01.put(None)
     network_assets.sender_02.put(None)
     out = (torch.from_numpy(out_1) + out_0)
