@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from research.communication.utils import Sender, Receiver
+from research.secure_inference_3pc.communication.utils import Sender, Receiver
 import time
 from numba import njit, prange
 num_bit_to_dtype = {
