@@ -3,7 +3,7 @@
 import logging
 import time
 
-from research.numpy_socket_test.numpysocket.numpysocket import NumpySocket
+from research.secure_inference_3pc.communication.numpy_socket.numpysocket.numpysocket import NumpySocket
 
 logger = logging.getLogger('simple server')
 logger.setLevel(logging.INFO)

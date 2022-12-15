@@ -2,7 +2,7 @@
 
 import logging
 
-from research.numpy_socket_test.numpysocket.numpysocket import NumpySocket
+from research.secure_inference_3pc.communication.numpy_socket.numpysocket.numpysocket import NumpySocket
 import cv2
 import numpy as np
 import time
