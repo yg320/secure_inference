@@ -1,4 +1,4 @@
-from research.parameters.base import BLOCK_SIZES_FULL, BLOCK_SIZES_MINI
+from research.parameters.base import BLOCK_SIZES_FULL, BLOCK_SIZES_MINI, BLOCK_SIZES_256x256
 
 class MobileNetV2_Params:
     def __init__(self):
@@ -466,51 +466,7 @@ class MobileNetV2_256_Params_1_Groups(MobileNetV2_256_Params):
     def __init__(self):
 
         super().__init__()
-        self.LAYER_GROUPS = \
-            [
-                [
-                    "conv1",
-                    "layer1_0_0",
-                    "layer2_0_0",
-                    "layer2_0_1",
-                    "layer2_1_0",
-                    "layer2_1_1",
-                    "layer3_0_0",
-                    "layer3_0_1",
-                    "layer3_1_0",
-                    "layer3_1_1",
-                    "layer3_2_0",
-                    "layer3_2_1",
-                    "layer4_0_0",
-                    "layer4_0_1",
-                    "layer4_1_0",
-                    "layer4_1_1",
-                    "layer4_2_0",
-                    "layer4_2_1",
-                    "layer4_3_0",
-                    "layer4_3_1",
-                    "layer5_0_0",
-                    "layer5_0_1",
-                    "layer5_1_0",
-                    "layer5_1_1",
-                    "layer5_2_0",
-                    "layer5_2_1",
-                    "layer6_0_0",
-                    "layer6_0_1",
-                    "layer6_1_0",
-                    "layer6_1_1",
-                    "layer6_2_0",
-                    "layer6_2_1",
-                    "layer7_0_0",
-                    "layer7_0_1",
-                    "decode_0",
-                    "decode_1",
-                    "decode_2",
-                    "decode_3",
-                    "decode_4",
-                    "decode_5",
-                ]
-            ]
+
         self.IN_LAYER_PROXY_SPEC = \
             {
                 'conv1':      'decode',
@@ -553,6 +509,50 @@ class MobileNetV2_256_Params_1_Groups(MobileNetV2_256_Params):
                 'decode_3': "decode",
                 'decode_4': "decode",
                 'decode_5': "decode"
+            }
+
+        self.LAYER_NAME_TO_BLOCK_SIZES = \
+            {
+                'conv1': BLOCK_SIZES_256x256,
+                'layer1_0_0': BLOCK_SIZES_256x256,
+                'layer2_0_0': BLOCK_SIZES_256x256,
+                'layer2_0_1': BLOCK_SIZES_256x256,
+                'layer2_1_0': BLOCK_SIZES_256x256,
+                'layer2_1_1': BLOCK_SIZES_256x256,
+                'layer3_0_0': BLOCK_SIZES_256x256,
+                'layer3_0_1': BLOCK_SIZES_256x256,
+                'layer3_1_0': BLOCK_SIZES_256x256,
+                'layer3_1_1': BLOCK_SIZES_256x256,
+                'layer3_2_0': BLOCK_SIZES_256x256,
+                'layer3_2_1': BLOCK_SIZES_256x256,
+                'layer4_0_0': BLOCK_SIZES_256x256,
+                'layer4_0_1': BLOCK_SIZES_256x256,
+                'layer4_1_0': BLOCK_SIZES_256x256,
+                'layer4_1_1': BLOCK_SIZES_256x256,
+                'layer4_2_0': BLOCK_SIZES_256x256,
+                'layer4_2_1': BLOCK_SIZES_256x256,
+                'layer4_3_0': BLOCK_SIZES_256x256,
+                'layer4_3_1': BLOCK_SIZES_256x256,
+                'layer5_0_0': BLOCK_SIZES_256x256,
+                'layer5_0_1': BLOCK_SIZES_256x256,
+                'layer5_1_0': BLOCK_SIZES_256x256,
+                'layer5_1_1': BLOCK_SIZES_256x256,
+                'layer5_2_0': BLOCK_SIZES_256x256,
+                'layer5_2_1': BLOCK_SIZES_256x256,
+                'layer6_0_0': BLOCK_SIZES_256x256,
+                'layer6_0_1': BLOCK_SIZES_256x256,
+                'layer6_1_0': BLOCK_SIZES_256x256,
+                'layer6_1_1': BLOCK_SIZES_256x256,
+                'layer6_2_0': BLOCK_SIZES_256x256,
+                'layer6_2_1': BLOCK_SIZES_256x256,
+                'layer7_0_0': BLOCK_SIZES_256x256,
+                'layer7_0_1': BLOCK_SIZES_256x256,
+                'decode_0': BLOCK_SIZES_256x256,
+                'decode_1': BLOCK_SIZES_256x256,
+                'decode_2': BLOCK_SIZES_256x256,
+                'decode_3': BLOCK_SIZES_256x256,
+                'decode_4': BLOCK_SIZES_256x256,
+                'decode_5': BLOCK_SIZES_256x256
             }
 
 class MobileNetV2_256_Params_1_Groups_mini(MobileNetV2_256_Params_1_Groups):
