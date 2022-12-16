@@ -26,7 +26,7 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
         self.groups = groups
 
-    def forward(self, X_share):
+    def forward_(self, X_share):
 
         X_share = X_share.numpy()
         assert X_share.dtype == self.signed_type
@@ -58,16 +58,23 @@ class SecureConv2DClient(SecureModule):
 
         return torch.from_numpy(out)
 
+    def forward(self, X_share):
+        with Timer("SecureConv2DClient"):
+            return self.forward_(X_share)
 
 class PrivateCompareClient(SecureModule):
     def __init__(self, crypto_assets, network_assets):
         super(PrivateCompareClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_0, r, beta):
+        with Timer("PrivateCompareClient"):
+            return self.forward_(x_bits_0, r, beta)
+
+    def forward_(self, x_bits_0, r, beta):
         if np.any(r == np.iinfo(r.dtype).max):
             assert False
-        with Timer("PrivateCompareClient - Random"):
-            s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=np.int32)
+        # with Timer("PrivateCompareClient - Random"):
+        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=np.int32)
         # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
         r[beta] += 1
         bits = decompose(r)
@@ -88,6 +95,10 @@ class ShareConvertClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
+        with Timer("ShareConvertClient"):
+            return self.forward_(a_0)
+    #TODO: should be like :@Timer("ShareConvertClient")
+    def forward_(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
         r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
@@ -126,6 +137,10 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
+        with Timer("SecureMultiplicationClient"):
+            return self.forward_(X_share, Y_share)
+
+    def forward_(self, X_share, Y_share):
         assert X_share.dtype == self.dtype
         assert Y_share.dtype == self.dtype
 
@@ -158,6 +173,10 @@ class SecureMSBClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
+        with Timer("SecureMSBClient"):
+            return self.forward_(a_0)
+
+    def forward_(self, a_0):
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
@@ -208,6 +227,10 @@ class SecureReLUClient(SecureModule):
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
+        with Timer("SecureReLUClient"):
+            return self.forward_(X_share)
+
+    def forward_(self, X_share):
         shape = X_share.shape
         X_share = X_share.numpy()
         X_share = X_share.astype(self.dtype).flatten()
@@ -298,12 +321,14 @@ def run_inference(model, image_path, crypto_assets, network_assets):
 
     import time
     image = I0
-    out_0 = model.decode_head(model.backbone(image))
-    out_1 = network_assets.receiver_01.get()
+    with Timer("Inference"):
+        out_0 = model.decode_head(model.backbone(image))
+        out_1 = network_assets.receiver_01.get()
+        out = (torch.from_numpy(out_1) + out_0)
+        out = TypeConverter.i2f(out)
     network_assets.sender_01.put(None)
     network_assets.sender_02.put(None)
-    out = (torch.from_numpy(out_1) + out_0)
-    out = TypeConverter.i2f(out)
+
     return out
 
 
@@ -354,3 +379,8 @@ if __name__ == "__main__":
 # sudo apt-get install ffmpeg libsm6 libxext6  -y
 # conda install numba
 # https://stackoverflow.com/questions/62436205/connecting-aws-ec2-instance-using-python-socket
+
+
+
+
+

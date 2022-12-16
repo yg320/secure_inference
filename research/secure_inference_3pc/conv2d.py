@@ -455,8 +455,8 @@ def compile_numba_funcs():
     conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
     conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
 
-    conv_2d(A, B_3x3[:,:1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=1)
-    conv_2d(A, B_3x3[:,:1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=1)
+    conv_2d(A, B_3x3[:,:1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=B_3x3.shape[0])
+    conv_2d(A, B_3x3[:,:1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=B_3x3.shape[0])
 
     conv_2d(A, B_1x1, C, D_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
     conv_2d(A, B_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
@@ -480,35 +480,23 @@ if __name__ == "__main__":
     np.random.seed(123)
     N = 100
     for iii in tqdm(range(N)):
-        nb_rows = np.random.choice([24, 32])
-        kernel_size = np.random.choice([1, 3])
-        in_channel = np.random.choice([512, 640])
-        out_channel = np.random.choice([128, 256, 512])
-        dilation = np.random.choice([1, 2, 4, 8])
-        padding = np.random.choice([0, 1, 2])
-        stride = np.random.choice([1, 2])
-
-        dilation = (dilation, dilation)
-        padding = (padding, padding)
-        stride = (stride, stride)
-        nb_rows_kernel = kernel_size
-        nb_cols_kernel = kernel_size
+        in_channel = 512
+        dilation = (1, 1)
+        padding = (1, 1)
+        stride = (1, 1)
+        nb_rows = 36
 
         A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
-        B = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, in_channel, kernel_size, kernel_size))
+        B_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
         C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
-        D = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, in_channel, kernel_size, kernel_size))
-
-        # Compute output shape
-        t0 = time.time()
-        out_0 = conv_2d(A, B, C, D, padding, stride, dilation, method=NUMBA_CONV)
-        t_avg_conv += (time.time() - t0)
+        D_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
 
         t0 = time.time()
-        out_1 = conv_2d(A, B, C, D, padding, stride, dilation, method=NUMBA_MATMUL)
-        t_avg_matmul += (time.time() - t0)
+        conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
+                groups=B_3x3.shape[0])
+        t1 = time.time()
+        t_avg_conv += (t1 - t0)
 
-        assert np.all(out_0 == out_1)
 
     print(t_avg_conv / N)
     print(t_avg_matmul / N)

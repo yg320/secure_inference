@@ -42,7 +42,7 @@ class Timer:
             self.timers[self.name] += elapsed_time
 
         if self.logger:
-            self.logger(self.text.format(elapsed_time, self.timers[self.name]))
+            self.logger(self.name + " " + self.text.format(elapsed_time, self.timers[self.name]))
         return elapsed_time
 
     def __enter__(self):
@@ -55,10 +55,11 @@ class Timer:
         self.stop()
 
 if __name__ == "__main__":
+
     with Timer("HHH"):
         time.sleep(0.7)
 
-    with Timer("HHH"):
+    with Timer("dsr"):
         time.sleep(0.7)
 
     print(Timer.timers)

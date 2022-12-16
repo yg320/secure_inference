@@ -335,4 +335,6 @@ if __name__ == "__main__":
     securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=None, relu_spec_file=relu_spec_file)
     out = run_inference(model, image_shape, crypto_assets, network_assets)
 
+    print('fdsfds')
+
 
