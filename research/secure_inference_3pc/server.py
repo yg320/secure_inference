@@ -298,27 +298,19 @@ def build_secure_relu(crypto_assets, network_assets):
 
 
 def run_inference(model, image_shape, crypto_assets, network_assets):
-    I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=image_shape)
-
-    print("Start")
-
-    image = I1
+    image = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=image_shape)
     out = model.decode_head(model.backbone(image))
-
     network_assets.sender_01.put(out)
-    network_assets.sender_01.put(None)
-    network_assets.sender_12.put(None)
+
 
 
 if __name__ == "__main__":
-    compile_numba_funcs()
-
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
-    image_path = "/home/yakir/tmp/image_0.pt"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None# "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
-    image_shape = (1, 3, 192, 192)
+    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.15.pickle"
+    image_shape = (1, 3, 256, 256)
+    num_images = 1
 
     model = get_model(
         config=secure_config_path,
@@ -326,15 +318,22 @@ if __name__ == "__main__":
         checkpoint_path=model_path
     )
 
-
     compile_numba_funcs()
-    crypto_assets, network_assets = get_assets(1)
+
+    crypto_assets, network_assets = get_assets(1, repeat=num_images)
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
-    securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=None, relu_spec_file=relu_spec_file)
-    out = run_inference(model, image_shape, crypto_assets, network_assets)
 
-    print('fdsfds')
+    securify_mobilenetv2_model(model,
+                               build_secure_conv,
+                               build_secure_relu,
+                               block_relu=partial(SecureBlockReLUServer, crypto_assets=crypto_assets, network_assets=network_assets),
+                               relu_spec_file=relu_spec_file)
+
+    for _ in range(num_images):
+        out = run_inference(model, image_shape, crypto_assets, network_assets)
 
 
+    crypto_assets.done()
+    network_assets.done()

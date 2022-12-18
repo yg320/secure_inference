@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from tqdm import tqdm
 
 from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
     SpaceToDepth, get_assets, TypeConverter
@@ -7,6 +8,8 @@ from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
 from functools import partial
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
+from mmseg.ops import resize
+from mmseg.datasets import build_dataset
 
 from research.secure_inference_3pc.timer import Timer
 from research.distortion.utils import get_model
@@ -14,6 +17,9 @@ from research.distortion.utils import ArchUtilsFactory
 
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
+from research.distortion.utils import get_data
+import torch.nn.functional as F
+from mmseg.core import intersect_and_union
 
 
 class SecureConv2DClient(SecureModule):
@@ -313,6 +319,75 @@ def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
 
 
+def full_inference(model, num_images):
+
+    dataset = build_dataset({'type': 'ADE20KDataset',
+           'data_root': 'data/ade/ADEChallengeData2016',
+           'img_dir': 'images/validation',
+           'ann_dir': 'annotations/validation',
+           'pipeline': [
+               {'type': 'LoadImageFromFile'},
+               {'type': 'LoadAnnotations', 'reduce_zero_label': True},
+               {'type': 'Resize', 'img_scale': (1024, 256), 'keep_ratio': True},
+               {'type': 'RandomFlip', 'prob': 0.0},
+               {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+               {'type': 'DefaultFormatBundle'},
+               {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
+           })
+    results = []
+    for sample_id in tqdm(range(num_images)):
+        img = dataset[sample_id]['img'].data.unsqueeze(0)[:, :, :256, :256]
+        img_meta = dataset[sample_id]['img_metas'].data
+
+        img_meta['img_shape'] = (256, 256, 3)
+        seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
+        seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
+        img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
+
+        I = TypeConverter.f2i(img)
+        I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=I.shape)
+        I0 = I - I1
+
+        out_0 = model.decode_head(model.backbone(I0)).to("cpu")
+
+        out_1 = network_assets.receiver_01.get()
+        out = (torch.from_numpy(out_1) + out_0)
+        out = TypeConverter.i2f(out)
+
+        out = resize(
+            input=out,
+            size=img.shape[2:],
+            mode='bilinear',
+            align_corners=False)
+
+        resize_shape = img_meta['img_shape'][:2]
+        seg_logit = out[:, :, :resize_shape[0], :resize_shape[1]]
+        size = img_meta['ori_shape'][:2]
+
+        seg_logit = resize(
+            seg_logit,
+            size=size,
+            mode='bilinear',
+            align_corners=False,
+            warning=False)
+
+        output = F.softmax(seg_logit, dim=1)
+        seg_pred = output.argmax(dim=1)
+        seg_pred = seg_pred.cpu().numpy()[0]
+
+        results.append(
+            intersect_and_union(
+                seg_pred,
+                seg_map,
+                len(dataset.CLASSES),
+                dataset.ignore_index,
+                label_map=dict(),
+                reduce_zero_label=dataset.reduce_zero_label)
+        )
+
+    print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+
+
 def run_inference(model, image_path, crypto_assets, network_assets):
 
     I = TypeConverter.f2i(torch.load(image_path).unsqueeze(0))[:, :, :192, :192]
@@ -336,10 +411,10 @@ if __name__ == "__main__":
 
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
-    image_path = "/home/yakir/tmp/image_0.pt"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None# "/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle"
-    image_shape = (1, 3, 192, 192)
+    relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.15.pickle"
+    image_shape = (1, 3, 256, 256)
+    num_images = 1
 
     model = get_model(
         config=secure_config_path,
@@ -348,39 +423,32 @@ if __name__ == "__main__":
     )
 
     compile_numba_funcs()
-    crypto_assets, network_assets = get_assets(0)
+    crypto_assets, network_assets = get_assets(0, repeat=num_images)
 
-    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
-    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
-    securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=None, relu_spec_file=relu_spec_file)
-    out = run_inference(model, image_path, crypto_assets, network_assets)
+    securify_mobilenetv2_model(model,
+                               build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
+                               build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+                               block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
+                               relu_spec_file=relu_spec_file)
 
-    import pickle
-    from research.bReLU import BlockRelu
+    full_inference(model, num_images)
 
-    model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
-    # ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
+    crypto_assets.done()
+    network_assets.done()
 
-    im = torch.load(image_path).unsqueeze(0)[:, :, :192, :192]
-    desired_out = model_baseline.decode_head(model_baseline.backbone(im))
-
-    print(np.abs((out - desired_out.detach()).numpy()).max())
-
-# sudo apt-get update
-# curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
-# sudo apt-get install bzip2
-# bash Anaconda3-2019.03-Linux-x86_64.sh
-# exit
-# conda create -n open-mmlab python=3.7 -y
-# conda activate open-mmlab
-# conda install pytorch=1.6.0 torchvision cudatoolkit=10.1 -c pytorch
-# pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu101/torch1.6.0/index.html
-# pip install mmsegmentation
-# sudo apt-get install ffmpeg libsm6 libxext6  -y
-# conda install numba
-# https://stackoverflow.com/questions/62436205/connecting-aws-ec2-instance-using-python-socket
-
-
+    # out = run_inference(model, image_path, crypto_assets, network_assets)
+    #
+    # import pickle
+    # from research.bReLU import BlockRelu
+    #
+    # model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
+    # # ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
+    #
+    # im = torch.load(image_path).unsqueeze(0)[:, :, :192, :192]
+    # desired_out = model_baseline.decode_head(model_baseline.backbone(im))
+    #
+    # print(np.abs((out - desired_out.detach()).numpy()).max())
+    #
 
 
 

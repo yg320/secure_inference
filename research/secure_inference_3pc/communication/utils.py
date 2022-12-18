@@ -7,7 +7,7 @@ import torch
 import queue
 import numpy as np
 
-# Server
+
 class Receiver(Thread):
     def __init__(self, port):
         super(Receiver, self).__init__()
@@ -16,7 +16,6 @@ class Receiver(Thread):
 
         self.lock = threading.Lock()
         self.stop_running = False
-        self.get_total_time = 0
 
     def run(self):
 
@@ -33,14 +32,10 @@ class Receiver(Thread):
                 self.numpy_arr_queue.put(frame)
 
     def get(self):
-        t0 = time.time()
         arr = self.numpy_arr_queue.get()
-        t1 = time.time()
-        self.get_total_time += (t1-t0)
         return arr
 
 
-# Client
 class Sender(Thread):
     def __init__(self, port):
         super(Sender, self).__init__()
@@ -82,6 +77,7 @@ class Sender(Thread):
                 s.recv(1)
 
         print(num_bytes_send)
+
     def put(self, arr):
         self.numpy_arr_queue.put(arr)
 

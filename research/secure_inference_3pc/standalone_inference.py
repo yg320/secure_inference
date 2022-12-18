@@ -16,8 +16,6 @@ from mmseg.datasets import build_dataset
 config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
 model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
 
-
-
 cfg = {'type': 'ADE20KDataset',
        'data_root': 'data/ade/ADEChallengeData2016',
        'img_dir': 'images/validation',
@@ -37,11 +35,15 @@ dataset = build_dataset(cfg)
 device = "cuda:0"
 model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
 results = []
-for sample_id in tqdm(range(2000)):
-    img = dataset[sample_id]['img'].data.unsqueeze(0)
+for sample_id in tqdm(range(10)):
+    img = dataset[sample_id]['img'].data.unsqueeze(0)[:,:,:256,:256]
     img_meta = dataset[sample_id]['img_metas'].data
-    seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
 
+    img_shape = img_meta['img_shape']
+    img_meta['img_shape'] = (256, 256, 3)
+    seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
+    seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
+    img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
     out = model_baseline.decode_head(model_baseline.backbone(img)).to("cpu")
 
     out = resize(

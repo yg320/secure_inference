@@ -26,12 +26,13 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13094
-        self.port_10 = 13095
-        self.port_02 = 13096
-        self.port_20 = 13097
-        self.port_12 = 13098
-        self.port_21 = 13099
+        self.port_01 = 13124
+        self.port_10 = 13125
+        self.port_02 = 13126
+        self.port_20 = 13127
+        self.port_12 = 13128
+        self.port_21 = 13129
+
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -56,20 +57,29 @@ class NetworkAssets:
         if self.sender_01:
             self.sender_01.start()
 
+    def done(self):
+        if self.sender_12:
+            self.sender_12.put(None)
+        if self.sender_02:
+            self.sender_02.put(None)
+        if self.sender_01:
+            self.sender_01.put(None)
 
-def get_assets(party):
+
+def get_assets(party, repeat):
 
     addresses = Addresses()
 
     if party == 0:
-        crypto_assets = MultiPartyPRFHandler({
-            (CLIENT, SERVER): 0,
-            (CLIENT, CRYPTO_PROVIDER): 1,
-            # (SERVER, CRYPTO_PROVIDER): None,
-            CLIENT: 3,
-            # SERVER: None,
-            # CRYPTO_PROVIDER: None,
-        })
+        crypto_assets = MultiPartyPRFHandler(
+            party=0, seeds={
+                (CLIENT, SERVER): 0,
+                (CLIENT, CRYPTO_PROVIDER): 1,
+                # (SERVER, CRYPTO_PROVIDER): None,
+                CLIENT: 3,
+                # SERVER: None,
+                # CRYPTO_PROVIDER: None,
+            }, repeat=repeat)
         network_assets = NetworkAssets(
             sender_01=Sender(addresses.port_01),
             sender_02=Sender(addresses.port_02),
@@ -80,14 +90,15 @@ def get_assets(party):
         )
 
     if party == 1:
-        crypto_assets = MultiPartyPRFHandler({
-            (CLIENT, SERVER): 0,
-            # (CLIENT, CRYPTO_PROVIDER): None,
-            (SERVER, CRYPTO_PROVIDER): 2,
-            # CLIENT: None,
-            SERVER: 4,
-            # CRYPTO_PROVIDER: None,
-        })
+        crypto_assets = MultiPartyPRFHandler(
+            party=1, seeds={
+                (CLIENT, SERVER): 0,
+                # (CLIENT, CRYPTO_PROVIDER): None,
+                (SERVER, CRYPTO_PROVIDER): 2,
+                # CLIENT: None,
+                SERVER: 4,
+                # CRYPTO_PROVIDER: None,
+            }, repeat=repeat)
         network_assets = NetworkAssets(
             sender_01=Sender(addresses.port_10),
             sender_02=None,
@@ -98,15 +109,15 @@ def get_assets(party):
         )
 
     if party == 2:
-
-        crypto_assets = MultiPartyPRFHandler({
-            # (CLIENT, SERVER): None,
-            (CLIENT, CRYPTO_PROVIDER): 1,
-            (SERVER, CRYPTO_PROVIDER): 2,
-            # CLIENT: None,
-            # SERVER: None,
-            CRYPTO_PROVIDER: 5,
-        })
+        crypto_assets = MultiPartyPRFHandler(
+            party=2, seeds={
+                # (CLIENT, SERVER): None,
+                (CLIENT, CRYPTO_PROVIDER): 1,
+                (SERVER, CRYPTO_PROVIDER): 2,
+                # CLIENT: None,
+                # SERVER: None,
+                CRYPTO_PROVIDER: 5,
+            }, repeat=repeat)
 
         network_assets = NetworkAssets(
             sender_01=None,
