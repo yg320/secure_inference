@@ -26,7 +26,7 @@ class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, groups, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W.numpy()
+        self.W_share = W
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
@@ -260,7 +260,7 @@ class SecureBlockReLUClient(SecureModule):
 
     def forward(self, activation):
         # activation_server = network_assets.receiver_01.get()
-        assert False
+
         activation = activation.numpy()
         # desired_out = BlockReLU_V1(self.block_sizes)(activation + activation_server)
         assert activation.dtype == self.signed_type
@@ -302,10 +302,26 @@ class SecureBlockReLUClient(SecureModule):
         return torch.from_numpy(activation)
 
 
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
-    # assert module.groups == 1
-    return SecureConv2DClient(
-        W=crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=conv_module.weight.shape),
+
+
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+
+    conv_class = SecureConv2DClient
+    # if is_prf_fetcher:
+    #     dtype = np.int64
+    #     W = crypto_assets[CLIENT, SERVER].integers_fetch(low=np.iinfo(dtype).min // 2,
+    #                                                      high=np.iinfo(dtype).max // 2,
+    #                                                      size=conv_module.weight.shape,
+    #                                                      dtype=dtype)
+    # else:
+    dtype = np.int64
+    W = crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
+                                               high=np.iinfo(dtype).max // 2,
+                                               size=conv_module.weight.shape,
+                                               dtype=dtype)
+
+    return conv_class(
+        W=W,
         stride=conv_module.stride,
         dilation=conv_module.dilation,
         padding=conv_module.padding,
@@ -318,6 +334,24 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
 def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
 
+class SecureModel(SecureModule):
+    def __init__(self, model,  crypto_assets, network_assets):
+        super(SecureModel, self).__init__( crypto_assets, network_assets)
+        self.model = model
+
+    def forward(self, img):
+        dtype = np.int64
+
+        I = TypeConverter.f2i(img)
+        I1 = torch.from_numpy(self.prf_handler[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2, high=np.iinfo(dtype).max // 2, dtype=dtype, size=img.shape))
+        I0 = I - I1
+        out_0 = self.model.decode_head(self.model.backbone(I0))
+        out_1 = self.network_assets.receiver_01.get()
+        out = (torch.from_numpy(out_1) + out_0)
+        out = TypeConverter.i2f(out)
+
+
+        return out
 
 def full_inference(model, num_images):
 
@@ -343,16 +377,8 @@ def full_inference(model, num_images):
         seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
         seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
         img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
-
-        I = TypeConverter.f2i(img)
-        I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=I.shape)
-        I0 = I - I1
-
-        out_0 = model.decode_head(model.backbone(I0)).to("cpu")
-
-        out_1 = network_assets.receiver_01.get()
-        out = (torch.from_numpy(out_1) + out_0)
-        out = TypeConverter.i2f(out)
+        with Timer("Inference"):
+            out = model(img)
 
         out = resize(
             input=out,
@@ -425,11 +451,13 @@ if __name__ == "__main__":
     compile_numba_funcs()
     crypto_assets, network_assets = get_assets(0, repeat=num_images)
 
-    securify_mobilenetv2_model(model,
-                               build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-                               build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
-                               block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-                               relu_spec_file=relu_spec_file)
+    model = securify_mobilenetv2_model(
+        model,
+        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
+        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
+        block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
+        relu_spec_file=relu_spec_file)
 
     full_inference(model, num_images)
 

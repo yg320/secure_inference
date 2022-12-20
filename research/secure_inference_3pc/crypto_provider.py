@@ -250,10 +250,19 @@ def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
 
 
-def run_inference(model, image_shape, crypto_assets, network_assets):
-    dummy_image = crypto_assets[CRYPTO_PROVIDER].get_random_tensor_over_L(shape=image_shape)
-    _ = model.decode_head(model.backbone(dummy_image))
+class SecureModel(SecureModule):
+    def __init__(self, model,  crypto_assets, network_assets):
+        super(SecureModel, self).__init__( crypto_assets, network_assets)
+        self.model = model
 
+    def forward(self, image_shape):
+        dtype = np.int64
+
+        dummy_image = torch.from_numpy(crypto_assets[CRYPTO_PROVIDER].integers(low=np.iinfo(dtype).min // 2,
+                                                                               high=np.iinfo(dtype).max // 2,
+                                                                               size=image_shape,
+                                                                               dtype=dtype))
+        _ = self.model.decode_head(self.model.backbone(dummy_image))
 
 
 if __name__ == "__main__":
@@ -274,13 +283,15 @@ if __name__ == "__main__":
     compile_numba_funcs()
     crypto_assets, network_assets = get_assets(2, repeat=num_images)
 
-    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
-    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
-
-    securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets), relu_spec_file=relu_spec_file)
+    model = securify_mobilenetv2_model(
+        model,
+        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
+        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
+        block_relu=partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets),
+        relu_spec_file=relu_spec_file)
 
     for _ in range(num_images):
-        out = run_inference(model, image_shape, crypto_assets, network_assets)
+        model(image_shape)
 
-    crypto_assets.done()
     network_assets.done()

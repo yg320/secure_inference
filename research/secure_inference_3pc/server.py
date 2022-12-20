@@ -270,18 +270,24 @@ class SecureBlockReLUServer(SecureModule):
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
+
+    dtype = np.int64
+
     if bn_module:
         W, B = fuse_conv_bn(conv_module=conv_module, batch_norm_module=bn_module)
         W = TypeConverter.f2i(W)
         B = TypeConverter.f2i(B)
-        W = W - crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=W.shape)
 
     else:
         W = conv_module.weight
         W = TypeConverter.f2i(W)
-        W = W - crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=W.shape)
         B = None
 
+    W_client = torch.from_numpy(crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
+                                           high=np.iinfo(dtype).max // 2,
+                                           size=conv_module.weight.shape,
+                                           dtype=dtype))
+    W = W - W_client
     return SecureConv2DServer(
         W=W,
         bias=B,
@@ -298,10 +304,21 @@ def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets)
 
 
-def run_inference(model, image_shape, crypto_assets, network_assets):
-    image = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=image_shape)
-    out = model.decode_head(model.backbone(image))
-    network_assets.sender_01.put(out)
+
+class SecureModel(SecureModule):
+    def __init__(self, model,  crypto_assets, network_assets):
+        super(SecureModel, self).__init__( crypto_assets, network_assets)
+        self.model = model
+
+    def forward(self, image_shape):
+        dtype = np.int64
+
+        image = torch.from_numpy(self.prf_handler[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
+                                                                        high=np.iinfo(dtype).max // 2,
+                                                                               size=image_shape,
+                                                                               dtype=dtype))
+        out = self.model.decode_head(self.model.backbone(image))
+        self.network_assets.sender_01.put(out)
 
 
 
@@ -326,15 +343,15 @@ if __name__ == "__main__":
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
 
-    securify_mobilenetv2_model(model,
-                               build_secure_conv,
-                               build_secure_relu,
-                               block_relu=partial(SecureBlockReLUServer, crypto_assets=crypto_assets, network_assets=network_assets),
-                               relu_spec_file=relu_spec_file)
+    model = securify_mobilenetv2_model(
+        model,
+        build_secure_conv,
+        build_secure_relu,
+        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
+        block_relu=partial(SecureBlockReLUServer, crypto_assets=crypto_assets, network_assets=network_assets),
+        relu_spec_file=relu_spec_file)
 
     for _ in range(num_images):
-        out = run_inference(model, image_shape, crypto_assets, network_assets)
+        out = model(image_shape)
 
-
-    crypto_assets.done()
     network_assets.done()
