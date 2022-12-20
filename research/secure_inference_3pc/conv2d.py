@@ -6,6 +6,23 @@ NUMBA_MATMUL = "NUMBA_MATMUL"
 NUMBA_CONV = "NUMBA_CONV"
 
 
+# TODO: replace redundancy in code
+def get_output_shape(A, B, padding, dilation, stride):
+    nb_rows_in = A.shape[2]
+    nb_cols_in = A.shape[3]
+    nb_rows_kernel = B.shape[2]
+    nb_cols_kernel = B.shape[3]
+
+    nb_rows_out = int(
+        ((nb_rows_in + 2 * padding[0] - dilation[0] * (nb_rows_kernel - 1) - 1) / stride[0]) + 1
+    )
+    nb_cols_out = int(
+        ((nb_cols_in + 2 * padding[1] - dilation[1] * (nb_cols_kernel - 1) - 1) / stride[1]) + 1
+    )
+
+    return 1, B.shape[0], nb_rows_out, nb_cols_out
+
+
 def pre_conv(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     """
     This is a block of local computation done at the beginning of the convolution. It
@@ -180,6 +197,7 @@ def numba_double_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilati
     return res
 
 
+
 @njit(parallel=True)
 def numba_double_separable_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
@@ -224,6 +242,7 @@ def numba_single_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
                                 B[out_channel, in_channel, k_0, k_1] * \
                                 A[0, in_channel, x, y]
 
+
     return res
 
 
@@ -245,7 +264,9 @@ def numba_single_separable_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, di
                             B[out_channel, 0, k_0, k_1] * \
                             A[0, out_channel, x, y]
 
+
     return res
+
 
 
 @njit(parallel=True)
@@ -334,6 +355,7 @@ def numba_single_conv2d(A, B, nb_rows_out, nb_cols_out, stride, dilation):
                             res[out_channel, i, j] += \
                                 B[out_channel, in_channel, k_0, k_1] * \
                                 A[0, in_channel, x, y]
+
 
     return res
 

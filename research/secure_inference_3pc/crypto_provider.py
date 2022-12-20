@@ -3,7 +3,7 @@ import numpy as np
 
 from research.secure_inference_3pc.base import P, sub_mode_p, decompose, SpaceToDepth, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 
 from research.distortion.utils import get_model
@@ -13,7 +13,7 @@ from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_
 from functools import partial
 
 class SecureConv2DCryptoProvider(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
 
         self.W_shape = W_shape
@@ -188,6 +188,7 @@ class SecureReLUCryptoProvider(SecureModule):
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, X_share):
+        # return X_share
         shape = X_share.shape
         X_share = X_share.numpy()
         X_share_np = X_share.astype(self.dtype).flatten()

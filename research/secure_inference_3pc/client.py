@@ -331,8 +331,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
     )
 
 
-def build_secure_relu(crypto_assets, network_assets):
-    return SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
+def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False):
+    relu_class = SecureReLUClient
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets)
 
 class SecureModel(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
@@ -459,24 +460,22 @@ if __name__ == "__main__":
         block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
         relu_spec_file=relu_spec_file)
 
+    # prf_fetcher_model = get_model(
+    #     config=secure_config_path,
+    #     gpu_id=None,
+    #     checkpoint_path=None
+    # )
+    #
+    # prf_fetcher_model = securify_mobilenetv2_model(
+    #     prf_fetcher_model,
+    #     build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
+    #     build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
+    #     secure_model_class=partial(PRFFetcherSecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
+    #     block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
+    #     relu_spec_file=relu_spec_file)
+
+    # prf_fetcher_model.prf_handler.fetch(repeat=num_images, model=prf_fetcher_model, image=torch.zeros(size=image_shape, dtype=torch.int64))
+
     full_inference(model, num_images)
 
-    crypto_assets.done()
     network_assets.done()
-
-    # out = run_inference(model, image_path, crypto_assets, network_assets)
-    #
-    # import pickle
-    # from research.bReLU import BlockRelu
-    #
-    # model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
-    # # ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
-    #
-    # im = torch.load(image_path).unsqueeze(0)[:, :, :192, :192]
-    # desired_out = model_baseline.decode_head(model_baseline.backbone(im))
-    #
-    # print(np.abs((out - desired_out.detach()).numpy()).max())
-    #
-
-
-

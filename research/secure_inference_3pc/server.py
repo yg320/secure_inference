@@ -3,7 +3,7 @@ import numpy as np
 from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
 
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
@@ -13,7 +13,7 @@ from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_
 from functools import partial
 
 class SecureConv2DServer(SecureModule):
-    def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
+    def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
 
         self.W_share = W.numpy()
@@ -207,6 +207,10 @@ class SecureReLUServer(SecureModule):
         self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
 
     def forward(self, X_share):
+        # share_client = self.network_assets.receiver_01.get()
+        # value = share_client + X_share.numpy()
+        # value = value * ((value > 0).astype(value.dtype))
+        # return torch.from_numpy(value)
         shape = X_share.shape
         X_share = X_share.numpy()
         X_share = X_share.astype(self.dtype).flatten()
