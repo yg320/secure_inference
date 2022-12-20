@@ -20,6 +20,7 @@ from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.distortion.utils import get_data
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
+from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel
 
 
 class SecureConv2DClient(SecureModule):
@@ -73,8 +74,8 @@ class PrivateCompareClient(SecureModule):
         super(PrivateCompareClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_0, r, beta):
-        with Timer("PrivateCompareClient"):
-            return self.forward_(x_bits_0, r, beta)
+        # with Timer("PrivateCompareClient"):
+        return self.forward_(x_bits_0, r, beta)
 
     def forward_(self, x_bits_0, r, beta):
         if np.any(r == np.iinfo(r.dtype).max):
@@ -101,8 +102,8 @@ class ShareConvertClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        with Timer("ShareConvertClient"):
-            return self.forward_(a_0)
+        # with Timer("ShareConvertClient"):
+        return self.forward_(a_0)
     #TODO: should be like :@Timer("ShareConvertClient")
     def forward_(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
@@ -143,8 +144,8 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
-        with Timer("SecureMultiplicationClient"):
-            return self.forward_(X_share, Y_share)
+        # with Timer("SecureMultiplicationClient"):
+        return self.forward_(X_share, Y_share)
 
     def forward_(self, X_share, Y_share):
         assert X_share.dtype == self.dtype
@@ -179,8 +180,8 @@ class SecureMSBClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        with Timer("SecureMSBClient"):
-            return self.forward_(a_0)
+        # with Timer("SecureMSBClient"):
+        return self.forward_(a_0)
 
     def forward_(self, a_0):
 
@@ -306,7 +307,7 @@ class SecureBlockReLUClient(SecureModule):
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
 
-    conv_class = SecureConv2DClient
+    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
     # if is_prf_fetcher:
     #     dtype = np.int64
     #     W = crypto_assets[CLIENT, SERVER].integers_fetch(low=np.iinfo(dtype).min // 2,
@@ -314,11 +315,14 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
     #                                                      size=conv_module.weight.shape,
     #                                                      dtype=dtype)
     # else:
-    dtype = np.int64
-    W = crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
-                                               high=np.iinfo(dtype).max // 2,
-                                               size=conv_module.weight.shape,
-                                               dtype=dtype)
+    if is_prf_fetcher:
+        W = np.zeros(shape=conv_module.weight.shape, dtype=np.int64)
+    else:
+        dtype = np.int64
+        W = crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
+                                                   high=np.iinfo(dtype).max // 2,
+                                                   size=conv_module.weight.shape,
+                                                   dtype=dtype)
 
     return conv_class(
         W=W,
@@ -332,7 +336,7 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
 
 
 def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False):
-    relu_class = SecureReLUClient
+    relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUClient
     return relu_class(crypto_assets=crypto_assets, network_assets=network_assets)
 
 class SecureModel(SecureModule):
@@ -415,24 +419,6 @@ def full_inference(model, num_images):
     print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
 
 
-def run_inference(model, image_path, crypto_assets, network_assets):
-
-    I = TypeConverter.f2i(torch.load(image_path).unsqueeze(0))[:, :, :192, :192]
-    I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=I.shape)
-    I0 = I - I1
-
-    import time
-    image = I0
-    with Timer("Inference"):
-        out_0 = model.decode_head(model.backbone(image))
-        out_1 = network_assets.receiver_01.get()
-        out = (torch.from_numpy(out_1) + out_0)
-        out = TypeConverter.i2f(out)
-    network_assets.sender_01.put(None)
-    network_assets.sender_02.put(None)
-
-    return out
-
 
 if __name__ == "__main__":
 
@@ -479,3 +465,8 @@ if __name__ == "__main__":
     full_inference(model, num_images)
 
     network_assets.done()
+    
+# SecureReLUClient Elapsed time: 3.2032 seconds. Total elapsed time: 112.7030 seconds.
+# Integers - fetch Elapsed time: 0.0000 seconds. Total elapsed time: 0.1586 seconds.
+# SecureConv2DClient Elapsed time: 0.0916 seconds. Total elapsed time: 12.8702 seconds.
+# Inference Elapsed time: 125.5989 seconds. Total elapsed time: 125.5989 seconds.
