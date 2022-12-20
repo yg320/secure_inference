@@ -332,7 +332,7 @@ if __name__ == "__main__":
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
     relu_spec_file = None
     image_shape = (1, 3, 256, 256)
-    num_images = 1
+    num_images = 50
 
     model = get_model(
         config=secure_config_path,

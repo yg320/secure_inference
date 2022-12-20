@@ -41,8 +41,8 @@ img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 
 data = dict(
-    samples_per_gpu=2,
-    workers_per_gpu=2,
+    samples_per_gpu=16,
+    workers_per_gpu=16,
     train=dict(
         type='ADE20KDataset',
         data_root='data/ade/ADEChallengeData2016',
@@ -124,7 +124,7 @@ lr_config = dict(policy='poly', power=0.9, min_lr=0.0001, by_epoch=False)
 runner = dict(type='IterBasedRunner', max_iters=160000)
 checkpoint_config = dict(by_epoch=False, interval=16000)
 evaluation = dict(interval=16000, metric='mIoU', pre_eval=True)
-work_dir = './work_dirs/m-v2_256x256_ade20k/baseline_test'
+work_dir = './work_dirs/m-v2_256x256_ade20k/relu_spec_0.15'
 gpu_ids = [0, 1]
 auto_resume = False
-relu_spec_file = None
+relu_spec_file = "./block_size_spec_0.15.pickle"

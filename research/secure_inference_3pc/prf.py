@@ -21,11 +21,11 @@ class PRFWrapper:
 
     def integers(self, low, high, size, dtype):
         if self.fetch:
-            with Timer("Integers - fetch"):
-                ret = self.queue.get()
-                assert ret.shape == tuple(size), f"{ret.shape} , {tuple(size)}"
-                assert ret.dtype == dtype
-                return ret
+            # with Timer("Integers - fetch"):
+            ret = self.queue.get()
+            assert ret.shape == tuple(size), f"{ret.shape} , {tuple(size)}"
+            assert ret.dtype == dtype
+            return ret
         else:
             return self.prf.integers(low=low, high=high, size=size, dtype=dtype)
 
