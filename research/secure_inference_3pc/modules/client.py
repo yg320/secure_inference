@@ -1,26 +1,118 @@
-import torch
 import numpy as np
-from tqdm import tqdm
+import torch
 
-from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
-    SpaceToDepth, get_assets, TypeConverter
-from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
-from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
-from functools import partial
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
-from mmseg.ops import resize
-from mmseg.datasets import build_dataset
-
+from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureModule
+from research.secure_inference_3pc.modules.conv2d import get_output_shape, conv_2d
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P
 from research.secure_inference_3pc.timer import Timer
-from research.distortion.utils import get_model
-from research.distortion.utils import ArchUtilsFactory
+from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter
 
-from research.pipeline.backbones.secure_resnet import AvgPoolResNet
-from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.distortion.utils import get_data
-import torch.nn.functional as F
-from mmseg.core import intersect_and_union
-from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel
+# TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
+class PRFFetcherConv2D(PRFFetcherModule):
+    def __init__(self, W, stride, dilation, padding, groups, crypto_assets, network_assets):
+        super(PRFFetcherConv2D, self).__init__(crypto_assets, network_assets)
+
+        self.W_share = W
+        self.stride = stride
+        self.dilation = dilation
+        self.padding = padding
+
+    def forward(self, X_share):
+
+        X_share = X_share.numpy()
+        out_shape = get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride)
+
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
+
+        return torch.from_numpy(np.zeros(shape=out_shape, dtype=X_share.dtype))
+
+
+class PRFFetcherPrivateCompare(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherPrivateCompare, self).__init__(crypto_assets, network_assets)
+
+    def forward(self, x_bits_0):
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[x_bits_0.shape[0]] + [64], dtype=np.int32)
+
+
+class PRFFetcherShareConvert(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherShareConvert, self).__init__(crypto_assets, network_assets)
+        self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
+
+    def forward(self, dummy_tensor):
+        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [64], dtype=np.int8)
+
+        self.private_compare(dummy_tensor)
+
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=dummy_tensor.shape, dtype=self.dtype)
+
+        return dummy_tensor
+
+
+class PRFFetcherMultiplication(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherMultiplication, self).__init__(crypto_assets, network_assets)
+
+
+    def forward(self, dummy_tensor):
+
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
+
+        return dummy_tensor
+
+
+class PRFFetcherMSB(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherMSB, self).__init__(crypto_assets, network_assets)
+        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
+
+    def forward(self, dummy_tensor):
+
+        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [64], dtype=np.int8)
+
+        self.private_compare(dummy_tensor)
+        self.mult(dummy_tensor)
+
+        return dummy_tensor
+
+
+class PRFFetcherDReLU(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherDReLU, self).__init__(crypto_assets, network_assets)
+
+        self.share_convert = PRFFetcherShareConvert(crypto_assets, network_assets)
+        self.msb = PRFFetcherMSB(crypto_assets, network_assets)
+
+    def forward(self, dummy_tensor):
+
+        self.share_convert(dummy_tensor)
+        self.msb(dummy_tensor)
+
+        return dummy_tensor
+
+
+class PRFFetcherReLU(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherReLU, self).__init__(crypto_assets, network_assets)
+
+        self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
+        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+
+    def forward(self, dummy_tensor):
+
+        dummy_arr = dummy_tensor.numpy().astype(self.dtype).flatten()
+        self.DReLU(dummy_arr)
+        self.mult(dummy_arr)
+        return dummy_tensor
+
 
 
 class SecureConv2DClient(SecureModule):
@@ -69,13 +161,14 @@ class SecureConv2DClient(SecureModule):
         with Timer("SecureConv2DClient"):
             return self.forward_(X_share)
 
+
 class PrivateCompareClient(SecureModule):
     def __init__(self, crypto_assets, network_assets):
         super(PrivateCompareClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_0, r, beta):
-        with Timer("PrivateCompareClient"):
-            return self.forward_(x_bits_0, r, beta)
+        # with Timer("PrivateCompareClient"):
+        return self.forward_(x_bits_0, r, beta)
 
     def forward_(self, x_bits_0, r, beta):
         if np.any(r == np.iinfo(r.dtype).max):
@@ -102,8 +195,8 @@ class ShareConvertClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        with Timer("ShareConvertClient"):
-            return self.forward_(a_0)
+        # with Timer("ShareConvertClient"):
+        return self.forward_(a_0)
     #TODO: should be like :@Timer("ShareConvertClient")
     def forward_(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
@@ -144,8 +237,8 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
-        with Timer("SecureMultiplicationClient"):
-            return self.forward_(X_share, Y_share)
+        # with Timer("SecureMultiplicationClient"):
+        return self.forward_(X_share, Y_share)
 
     def forward_(self, X_share, Y_share):
         assert X_share.dtype == self.dtype
@@ -180,8 +273,8 @@ class SecureMSBClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        with Timer("SecureMSBClient"):
-            return self.forward_(a_0)
+        # with Timer("SecureMSBClient"):
+        return self.forward_(a_0)
 
     def forward_(self, a_0):
 
@@ -238,6 +331,8 @@ class SecureReLUClient(SecureModule):
             return self.forward_(X_share)
 
     def forward_(self, X_share):
+        # network_assets.sender_01.put(X_share)
+        # return torch.zeros_like(X_share)
         shape = X_share.shape
         X_share = X_share.numpy()
         X_share = X_share.astype(self.dtype).flatten()
@@ -303,180 +398,15 @@ class SecureBlockReLUClient(SecureModule):
         return torch.from_numpy(activation)
 
 
-
-
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
-
-    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
-    # if is_prf_fetcher:
-    #     dtype = np.int64
-    #     W = crypto_assets[CLIENT, SERVER].integers_fetch(low=np.iinfo(dtype).min // 2,
-    #                                                      high=np.iinfo(dtype).max // 2,
-    #                                                      size=conv_module.weight.shape,
-    #                                                      dtype=dtype)
-    # else:
-    dtype = np.int64
-    W = crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
-                                               high=np.iinfo(dtype).max // 2,
-                                               size=conv_module.weight.shape,
-                                               dtype=dtype)
-
-    return conv_class(
-        W=W,
-        stride=conv_module.stride,
-        dilation=conv_module.dilation,
-        padding=conv_module.padding,
-        groups=conv_module.groups,
-        crypto_assets=crypto_assets,
-        network_assets=network_assets
-    )
-
-
-def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False):
-    relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUClient
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets)
-
-class SecureModel(SecureModule):
+class PRFFetcherSecureModel(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModel, self).__init__( crypto_assets, network_assets)
+        super(PRFFetcherSecureModel, self).__init__( crypto_assets, network_assets)
         self.model = model
 
     def forward(self, img):
+
         dtype = np.int64
-
-        I = TypeConverter.f2i(img)
-        I1 = torch.from_numpy(self.prf_handler[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2, high=np.iinfo(dtype).max // 2, dtype=dtype, size=img.shape))
-        I0 = I - I1
-        out_0 = self.model.decode_head(self.model.backbone(I0))
-        out_1 = self.network_assets.receiver_01.get()
-        out = (torch.from_numpy(out_1) + out_0)
-        out = TypeConverter.i2f(out)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=np.iinfo(dtype).min // 2, high=np.iinfo(dtype).max // 2, dtype=dtype, size=img.shape)
+        out_0 = self.model.decode_head(self.model.backbone(torch.zeros(size=img.shape, dtype=torch.int64)))
 
 
-        return out
-
-def full_inference(model, num_images):
-
-    dataset = build_dataset({'type': 'ADE20KDataset',
-           'data_root': 'data/ade/ADEChallengeData2016',
-           'img_dir': 'images/validation',
-           'ann_dir': 'annotations/validation',
-           'pipeline': [
-               {'type': 'LoadImageFromFile'},
-               {'type': 'LoadAnnotations', 'reduce_zero_label': True},
-               {'type': 'Resize', 'img_scale': (1024, 256), 'keep_ratio': True},
-               {'type': 'RandomFlip', 'prob': 0.0},
-               {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
-               {'type': 'DefaultFormatBundle'},
-               {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
-           })
-    results = []
-    for sample_id in tqdm(range(num_images)):
-        img = dataset[sample_id]['img'].data.unsqueeze(0)[:, :, :256, :256]
-        img_meta = dataset[sample_id]['img_metas'].data
-
-        img_meta['img_shape'] = (256, 256, 3)
-        seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
-        seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
-        img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
-        with Timer("Inference"):
-            out = model(img)
-
-        out = resize(
-            input=out,
-            size=img.shape[2:],
-            mode='bilinear',
-            align_corners=False)
-
-        resize_shape = img_meta['img_shape'][:2]
-        seg_logit = out[:, :, :resize_shape[0], :resize_shape[1]]
-        size = img_meta['ori_shape'][:2]
-
-        seg_logit = resize(
-            seg_logit,
-            size=size,
-            mode='bilinear',
-            align_corners=False,
-            warning=False)
-
-        output = F.softmax(seg_logit, dim=1)
-        seg_pred = output.argmax(dim=1)
-        seg_pred = seg_pred.cpu().numpy()[0]
-
-        results.append(
-            intersect_and_union(
-                seg_pred,
-                seg_map,
-                len(dataset.CLASSES),
-                dataset.ignore_index,
-                label_map=dict(),
-                reduce_zero_label=dataset.reduce_zero_label)
-        )
-
-    print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
-
-
-def run_inference(model, image_path, crypto_assets, network_assets):
-
-    I = TypeConverter.f2i(torch.load(image_path).unsqueeze(0))[:, :, :192, :192]
-    I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=I.shape)
-    I0 = I - I1
-
-    import time
-    image = I0
-    with Timer("Inference"):
-        out_0 = model.decode_head(model.backbone(image))
-        out_1 = network_assets.receiver_01.get()
-        out = (torch.from_numpy(out_1) + out_0)
-        out = TypeConverter.i2f(out)
-    network_assets.sender_01.put(None)
-    network_assets.sender_02.put(None)
-
-    return out
-
-
-if __name__ == "__main__":
-
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
-    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None #"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.15.pickle"
-    image_shape = (1, 3, 256, 256)
-    num_images = 1
-
-    model = get_model(
-        config=secure_config_path,
-        gpu_id=None,
-        checkpoint_path=None
-    )
-
-    compile_numba_funcs()
-    crypto_assets, network_assets = get_assets(0, repeat=num_images)
-
-    model = securify_mobilenetv2_model(
-        model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
-        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=relu_spec_file)
-
-    # prf_fetcher_model = get_model(
-    #     config=secure_config_path,
-    #     gpu_id=None,
-    #     checkpoint_path=None
-    # )
-    #
-    # prf_fetcher_model = securify_mobilenetv2_model(
-    #     prf_fetcher_model,
-    #     build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
-    #     build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
-    #     secure_model_class=partial(PRFFetcherSecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-    #     block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-    #     relu_spec_file=relu_spec_file)
-
-    # prf_fetcher_model.prf_handler.fetch(repeat=num_images, model=prf_fetcher_model, image=torch.zeros(size=image_shape, dtype=torch.int64))
-
-    full_inference(model, num_images)
-
-    network_assets.done()

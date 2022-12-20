@@ -26,12 +26,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13124
-        self.port_10 = 13125
-        self.port_02 = 13126
-        self.port_20 = 13127
-        self.port_12 = 13128
-        self.port_21 = 13129
+        self.port_01 = 13444
+        self.port_10 = 13445
+        self.port_02 = 13446
+        self.port_20 = 13447
+        self.port_12 = 13448
+        self.port_21 = 13449
 
 
 class NetworkAssets:
@@ -79,7 +79,7 @@ def get_assets(party, repeat):
                 CLIENT: 3,
                 # SERVER: None,
                 # CRYPTO_PROVIDER: None,
-            }, repeat=repeat)
+            })
         network_assets = NetworkAssets(
             sender_01=Sender(addresses.port_01),
             sender_02=Sender(addresses.port_02),
@@ -98,7 +98,7 @@ def get_assets(party, repeat):
                 # CLIENT: None,
                 SERVER: 4,
                 # CRYPTO_PROVIDER: None,
-            }, repeat=repeat)
+            })
         network_assets = NetworkAssets(
             sender_01=Sender(addresses.port_10),
             sender_02=None,
@@ -117,7 +117,7 @@ def get_assets(party, repeat):
                 # CLIENT: None,
                 # SERVER: None,
                 CRYPTO_PROVIDER: 5,
-            }, repeat=repeat)
+            })
 
         network_assets = NetworkAssets(
             sender_01=None,
@@ -184,33 +184,33 @@ def sub_mode_p(x, y):
     ret[mask] = ret_2[mask]
     return ret
 
-class CryptoAssets:
-    def __init__(self, prf_01_numpy, prf_02_numpy, prf_12_numpy, prf_01_torch, prf_02_torch, prf_12_torch):
-
-        self.prf_12_torch = prf_12_torch
-        self.prf_02_torch = prf_02_torch
-        self.prf_01_torch = prf_01_torch
-        self.prf_12_numpy = prf_12_numpy
-        self.prf_02_numpy = prf_02_numpy
-        self.prf_01_numpy = prf_01_numpy
-
-        self.private_prf_numpy = np.random.default_rng(seed=31243)
-        self.private_prf_torch = torch.Generator().manual_seed(31243)
-
-        self.numpy_dtype = num_bit_to_dtype[NUM_BITS]
-        self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
-        self.trunc = TRUNC
-
-        self.numpy_max_val = np.iinfo(self.numpy_dtype).max
-    def get_random_tensor_over_L(self, shape, prf):
-        return torch.randint(
-            low=torch.iinfo(self.torch_dtype).min // 2,
-            high=torch.iinfo(self.torch_dtype).max // 2 + 1,
-            size=shape,
-            dtype=self.torch_dtype,
-            generator=prf
-        )
-
+# class CryptoAssets:
+#     def __init__(self, prf_01_numpy, prf_02_numpy, prf_12_numpy, prf_01_torch, prf_02_torch, prf_12_torch):
+#
+#         self.prf_12_torch = prf_12_torch
+#         self.prf_02_torch = prf_02_torch
+#         self.prf_01_torch = prf_01_torch
+#         self.prf_12_numpy = prf_12_numpy
+#         self.prf_02_numpy = prf_02_numpy
+#         self.prf_01_numpy = prf_01_numpy
+#
+#         self.private_prf_numpy = np.random.default_rng(seed=31243)
+#         self.private_prf_torch = torch.Generator().manual_seed(31243)
+#
+#         self.numpy_dtype = num_bit_to_dtype[NUM_BITS]
+#         self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
+#         self.trunc = TRUNC
+#
+#         self.numpy_max_val = np.iinfo(self.numpy_dtype).max
+#     def get_random_tensor_over_L(self, shape, prf):
+#         return torch.randint(
+#             low=torch.iinfo(self.torch_dtype).min // 2,
+#             high=torch.iinfo(self.torch_dtype).max // 2 + 1,
+#             size=shape,
+#             dtype=self.torch_dtype,
+#             generator=prf
+#         )
+#
 
 
 class SecureModule(torch.nn.Module):
