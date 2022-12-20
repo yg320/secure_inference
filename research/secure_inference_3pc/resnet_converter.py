@@ -69,7 +69,7 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
     decoder.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
 
 
-def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secure_model_class, block_relu=None, relu_spec_file=None):
+def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=None, relu_spec_file=None):
 
     convert_conv_module(model.backbone.conv1, build_secure_conv, build_secure_relu)
 
@@ -85,5 +85,3 @@ def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secu
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
         arch_utils = ArchUtilsFactory()("MobileNetV2")
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
-
-    return secure_model_class(model)

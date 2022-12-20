@@ -6,23 +6,6 @@ NUMBA_MATMUL = "NUMBA_MATMUL"
 NUMBA_CONV = "NUMBA_CONV"
 
 
-# TODO: replace redundancy in code
-def get_output_shape(A, B, padding, dilation, stride):
-    nb_rows_in = A.shape[2]
-    nb_cols_in = A.shape[3]
-    nb_rows_kernel = B.shape[2]
-    nb_cols_kernel = B.shape[3]
-
-    nb_rows_out = int(
-        ((nb_rows_in + 2 * padding[0] - dilation[0] * (nb_rows_kernel - 1) - 1) / stride[0]) + 1
-    )
-    nb_cols_out = int(
-        ((nb_cols_in + 2 * padding[1] - dilation[1] * (nb_cols_kernel - 1) - 1) / stride[1]) + 1
-    )
-
-    return 1, B.shape[0], nb_rows_out, nb_cols_out
-
-
 def pre_conv(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     """
     This is a block of local computation done at the beginning of the convolution. It
@@ -197,7 +180,6 @@ def numba_double_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilati
     return res
 
 
-
 @njit(parallel=True)
 def numba_double_separable_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
@@ -242,7 +224,6 @@ def numba_single_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
                                 B[out_channel, in_channel, k_0, k_1] * \
                                 A[0, in_channel, x, y]
 
-
     return res
 
 
@@ -264,9 +245,7 @@ def numba_single_separable_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, di
                             B[out_channel, 0, k_0, k_1] * \
                             A[0, out_channel, x, y]
 
-
     return res
-
 
 
 @njit(parallel=True)
@@ -355,7 +334,6 @@ def numba_single_conv2d(A, B, nb_rows_out, nb_cols_out, stride, dilation):
                             res[out_channel, i, j] += \
                                 B[out_channel, in_channel, k_0, k_1] * \
                                 A[0, in_channel, x, y]
-
 
     return res
 
@@ -454,6 +432,8 @@ def conv_2d(A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1)
             return single_conv_2d(A, B, padding, stride, dilation, groups=groups)
         else:
             return double_conv_2d(A, B, C, D, padding, stride, dilation, groups=groups)
+
+
 # TODO: put in init
 def compile_numba_funcs():
     in_channel = 512
@@ -462,27 +442,27 @@ def compile_numba_funcs():
     padding = (1, 1)
     stride = (1, 1)
     nb_rows = 24
-    
+
     A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
     B_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, in_channel, 3, 3))
     B_1x1 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, in_channel, 1, 1))
     C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
     D_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, in_channel, 3, 3))
     D_1x1 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, in_channel, 1, 1))
-    
+
     conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
     conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
 
-    conv_2d(A, B_3x3[:,:1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=B_3x3.shape[0])
-    conv_2d(A, B_3x3[:,:1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=B_3x3.shape[0])
+    conv_2d(A, B_3x3[:, :1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
+            groups=B_3x3.shape[0])
+    conv_2d(A, B_3x3[:, :1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
+            groups=B_3x3.shape[0])
 
     conv_2d(A, B_1x1, C, D_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
     conv_2d(A, B_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
 
-
     conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
     conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
-    
 
 
 # TODO: allocate one array and reuse it
@@ -502,8 +482,7 @@ if __name__ == "__main__":
         dilation = (1, 1)
         padding = (1, 1)
         stride = (1, 1)
-        nb_rows = 32
-        out_channel = 512
+        nb_rows = 36
 
         A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
         B_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
@@ -515,7 +494,6 @@ if __name__ == "__main__":
                 groups=B_3x3.shape[0])
         t1 = time.time()
         t_avg_conv += (t1 - t0)
-
 
     print(t_avg_conv / N)
     print(t_avg_matmul / N)

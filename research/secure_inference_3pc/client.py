@@ -20,14 +20,13 @@ from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.distortion.utils import get_data
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
-from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel
 
 
 class SecureConv2DClient(SecureModule):
     def __init__(self, W, stride, dilation, padding, groups, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W
+        self.W_share = W.numpy()
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
@@ -261,7 +260,7 @@ class SecureBlockReLUClient(SecureModule):
 
     def forward(self, activation):
         # activation_server = network_assets.receiver_01.get()
-
+        assert False
         activation = activation.numpy()
         # desired_out = BlockReLU_V1(self.block_sizes)(activation + activation_server)
         assert activation.dtype == self.signed_type
@@ -303,26 +302,10 @@ class SecureBlockReLUClient(SecureModule):
         return torch.from_numpy(activation)
 
 
-
-
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
-
-    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
-    # if is_prf_fetcher:
-    #     dtype = np.int64
-    #     W = crypto_assets[CLIENT, SERVER].integers_fetch(low=np.iinfo(dtype).min // 2,
-    #                                                      high=np.iinfo(dtype).max // 2,
-    #                                                      size=conv_module.weight.shape,
-    #                                                      dtype=dtype)
-    # else:
-    dtype = np.int64
-    W = crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
-                                               high=np.iinfo(dtype).max // 2,
-                                               size=conv_module.weight.shape,
-                                               dtype=dtype)
-
-    return conv_class(
-        W=W,
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
+    # assert module.groups == 1
+    return SecureConv2DClient(
+        W=crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=conv_module.weight.shape),
         stride=conv_module.stride,
         dilation=conv_module.dilation,
         padding=conv_module.padding,
@@ -332,28 +315,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False):
-    relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUClient
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets)
+def build_secure_relu(crypto_assets, network_assets):
+    return SecureReLUClient(crypto_assets=crypto_assets, network_assets=network_assets)
 
-class SecureModel(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModel, self).__init__( crypto_assets, network_assets)
-        self.model = model
-
-    def forward(self, img):
-        dtype = np.int64
-
-        I = TypeConverter.f2i(img)
-        I1 = torch.from_numpy(self.prf_handler[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2, high=np.iinfo(dtype).max // 2, dtype=dtype, size=img.shape))
-        I0 = I - I1
-        out_0 = self.model.decode_head(self.model.backbone(I0))
-        out_1 = self.network_assets.receiver_01.get()
-        out = (torch.from_numpy(out_1) + out_0)
-        out = TypeConverter.i2f(out)
-
-
-        return out
 
 def full_inference(model, num_images):
 
@@ -379,8 +343,16 @@ def full_inference(model, num_images):
         seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
         seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
         img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
-        with Timer("Inference"):
-            out = model(img)
+
+        I = TypeConverter.f2i(img)
+        I1 = crypto_assets[CLIENT, SERVER].get_random_tensor_over_L(shape=I.shape)
+        I0 = I - I1
+
+        out_0 = model.decode_head(model.backbone(I0)).to("cpu")
+
+        out_1 = network_assets.receiver_01.get()
+        out = (torch.from_numpy(out_1) + out_0)
+        out = TypeConverter.i2f(out)
 
         out = resize(
             input=out,
@@ -440,7 +412,7 @@ if __name__ == "__main__":
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None #"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.15.pickle"
+    relu_spec_file = None
     image_shape = (1, 3, 256, 256)
     num_images = 1
 
@@ -453,30 +425,30 @@ if __name__ == "__main__":
     compile_numba_funcs()
     crypto_assets, network_assets = get_assets(0, repeat=num_images)
 
-    model = securify_mobilenetv2_model(
-        model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
-        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=relu_spec_file)
-
-    # prf_fetcher_model = get_model(
-    #     config=secure_config_path,
-    #     gpu_id=None,
-    #     checkpoint_path=None
-    # )
-    #
-    # prf_fetcher_model = securify_mobilenetv2_model(
-    #     prf_fetcher_model,
-    #     build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
-    #     build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
-    #     secure_model_class=partial(PRFFetcherSecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-    #     block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-    #     relu_spec_file=relu_spec_file)
-
-    # prf_fetcher_model.prf_handler.fetch(repeat=num_images, model=prf_fetcher_model, image=torch.zeros(size=image_shape, dtype=torch.int64))
+    securify_mobilenetv2_model(model,
+                               build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
+                               build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+                               block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
+                               relu_spec_file=relu_spec_file)
 
     full_inference(model, num_images)
 
+    crypto_assets.done()
     network_assets.done()
+
+    # out = run_inference(model, image_path, crypto_assets, network_assets)
+    #
+    # import pickle
+    # from research.bReLU import BlockRelu
+    #
+    # model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
+    # # ArchUtilsFactory()('AvgPoolResNet').set_bReLU_layers(model_baseline, pickle.load(open(relu_spec_file, 'rb')), block_relu_class=BlockRelu)
+    #
+    # im = torch.load(image_path).unsqueeze(0)[:, :, :192, :192]
+    # desired_out = model_baseline.decode_head(model_baseline.backbone(im))
+    #
+    # print(np.abs((out - desired_out.detach()).numpy()).max())
+    #
+
+
+

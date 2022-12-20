@@ -3,7 +3,7 @@ import numpy as np
 
 from research.secure_inference_3pc.base import P, sub_mode_p, decompose, SpaceToDepth, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets
+from research.secure_inference_3pc.base import SecureModule, NetworkAssets, CryptoAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 
 from research.distortion.utils import get_model
@@ -13,7 +13,7 @@ from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_
 from functools import partial
 
 class SecureConv2DCryptoProvider(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets: CryptoAssets, network_assets: NetworkAssets):
         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
 
         self.W_shape = W_shape
@@ -188,7 +188,6 @@ class SecureReLUCryptoProvider(SecureModule):
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        # return X_share
         shape = X_share.shape
         X_share = X_share.numpy()
         X_share_np = X_share.astype(self.dtype).flatten()
@@ -209,7 +208,7 @@ class SecureBlockReLUCryptoProvider(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
-
+        assert False
         activation = activation.numpy()
         assert activation.dtype == self.signed_type
 
@@ -251,19 +250,10 @@ def build_secure_relu(crypto_assets, network_assets):
     return SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
 
 
-class SecureModel(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModel, self).__init__( crypto_assets, network_assets)
-        self.model = model
+def run_inference(model, image_shape, crypto_assets, network_assets):
+    dummy_image = crypto_assets[CRYPTO_PROVIDER].get_random_tensor_over_L(shape=image_shape)
+    _ = model.decode_head(model.backbone(dummy_image))
 
-    def forward(self, image_shape):
-        dtype = np.int64
-
-        dummy_image = torch.from_numpy(crypto_assets[CRYPTO_PROVIDER].integers(low=np.iinfo(dtype).min // 2,
-                                                                               high=np.iinfo(dtype).max // 2,
-                                                                               size=image_shape,
-                                                                               dtype=dtype))
-        _ = self.model.decode_head(self.model.backbone(dummy_image))
 
 
 if __name__ == "__main__":
@@ -271,7 +261,7 @@ if __name__ == "__main__":
     config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
     secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
     model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None #"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.15.pickle"
+    relu_spec_file = None
     image_shape = (1, 3, 256, 256)
     num_images = 1
 
@@ -284,15 +274,13 @@ if __name__ == "__main__":
     compile_numba_funcs()
     crypto_assets, network_assets = get_assets(2, repeat=num_images)
 
-    model = securify_mobilenetv2_model(
-        model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
-        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=relu_spec_file)
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets)
+
+    securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, block_relu=partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets), relu_spec_file=relu_spec_file)
 
     for _ in range(num_images):
-        model(image_shape)
+        out = run_inference(model, image_shape, crypto_assets, network_assets)
 
+    crypto_assets.done()
     network_assets.done()
