@@ -455,7 +455,7 @@ class MultipleChoiceKnapsack:
         self.division = division
         self.ratio = ratio
         self.seed = seed
-        self.num_channels = num_channels
+        self.num_channels = num_channels if num_channels else sum([x[0] for x in params.LAYER_NAME_TO_DIMS.values()])
         self.channel_distortion_path = channel_distortion_path
         self.shuffle = shuffle
 
@@ -638,12 +638,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     # parser.add_argument('--iter', type=int)
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/block_size_spec_0.15.pickle")
-    parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_192x192/ResNet18/channel_distortions")
-    parser.add_argument('--ratio', type=float, default=0.15)
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.25.pickle")
+    parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/channel_distortions")
+    parser.add_argument('--ratio', type=float, default=0.25)
     parser.add_argument('--seed', type=float, default=123)
-    parser.add_argument('--num_channels', type=float, default=4736)
-    parser.add_argument('--params_name', type=str, default="ResNet18_Params_192x192")
+    parser.add_argument('--num_channels', type=float, default=None)
+    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_1_Groups")
     parser.add_argument('--cost_type', type=str, default="Bandwidth")
     parser.add_argument('--division', type=int, default=512)
     parser.add_argument('--shuffle', type=bool, default=False)
