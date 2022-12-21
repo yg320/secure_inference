@@ -37,6 +37,8 @@ class Receiver(Thread):
 
 
 class Sender(Thread):
+    lock = threading.Lock()
+
     def __init__(self, port, simulated_bandwidth=None):
         super(Sender, self).__init__()
         self.numpy_arr_queue = queue.Queue()
@@ -45,6 +47,7 @@ class Sender(Thread):
 
     def run(self):
         num_bytes_send = 0
+        total_sleep_time = 0
 
         with NumpySocket() as s:
 
@@ -71,12 +74,19 @@ class Sender(Thread):
                 if self.simulated_bandwidth:
                     arr_size_bits = 8 * arr_size_bytes
                     send_time = arr_size_bits / self.simulated_bandwidth
+                    Sender.lock.acquire()
+                    total_sleep_time += send_time
                     time.sleep(send_time)
-
-                s.sendall(data)
-                s.recv(1)
-
-        # print(num_bytes_send)
+                    s.sendall(data)
+                    s.recv(1)
+                    Sender.lock.release()
+                else:
+                    s.sendall(data)
+                    s.recv(1)
+        print('===================')
+        print(self.port, num_bytes_send)
+        print(self.port, total_sleep_time)
+        print('===================')
 
     def put(self, arr):
         self.numpy_arr_queue.put(arr)
