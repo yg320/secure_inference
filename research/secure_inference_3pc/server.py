@@ -65,7 +65,9 @@ class SecureConv2DServer(SecureModule):
         out = out // self.trunc
         if self.bias is not None:
             out = out + self.bias
-        return torch.from_numpy(out)
+
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out.shape, dtype=out.dtype)
+        return torch.from_numpy(out + mu_1)
 
 
 class PrivateCompareServer(SecureModule):
@@ -101,6 +103,8 @@ class ShareConvertServer(SecureModule):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
+
         r_1 = r - r_0
         a_tild_1 = a_1 + r_1
         beta_1 = (a_tild_1 < a_1).astype(self.dtype)
@@ -121,7 +125,7 @@ class ShareConvertServer(SecureModule):
         t00 = self.add_mode_L_minus_one(delta_1, eta_1)
         theta_1 = self.add_mode_L_minus_one(beta_1, t00)
         y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-
+        y_1 = self.add_mode_L_minus_one(y_1, mu_1)
         return y_1
 
 
@@ -147,8 +151,9 @@ class SecureMultiplicationServer(SecureModule):
         E = E_share_client + E_share
         F = F_share_client + F_share
         out = - E * F + X_share * F + Y_share * E + C_share
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(X_share.dtype).min, np.iinfo(X_share.dtype).max, size=out.shape, dtype=X_share.dtype)
 
-        return out
+        return out + mu_1
 
 
 class SecureMSBServer(SecureModule):
@@ -160,6 +165,7 @@ class SecureMSBServer(SecureModule):
     def forward(self, a_1):
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=a_1.dtype)
 
         x_bits_1 = self.network_assets.receiver_12.get()
         x_bit_0_1 = self.network_assets.receiver_12.get()
@@ -183,6 +189,7 @@ class SecureMSBServer(SecureModule):
         theta_1 = self.mult(gamma_1, delta_1)
 
         alpha_1 = gamma_1 + delta_1 - 2 * theta_1
+        alpha_1 = alpha_1 + mu_1
 
         return alpha_1
 
@@ -196,9 +203,11 @@ class SecureDReLUServer(SecureModule):
 
     def forward(self, X_share):
         assert X_share.dtype == self.dtype
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=X_share.dtype)
+
         X1_converted = self.share_convert(self.dtype(2) * X_share)
         MSB_1 = self.msb(X1_converted)
-        return 1 - MSB_1
+        return 1 - MSB_1 + mu_1
 
 
 class SecureReLUServer(SecureModule):
@@ -216,13 +225,17 @@ class SecureReLUServer(SecureModule):
             value = value * ((value > 0).astype(value.dtype))
             return torch.from_numpy(value)
         else:
+
             shape = X_share.shape
             X_share = X_share.numpy()
+            dtype = X_share.dtype
+            mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+
             X_share = X_share.astype(self.dtype).flatten()
             MSB_0 = self.DReLU(X_share)
             relu_0 = self.mult(X_share, MSB_0).reshape(shape)
             ret = relu_0.astype(self.signed_type)
-            return torch.from_numpy(ret)
+            return torch.from_numpy(ret + mu_1)
 
 
 class SecureBlockReLUServer(SecureModule):

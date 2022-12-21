@@ -4,7 +4,7 @@ class Params:
     MODEL_PATH = "/home/yakir/iter_80000.pth"
     RELU_SPEC_FILE = None #"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.15.pickle"
     IMAGE_SHAPE = (1, 3, 256, 256)
-    NUM_IMAGES = 4
+    NUM_IMAGES = 1
     DUMMY_RELU = False
-    PRF_PREFETCH = False
-    SIMULATED_BANDWIDTH = 100000000  # Bits/Second
+    PRF_PREFETCH = True
+    SIMULATED_BANDWIDTH = None #100000000  # Bits/Second
