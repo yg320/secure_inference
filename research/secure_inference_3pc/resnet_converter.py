@@ -2,6 +2,7 @@ import torch
 import pickle
 from research.distortion.utils import ArchUtilsFactory
 from functools import partial
+from research.distortion.utils import get_model
 
 def securify_resnet18_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=None, relu_spec_file=None):
     model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
@@ -69,7 +70,11 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
     decoder.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
 
 
-def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secure_model_class, block_relu=None, relu_spec_file=None):
+def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets)
 
     convert_conv_module(model.backbone.conv1, build_secure_conv, build_secure_relu)
 
@@ -82,8 +87,32 @@ def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secu
     convert_decoder(model.decode_head, build_secure_conv, build_secure_relu)
 
     if relu_spec_file:
+        block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
         arch_utils = ArchUtilsFactory()("MobileNetV2")
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
 
     return secure_model_class(model)
+
+
+def init_prf_fetcher(Params, build_secure_conv, build_secure_relu, prf_fetcher_secure_model, secure_block_relu, crypto_assets, network_assets):
+    prf_fetcher_model = get_model(
+        config=Params.SECURE_CONFIG_PATH,
+        gpu_id=None,
+        checkpoint_path=None
+    )
+
+    prf_fetcher_model = securify_mobilenetv2_model(
+        prf_fetcher_model,
+        build_secure_conv=partial(build_secure_conv, is_prf_fetcher=True),
+        build_secure_relu=partial(build_secure_relu, is_prf_fetcher=True),
+        secure_model_class=prf_fetcher_secure_model,
+        block_relu=secure_block_relu,
+        relu_spec_file=Params.RELU_SPEC_FILE,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets,
+        dummy_relu=Params.DUMMY_RELU
+    )
+
+    prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=torch.zeros(size=Params.IMAGE_SHAPE, dtype=torch.int64))

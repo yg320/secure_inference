@@ -7,7 +7,6 @@ from typing import Callable, ClassVar, Dict, Optional
 class TimerError(Exception):
     """A custom exception used to report errors in use of Timer class"""
 #TODO: should be like :@Timer("ShareConvertClient")
-
 @dataclass
 class Timer:
     timers: ClassVar[Dict[str, float]] = {}

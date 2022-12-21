@@ -5,7 +5,7 @@ from tqdm import tqdm
 from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
     SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d
-from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
+from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
 from functools import partial
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from mmseg.ops import resize
@@ -427,27 +427,23 @@ if __name__ == "__main__":
 
     model = securify_mobilenetv2_model(
         model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=Params.DUMMY_RELU),
-        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=Params.RELU_SPEC_FILE)
-
-    prf_fetcher_model = get_model(
-        config=Params.SECURE_CONFIG_PATH,
-        gpu_id=None,
-        checkpoint_path=None
+        build_secure_conv=build_secure_conv,
+        build_secure_relu=build_secure_relu,
+        secure_model_class=SecureModel,
+        block_relu=SecureBlockReLUClient,
+        relu_spec_file=Params.RELU_SPEC_FILE,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets,
+        dummy_relu=Params.DUMMY_RELU
     )
 
-    prf_fetcher_model = securify_mobilenetv2_model(
-        prf_fetcher_model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, dummy_relu=Params.DUMMY_RELU),
-        secure_model_class=partial(PRFFetcherSecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=Params.RELU_SPEC_FILE)
-
-    prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=torch.zeros(size=Params.IMAGE_SHAPE, dtype=torch.int64))
+    init_prf_fetcher(Params=Params,
+                     build_secure_conv=build_secure_conv,
+                     build_secure_relu=build_secure_relu,
+                     prf_fetcher_secure_model=PRFFetcherSecureModel,
+                     secure_block_relu=SecureBlockReLUClient,
+                     crypto_assets=crypto_assets,
+                     network_assets=network_assets)
 
     full_inference(model, Params.NUM_IMAGES)
 

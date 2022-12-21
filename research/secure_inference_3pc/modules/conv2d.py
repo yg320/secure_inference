@@ -1,18 +1,24 @@
 import numpy as np
 import time
+import torch
 from numba import njit, prange
 
 NUMBA_MATMUL = "NUMBA_MATMUL"
 NUMBA_CONV = "NUMBA_CONV"
 
 
-# TODO: replace redundancy in code
+# TODO: replace redundancy in code, Transfer shapes and not tensors
 def get_output_shape(A, B, padding, dilation, stride):
     nb_rows_in = A.shape[2]
     nb_cols_in = A.shape[3]
-    nb_rows_kernel = B.shape[2]
-    nb_cols_kernel = B.shape[3]
-
+    if type(B) in [tuple, torch.Size]:
+        nb_rows_kernel = B[2]
+        nb_cols_kernel = B[3]
+        channel_out = B[0]
+    else:
+        nb_rows_kernel = B.shape[2]
+        nb_cols_kernel = B.shape[3]
+        channel_out = B.shape[0]
     nb_rows_out = int(
         ((nb_rows_in + 2 * padding[0] - dilation[0] * (nb_rows_kernel - 1) - 1) / stride[0]) + 1
     )
@@ -20,7 +26,7 @@ def get_output_shape(A, B, padding, dilation, stride):
         ((nb_cols_in + 2 * padding[1] - dilation[1] * (nb_cols_kernel - 1) - 1) / stride[1]) + 1
     )
 
-    return 1, B.shape[0], nb_rows_out, nb_cols_out
+    return 1, channel_out, nb_rows_out, nb_cols_out
 
 
 def pre_conv(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):

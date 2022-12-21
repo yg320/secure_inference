@@ -76,7 +76,7 @@ class Sender(Thread):
                 s.sendall(data)
                 s.recv(1)
 
-        print(num_bytes_send)
+        # print(num_bytes_send)
 
     def put(self, arr):
         self.numpy_arr_queue.put(arr)

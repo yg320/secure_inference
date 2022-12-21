@@ -9,8 +9,9 @@ from research.distortion.utils import get_model
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
+from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
+from research.secure_inference_3pc.modules.server import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU
 from functools import partial
 
 class SecureConv2DServer(SecureModule):
@@ -277,7 +278,8 @@ class SecureBlockReLUServer(SecureModule):
         return torch.from_numpy(activation)
 
 
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DServer
 
     dtype = np.int64
 
@@ -290,13 +292,16 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
         W = conv_module.weight
         W = TypeConverter.f2i(W)
         B = None
+    if is_prf_fetcher:
+        W_client = np.zeros(shape=conv_module.weight.shape, dtype=np.int64)
 
-    W_client = torch.from_numpy(crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
-                                           high=np.iinfo(dtype).max // 2,
-                                           size=conv_module.weight.shape,
-                                           dtype=dtype))
+    else:
+        W_client = torch.from_numpy(crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
+                                               high=np.iinfo(dtype).max // 2,
+                                               size=conv_module.weight.shape,
+                                               dtype=dtype))
     W = W - W_client
-    return SecureConv2DServer(
+    return conv_class(
         W=W,
         bias=B,
         stride=conv_module.stride,
@@ -308,8 +313,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, dummy_relu):
-    return SecureReLUServer(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
+    relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUServer
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
 
 
@@ -329,7 +335,6 @@ class SecureModel(SecureModule):
         self.network_assets.sender_01.put(out)
 
 
-
 if __name__ == "__main__":
 
     model = get_model(
@@ -338,16 +343,28 @@ if __name__ == "__main__":
         checkpoint_path=Params.MODEL_PATH
     )
 
-
     crypto_assets, network_assets = get_assets(1, repeat=Params.NUM_IMAGES)
 
     model = securify_mobilenetv2_model(
         model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=Params.DUMMY_RELU),
-        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUServer, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=Params.RELU_SPEC_FILE)
+        build_secure_conv=build_secure_conv,
+        build_secure_relu=build_secure_relu,
+        secure_model_class=SecureModel,
+        block_relu=SecureBlockReLUServer,
+        relu_spec_file=Params.RELU_SPEC_FILE,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets,
+        dummy_relu=Params.DUMMY_RELU
+    )
+
+    init_prf_fetcher(Params=Params,
+                     build_secure_conv=build_secure_conv,
+                     build_secure_relu=build_secure_relu,
+                     prf_fetcher_secure_model=PRFFetcherSecureModel,
+                     secure_block_relu=SecureBlockReLUServer,
+                     crypto_assets=crypto_assets,
+                     network_assets=network_assets)
+
 
     for _ in range(Params.NUM_IMAGES):
         out = model(Params.IMAGE_SHAPE)

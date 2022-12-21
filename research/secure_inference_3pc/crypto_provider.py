@@ -9,8 +9,9 @@ from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
+from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
+from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU
 
 from functools import partial
 
@@ -240,8 +241,10 @@ class SecureBlockReLUCryptoProvider(SecureModule):
         return torch.from_numpy(activation)
 
 
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
-    return SecureConv2DCryptoProvider(
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DCryptoProvider
+
+    return conv_class(
         W_shape=conv_module.weight.shape,
         stride=conv_module.stride,
         dilation=conv_module.dilation,
@@ -252,8 +255,11 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, dummy_relu):
-    return SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+
+def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
+    relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUCryptoProvider
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+
 
 
 class SecureModel(SecureModule):
@@ -264,7 +270,7 @@ class SecureModel(SecureModule):
     def forward(self, image_shape):
         dtype = np.int64
 
-        dummy_image = torch.from_numpy(crypto_assets[CRYPTO_PROVIDER].integers(low=np.iinfo(dtype).min // 2,
+        dummy_image = torch.from_numpy(self.prf_handler[CRYPTO_PROVIDER].integers(low=np.iinfo(dtype).min // 2,
                                                                                high=np.iinfo(dtype).max // 2,
                                                                                size=image_shape,
                                                                                dtype=dtype))
@@ -283,11 +289,23 @@ if __name__ == "__main__":
 
     model = securify_mobilenetv2_model(
         model,
-        build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=Params.DUMMY_RELU),
-        secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
-        block_relu=partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=Params.RELU_SPEC_FILE)
+        build_secure_conv=build_secure_conv,
+        build_secure_relu=build_secure_relu,
+        secure_model_class=SecureModel,
+        block_relu=SecureBlockReLUCryptoProvider,
+        relu_spec_file=Params.RELU_SPEC_FILE,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets,
+        dummy_relu=Params.DUMMY_RELU
+    )
+
+    init_prf_fetcher(Params=Params,
+                     build_secure_conv=build_secure_conv,
+                     build_secure_relu=build_secure_relu,
+                     prf_fetcher_secure_model=PRFFetcherSecureModel,
+                     secure_block_relu=SecureBlockReLUCryptoProvider,
+                     crypto_assets=crypto_assets,
+                     network_assets=network_assets)
 
     for _ in range(Params.NUM_IMAGES):
         out = model(Params.IMAGE_SHAPE)
