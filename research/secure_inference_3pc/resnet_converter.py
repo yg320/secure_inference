@@ -87,7 +87,7 @@ def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secu
     convert_decoder(model.decode_head, build_secure_conv, build_secure_relu)
 
     if relu_spec_file:
-        block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+        block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets)
 
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
         arch_utils = ArchUtilsFactory()("MobileNetV2")

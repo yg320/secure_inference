@@ -37,11 +37,11 @@ class Receiver(Thread):
 
 
 class Sender(Thread):
-    def __init__(self, port):
+    def __init__(self, port, simulated_bandwidth=None):
         super(Sender, self).__init__()
         self.numpy_arr_queue = queue.Queue()
         self.port = port
-        self.simulated_bandwidth = None #100000000  #bits/second
+        self.simulated_bandwidth = simulated_bandwidth #100000000  #bits/second
 
     def run(self):
         num_bytes_send = 0

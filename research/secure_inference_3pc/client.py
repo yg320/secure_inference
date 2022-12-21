@@ -261,10 +261,8 @@ class SecureBlockReLUClient(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
-        # activation_server = network_assets.receiver_01.get()
 
         activation = activation.numpy()
-        # desired_out = BlockReLU_V1(self.block_sizes)(activation + activation_server)
         assert activation.dtype == self.signed_type
         reshaped_inputs = []
         mean_tensors = []
@@ -274,7 +272,6 @@ class SecureBlockReLUClient(SecureModule):
         for block_size in self.active_block_sizes:
             cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
             cur_input = activation[:, cur_channels]
-            # reshaped_input[0,1,38,31]
             reshaped_input = SpaceToDepth(block_size)(cur_input)
             assert reshaped_input.dtype == self.signed_type
             mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
@@ -296,8 +293,8 @@ class SecureBlockReLUClient(SecureModule):
             relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(
                 sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
 
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
-                                                              activation[:, ~self.is_identity_channels])
+        # with Timer("Mult in BlockRelu"):
+        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
         activation = activation.astype(self.signed_type)
 
         return torch.from_numpy(activation)
@@ -416,6 +413,7 @@ def full_inference(model, num_images):
 
 
 if __name__ == "__main__":
+    party = 0
 
     model = get_model(
         config=Params.SECURE_CONFIG_PATH,
@@ -423,7 +421,7 @@ if __name__ == "__main__":
         checkpoint_path=None
     )
 
-    crypto_assets, network_assets = get_assets(0, repeat=Params.NUM_IMAGES)
+    crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     model = securify_mobilenetv2_model(
         model,
@@ -437,13 +435,14 @@ if __name__ == "__main__":
         dummy_relu=Params.DUMMY_RELU
     )
 
-    init_prf_fetcher(Params=Params,
-                     build_secure_conv=build_secure_conv,
-                     build_secure_relu=build_secure_relu,
-                     prf_fetcher_secure_model=PRFFetcherSecureModel,
-                     secure_block_relu=SecureBlockReLUClient,
-                     crypto_assets=crypto_assets,
-                     network_assets=network_assets)
+    if Params.PRF_PREFETCH:
+        init_prf_fetcher(Params=Params,
+                         build_secure_conv=build_secure_conv,
+                         build_secure_relu=build_secure_relu,
+                         prf_fetcher_secure_model=PRFFetcherSecureModel,
+                         secure_block_relu=SecureBlockReLUClient,
+                         crypto_assets=crypto_assets,
+                         network_assets=network_assets)
 
     full_inference(model, Params.NUM_IMAGES)
 

@@ -26,12 +26,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13614
-        self.port_10 = 13615
-        self.port_02 = 13616
-        self.port_20 = 13617
-        self.port_12 = 13618
-        self.port_21 = 13619
+        self.port_01 = 13654
+        self.port_10 = 13655
+        self.port_02 = 13656
+        self.port_20 = 13657
+        self.port_12 = 13658
+        self.port_21 = 13659
 
 
 class NetworkAssets:
@@ -66,7 +66,7 @@ class NetworkAssets:
             self.sender_01.put(None)
 
 
-def get_assets(party, repeat):
+def get_assets(party, repeat, simulated_bandwidth=None):
 
     addresses = Addresses()
 
@@ -81,8 +81,8 @@ def get_assets(party, repeat):
                 # CRYPTO_PROVIDER: None,
             })
         network_assets = NetworkAssets(
-            sender_01=Sender(addresses.port_01),
-            sender_02=Sender(addresses.port_02),
+            sender_01=Sender(addresses.port_01, simulated_bandwidth=simulated_bandwidth),
+            sender_02=Sender(addresses.port_02, simulated_bandwidth=simulated_bandwidth),
             sender_12=None,
             receiver_01=Receiver(addresses.port_10),
             receiver_02=Receiver(addresses.port_20),
@@ -100,9 +100,9 @@ def get_assets(party, repeat):
                 # CRYPTO_PROVIDER: None,
             })
         network_assets = NetworkAssets(
-            sender_01=Sender(addresses.port_10),
+            sender_01=Sender(addresses.port_10, simulated_bandwidth=simulated_bandwidth),
             sender_02=None,
-            sender_12=Sender(addresses.port_12),
+            sender_12=Sender(addresses.port_12, simulated_bandwidth=simulated_bandwidth),
             receiver_01=Receiver(addresses.port_01),
             receiver_02=None,
             receiver_12=Receiver(addresses.port_21),
@@ -121,8 +121,8 @@ def get_assets(party, repeat):
 
         network_assets = NetworkAssets(
             sender_01=None,
-            sender_02=Sender(addresses.port_20),
-            sender_12=Sender(addresses.port_21),
+            sender_02=Sender(addresses.port_20, simulated_bandwidth=simulated_bandwidth),
+            sender_12=Sender(addresses.port_21, simulated_bandwidth=simulated_bandwidth),
             receiver_01=None,
             receiver_02=Receiver(addresses.port_02),
             receiver_12=Receiver(addresses.port_12),

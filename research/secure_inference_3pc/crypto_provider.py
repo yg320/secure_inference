@@ -215,7 +215,7 @@ class SecureBlockReLUCryptoProvider(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
-        assert False
+
         activation = activation.numpy()
         assert activation.dtype == self.signed_type
 
@@ -278,6 +278,7 @@ class SecureModel(SecureModule):
 
 
 if __name__ == "__main__":
+    party = 2
 
     model = get_model(
         config=Params.SECURE_CONFIG_PATH,
@@ -285,7 +286,7 @@ if __name__ == "__main__":
         checkpoint_path=None
     )
 
-    crypto_assets, network_assets = get_assets(2, repeat=Params.NUM_IMAGES)
+    crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     model = securify_mobilenetv2_model(
         model,
@@ -298,14 +299,15 @@ if __name__ == "__main__":
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU
     )
+    if Params.PRF_PREFETCH:
 
-    init_prf_fetcher(Params=Params,
-                     build_secure_conv=build_secure_conv,
-                     build_secure_relu=build_secure_relu,
-                     prf_fetcher_secure_model=PRFFetcherSecureModel,
-                     secure_block_relu=SecureBlockReLUCryptoProvider,
-                     crypto_assets=crypto_assets,
-                     network_assets=network_assets)
+        init_prf_fetcher(Params=Params,
+                         build_secure_conv=build_secure_conv,
+                         build_secure_relu=build_secure_relu,
+                         prf_fetcher_secure_model=PRFFetcherSecureModel,
+                         secure_block_relu=SecureBlockReLUCryptoProvider,
+                         crypto_assets=crypto_assets,
+                         network_assets=network_assets)
 
     for _ in range(Params.NUM_IMAGES):
         out = model(Params.IMAGE_SHAPE)
