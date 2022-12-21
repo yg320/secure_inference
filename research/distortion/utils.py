@@ -10,7 +10,7 @@ import numpy as np
 from mmseg.datasets import build_dataset
 from research.bReLU import BlockRelu
 
-def get_model(config, gpu_id, checkpoint_path):
+def get_model(config, gpu_id=None, checkpoint_path=None):
     cfg = mmcv.Config.fromfile(config)
 
     setup_multi_processes(cfg)
@@ -469,3 +469,23 @@ class ArchUtilsFactory:
         else:
             assert False
 
+
+if __name__ == "__main__":
+    cfg = {'type': 'ADE20KDataset',
+           'data_root': 'data/ade/ADEChallengeData2016',
+           'img_dir': 'images/validation',
+           'ann_dir': 'annotations/validation',
+           'pipeline': [
+               {'type': 'LoadImageFromFile'},
+               {'type': 'MultiScaleFlipAug',
+                'img_scale': (256, 256),
+                'flip': False,
+                'transforms': [
+                    {'type': 'Resize', 'keep_ratio': False},
+                    {'type': 'RandomFlip'},
+                    {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+                    {'type': 'ImageToTensor', 'keys': ['img']},
+                    {'type': 'Collect', 'keys': ['img']}]}],
+           'test_mode': True}
+    dataset = build_dataset(cfg)
+    print(dataset[0])
