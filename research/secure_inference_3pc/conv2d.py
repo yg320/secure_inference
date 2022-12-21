@@ -1,6 +1,6 @@
 import numpy as np
 import time
-from numba import njit, prange
+from numba import njit, prange, int64, int32
 
 NUMBA_MATMUL = "NUMBA_MATMUL"
 NUMBA_CONV = "NUMBA_CONV"
@@ -146,7 +146,7 @@ def post_conv(bias, res, batch_size, nb_channels_out, nb_rows_out, nb_cols_out):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :](int64[:, :], int64[:, :], int64[:, :], int64[:, :]), parallel=True,  nogil=True, cache=True)
 def numba_double_mat_mult(a, b, c, d):
     assert a.shape[1] == b.shape[0]
     res = np.zeros((a.shape[0], b.shape[1]), dtype=a.dtype)
@@ -159,7 +159,7 @@ def numba_double_mat_mult(a, b, c, d):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :](int64[:, :], int64[:, :]), parallel=True,  nogil=True, cache=True)
 def numba_single_mat_mult(a, b):
     assert a.shape[1] == b.shape[0]
     res = np.zeros((a.shape[0], b.shape[1]), dtype=a.dtype)
@@ -171,7 +171,7 @@ def numba_single_mat_mult(a, b):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True,  nogil=True, cache=True)
 def numba_double_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
     dilation_row, dilation_col = dilation
@@ -197,8 +197,7 @@ def numba_double_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilati
     return res
 
 
-
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True, nogil=True, cache=True)
 def numba_double_separable_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
     dilation_row, dilation_col = dilation
@@ -223,7 +222,7 @@ def numba_double_separable_conv2d_3x3(A, B, C, D, nb_rows_out, nb_cols_out, stri
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True, nogil=True, cache=True)
 def numba_single_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
     dilation_row, dilation_col = dilation
@@ -246,7 +245,7 @@ def numba_single_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True, nogil=True, cache=True)
 def numba_single_separable_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
     dilation_row, dilation_col = dilation
@@ -268,8 +267,7 @@ def numba_single_separable_conv2d_3x3(A, B, nb_rows_out, nb_cols_out, stride, di
     return res
 
 
-
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:]), parallel=True, nogil=True, cache=True)
 def numba_double_conv2d_1x1(A, B, C, D, nb_rows_out, nb_cols_out, stride):
     stride_row, stride_col = stride
     res = np.zeros((B.shape[0], nb_rows_out, nb_cols_out), dtype=np.int64)
@@ -292,7 +290,7 @@ def numba_double_conv2d_1x1(A, B, C, D, nb_rows_out, nb_cols_out, stride):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:]), parallel=True, nogil=True, cache=True)
 def numba_single_conv2d_1x1(A, B, nb_rows_out, nb_cols_out, stride):
     stride_row, stride_col = stride
     res = np.zeros((B.shape[0], nb_rows_out, nb_cols_out), dtype=np.int64)
@@ -311,7 +309,7 @@ def numba_single_conv2d_1x1(A, B, nb_rows_out, nb_cols_out, stride):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True, nogil=True, cache=True)
 def numba_double_conv2d(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
     dilation_row, dilation_col = dilation
@@ -337,7 +335,7 @@ def numba_double_conv2d(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
     return res
 
 
-@njit(parallel=True)
+@njit(int64[:, :, :](int64[:, :, :, :], int64[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True, nogil=True, cache=True)
 def numba_single_conv2d(A, B, nb_rows_out, nb_cols_out, stride, dilation):
     stride_row, stride_col = stride
     dilation_row, dilation_col = dilation
@@ -365,16 +363,17 @@ def double_conv_2d(A, B, C, D, padding, stride, dilation, groups=1):
     nb_cols_in = A.shape[3]
     nb_rows_kernel = B.shape[2]
     nb_cols_kernel = B.shape[3]
-    nb_rows_out = int(
+    nb_rows_out = np.int32(
         ((nb_rows_in + 2 * padding[0] - dilation[0] * (nb_rows_kernel - 1) - 1) / stride[0]) + 1
     )
-    nb_cols_out = int(
+    nb_cols_out = np.int32(
         ((nb_cols_in + 2 * padding[1] - dilation[1] * (nb_cols_kernel - 1) - 1) / stride[1]) + 1
     )
 
     A_ = np.pad(A, ((0, 0), (0, 0), padding, padding), mode='constant')
     C_ = np.pad(C, ((0, 0), (0, 0), padding, padding), mode='constant')
-
+    stride = np.int32(stride)
+    dilation = np.int32(dilation)
     if B.shape[2] == B.shape[3] == 3:
         if groups == 1:
             out = numba_double_conv2d_3x3(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
@@ -394,15 +393,16 @@ def single_conv_2d(A, B, padding, stride, dilation, groups=1):
     nb_cols_in = A.shape[3]
     nb_rows_kernel = B.shape[2]
     nb_cols_kernel = B.shape[3]
-    nb_rows_out = int(
+    nb_rows_out = np.int32(
         ((nb_rows_in + 2 * padding[0] - dilation[0] * (nb_rows_kernel - 1) - 1) / stride[0]) + 1
     )
-    nb_cols_out = int(
+    nb_cols_out = np.int32(
         ((nb_cols_in + 2 * padding[1] - dilation[1] * (nb_cols_kernel - 1) - 1) / stride[1]) + 1
     )
 
     A_ = np.pad(A, ((0, 0), (0, 0), padding, padding), mode='constant')
-
+    stride = np.int32(stride)
+    dilation = np.int32(dilation)
     if B.shape[2] == B.shape[3] == 3:
         if groups == 1:
             out = numba_single_conv2d_3x3(A_, B, nb_rows_out, nb_cols_out, stride, dilation)
@@ -493,29 +493,29 @@ def compile_numba_funcs():
 if __name__ == "__main__":
 
     compile_numba_funcs()
-    t_avg_conv = 0
-    t_avg_matmul = 0
-    from tqdm import tqdm
-
-    np.random.seed(123)
-    N = 100
-    for iii in tqdm(range(N)):
-        in_channel = 512
-        dilation = (1, 1)
-        padding = (1, 1)
-        stride = (1, 1)
-        nb_rows = 36
-
-        A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
-        B_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
-        C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
-        D_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
-
-        t0 = time.time()
-        conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
-                groups=B_3x3.shape[0])
-        t1 = time.time()
-        t_avg_conv += (t1 - t0)
-
-    print(t_avg_conv / N)
-    print(t_avg_matmul / N)
+    # t_avg_conv = 0
+    # t_avg_matmul = 0
+    # from tqdm import tqdm
+    #
+    # np.random.seed(123)
+    # N = 100
+    # for iii in tqdm(range(N)):
+    #     in_channel = 512
+    #     dilation = (1, 1)
+    #     padding = (1, 1)
+    #     stride = (1, 1)
+    #     nb_rows = 36
+    #
+    #     A = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
+    #     B_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
+    #     C = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(1, in_channel, nb_rows, nb_rows))
+    #     D_3x3 = np.random.randint(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=(out_channel, 1, 3, 3))
+    #
+    #     t0 = time.time()
+    #     conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
+    #             groups=B_3x3.shape[0])
+    #     t1 = time.time()
+    #     t_avg_conv += (t1 - t0)
+    #
+    # print(t_avg_conv / N)
+    # print(t_avg_matmul / N)

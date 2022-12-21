@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
-from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
+from research.secure_inference_3pc.conv2d import conv_2d
 
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 
@@ -338,7 +338,6 @@ if __name__ == "__main__":
         checkpoint_path=Params.MODEL_PATH
     )
 
-    compile_numba_funcs()
 
     crypto_assets, network_assets = get_assets(1, repeat=Params.NUM_IMAGES)
 

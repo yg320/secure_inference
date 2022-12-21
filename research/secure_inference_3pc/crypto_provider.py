@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 from research.secure_inference_3pc.base import P, sub_mode_p, decompose, SpaceToDepth, get_assets
-from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
+from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 
@@ -278,8 +278,6 @@ if __name__ == "__main__":
         gpu_id=None,
         checkpoint_path=None
     )
-
-    compile_numba_funcs()
 
     crypto_assets, network_assets = get_assets(2, repeat=Params.NUM_IMAGES)
 

@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
     SpaceToDepth, get_assets, TypeConverter
-from research.secure_inference_3pc.conv2d import conv_2d, compile_numba_funcs
+from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
 from functools import partial
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
@@ -13,11 +13,10 @@ from mmseg.datasets import build_dataset
 
 from research.secure_inference_3pc.timer import Timer
 from research.distortion.utils import get_model
-from research.distortion.utils import ArchUtilsFactory
 
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.distortion.utils import get_data
+
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
 from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel
@@ -424,7 +423,6 @@ if __name__ == "__main__":
         checkpoint_path=None
     )
 
-    compile_numba_funcs()
     crypto_assets, network_assets = get_assets(0, repeat=Params.NUM_IMAGES)
 
     model = securify_mobilenetv2_model(
