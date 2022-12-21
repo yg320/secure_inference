@@ -21,6 +21,7 @@ from research.distortion.utils import get_data
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
 from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel
+from research.secure_inference_3pc.params import Params
 
 
 class SecureConv2DClient(SecureModule):
@@ -102,9 +103,8 @@ class ShareConvertClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        # with Timer("ShareConvertClient"):
         return self.forward_(a_0)
-    #TODO: should be like :@Timer("ShareConvertClient")
+
     def forward_(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
@@ -144,7 +144,6 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
-        # with Timer("SecureMultiplicationClient"):
         return self.forward_(X_share, Y_share)
 
     def forward_(self, X_share, Y_share):
@@ -180,7 +179,6 @@ class SecureMSBClient(SecureModule):
         self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
 
     def forward(self, a_0):
-        # with Timer("SecureMSBClient"):
         return self.forward_(a_0)
 
     def forward_(self, a_0):
@@ -199,7 +197,7 @@ class SecureMSBClient(SecureModule):
 
         r_mode_2 = r % 2
         self.private_compare(x_bits_0, r, beta)
-        # execute_secure_compare
+
         beta = beta.astype(self.dtype)
         beta_p_0 = self.network_assets.receiver_02.get()
 
@@ -227,26 +225,28 @@ class SecureDReLUClient(SecureModule):
 
 
 class SecureReLUClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
+    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
         super(SecureReLUClient, self).__init__(crypto_assets, network_assets)
 
         self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
+        self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
-        # with Timer("SecureReLUClient"):
         return self.forward_(X_share)
 
     def forward_(self, X_share):
-        # network_assets.sender_01.put(X_share)
-        # return torch.zeros_like(X_share)
-        shape = X_share.shape
-        X_share = X_share.numpy()
-        X_share = X_share.astype(self.dtype).flatten()
-        MSB_0 = self.DReLU(X_share)
-        relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-        ret = relu_0.astype(self.signed_type)
-        return torch.from_numpy(ret)
+        if self.dummy_relu:
+            network_assets.sender_01.put(X_share)
+            return torch.zeros_like(X_share)
+        else:
+            shape = X_share.shape
+            X_share = X_share.numpy()
+            X_share = X_share.astype(self.dtype).flatten()
+            MSB_0 = self.DReLU(X_share)
+            relu_0 = self.mult(X_share, MSB_0).reshape(shape)
+            ret = relu_0.astype(self.signed_type)
+            return torch.from_numpy(ret)
 
 
 class SecureBlockReLUClient(SecureModule):
@@ -300,8 +300,7 @@ class SecureBlockReLUClient(SecureModule):
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
                                                               activation[:, ~self.is_identity_channels])
         activation = activation.astype(self.signed_type)
-        # real_out = network_assets.receiver_01.get() + activation
-        # assert np.all(real_out == desired_out.numpy())
+
         return torch.from_numpy(activation)
 
 
@@ -331,9 +330,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False):
+def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
     relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUClient
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets)
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
 
 class SecureModel(SecureModule):
@@ -417,35 +416,27 @@ def full_inference(model, num_images):
     print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
 
 
-
 if __name__ == "__main__":
 
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
-    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None
-    image_shape = (1, 3, 256, 256)
-    num_images = 50
-
     model = get_model(
-        config=secure_config_path,
+        config=Params.SECURE_CONFIG_PATH,
         gpu_id=None,
         checkpoint_path=None
     )
 
     compile_numba_funcs()
-    crypto_assets, network_assets = get_assets(0, repeat=num_images)
+    crypto_assets, network_assets = get_assets(0, repeat=Params.NUM_IMAGES)
 
     model = securify_mobilenetv2_model(
         model,
         build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=Params.DUMMY_RELU),
         secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
         block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=relu_spec_file)
+        relu_spec_file=Params.RELU_SPEC_FILE)
 
     prf_fetcher_model = get_model(
-        config=secure_config_path,
+        config=Params.SECURE_CONFIG_PATH,
         gpu_id=None,
         checkpoint_path=None
     )
@@ -453,18 +444,13 @@ if __name__ == "__main__":
     prf_fetcher_model = securify_mobilenetv2_model(
         prf_fetcher_model,
         build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True),
+        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, dummy_relu=Params.DUMMY_RELU),
         secure_model_class=partial(PRFFetcherSecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
         block_relu=partial(SecureBlockReLUClient, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=relu_spec_file)
+        relu_spec_file=Params.RELU_SPEC_FILE)
 
-    prf_fetcher_model.prf_handler.fetch(repeat=num_images, model=prf_fetcher_model, image=torch.zeros(size=image_shape, dtype=torch.int64))
+    prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=torch.zeros(size=Params.IMAGE_SHAPE, dtype=torch.int64))
 
-    full_inference(model, num_images)
+    full_inference(model, Params.NUM_IMAGES)
 
     network_assets.done()
-    
-# SecureReLUClient Elapsed time: 3.2032 seconds. Total elapsed time: 112.7030 seconds.
-# Integers - fetch Elapsed time: 0.0000 seconds. Total elapsed time: 0.1586 seconds.
-# SecureConv2DClient Elapsed time: 0.0916 seconds. Total elapsed time: 12.8702 seconds.
-# Inference Elapsed time: 125.5989 seconds. Total elapsed time: 125.5989 seconds.

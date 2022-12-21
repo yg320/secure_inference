@@ -10,6 +10,8 @@ from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model
+from research.secure_inference_3pc.params import Params
+
 from functools import partial
 
 class SecureConv2DCryptoProvider(SecureModule):
@@ -181,20 +183,23 @@ class SecureDReLUCryptoProvider(SecureModule):
 
 
 class SecureReLUCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
+    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
         super(SecureReLUCryptoProvider, self).__init__(crypto_assets, network_assets)
 
         self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+        self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
-        # return X_share
-        shape = X_share.shape
-        X_share = X_share.numpy()
-        X_share_np = X_share.astype(self.dtype).flatten()
-        X_share_np = self.DReLU(X_share_np)
-        self.mult(X_share_np.shape)
-        return torch.from_numpy(X_share)
+        if self.dummy_relu:
+            return X_share
+        else:
+            shape = X_share.shape
+            X_share = X_share.numpy()
+            X_share_np = X_share.astype(self.dtype).flatten()
+            X_share_np = self.DReLU(X_share_np)
+            self.mult(X_share_np.shape)
+            return torch.from_numpy(X_share)
 
 
 class SecureBlockReLUCryptoProvider(SecureModule):
@@ -247,8 +252,8 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module):
     )
 
 
-def build_secure_relu(crypto_assets, network_assets):
-    return SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets)
+def build_secure_relu(crypto_assets, network_assets, dummy_relu):
+    return SecureReLUCryptoProvider(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
 
 class SecureModel(SecureModule):
@@ -268,31 +273,25 @@ class SecureModel(SecureModule):
 
 if __name__ == "__main__":
 
-    config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
-    secure_config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
-    model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
-    relu_spec_file = None
-    image_shape = (1, 3, 256, 256)
-    num_images = 50
-
     model = get_model(
-        config=secure_config_path,
+        config=Params.SECURE_CONFIG_PATH,
         gpu_id=None,
         checkpoint_path=None
     )
 
     compile_numba_funcs()
-    crypto_assets, network_assets = get_assets(2, repeat=num_images)
+
+    crypto_assets, network_assets = get_assets(2, repeat=Params.NUM_IMAGES)
 
     model = securify_mobilenetv2_model(
         model,
         build_secure_conv=partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets),
-        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets),
+        build_secure_relu=partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=Params.DUMMY_RELU),
         secure_model_class=partial(SecureModel, crypto_assets=crypto_assets, network_assets=network_assets),
         block_relu=partial(SecureBlockReLUCryptoProvider, crypto_assets=crypto_assets, network_assets=network_assets),
-        relu_spec_file=relu_spec_file)
+        relu_spec_file=Params.RELU_SPEC_FILE)
 
-    for _ in range(num_images):
-        model(image_shape)
+    for _ in range(Params.NUM_IMAGES):
+        out = model(Params.IMAGE_SHAPE)
 
     network_assets.done()

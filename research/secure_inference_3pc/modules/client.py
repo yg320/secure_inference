@@ -100,18 +100,21 @@ class PRFFetcherDReLU(PRFFetcherModule):
 
 
 class PRFFetcherReLU(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
+    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
         super(PRFFetcherReLU, self).__init__(crypto_assets, network_assets)
 
         self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
         self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.dummy_relu = dummy_relu
 
     def forward(self, dummy_tensor):
-        # return dummy_tensor
-        dummy_arr = dummy_tensor.numpy().astype(self.dtype).flatten()
-        self.DReLU(dummy_arr)
-        self.mult(dummy_arr)
-        return dummy_tensor
+        if self.dummy_relu:
+            return dummy_tensor
+        else:
+            dummy_arr = dummy_tensor.numpy().astype(self.dtype).flatten()
+            self.DReLU(dummy_arr)
+            self.mult(dummy_arr)
+            return dummy_tensor
 
 
 class SecureBlockReLUClient(SecureModule):
