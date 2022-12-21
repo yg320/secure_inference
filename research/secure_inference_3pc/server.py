@@ -11,7 +11,7 @@ from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
-from research.secure_inference_3pc.modules.server import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU
+from research.secure_inference_3pc.modules.server import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherBlockReLU
 from functools import partial
 
 class SecureConv2DServer(SecureModule):
@@ -375,7 +375,7 @@ if __name__ == "__main__":
                          build_secure_conv=build_secure_conv,
                          build_secure_relu=build_secure_relu,
                          prf_fetcher_secure_model=PRFFetcherSecureModel,
-                         secure_block_relu=SecureBlockReLUServer,
+                         secure_block_relu=PRFFetcherBlockReLU,
                          crypto_assets=crypto_assets,
                          network_assets=network_assets)
 

@@ -19,7 +19,7 @@ from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
-from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel
+from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel, PRFFetcherBlockReLU
 from research.secure_inference_3pc.params import Params
 
 
@@ -455,7 +455,7 @@ if __name__ == "__main__":
                          build_secure_conv=build_secure_conv,
                          build_secure_relu=build_secure_relu,
                          prf_fetcher_secure_model=PRFFetcherSecureModel,
-                         secure_block_relu=SecureBlockReLUClient,
+                         secure_block_relu=PRFFetcherBlockReLU,
                          crypto_assets=crypto_assets,
                          network_assets=network_assets)
 

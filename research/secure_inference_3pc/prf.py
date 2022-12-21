@@ -24,7 +24,7 @@ class PRFWrapper:
             # with Timer("Integers - fetch"):
             ret = self.queue.get()
             assert ret.shape == tuple(size), f"{ret.shape} , {tuple(size)}"
-            assert ret.dtype == dtype
+            assert ret.dtype == dtype, f"{ret.dtype} , {dtype}"
             return ret
         else:
             return self.prf.integers(low=low, high=high, size=size, dtype=dtype)

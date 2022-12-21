@@ -5,7 +5,7 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 from research.secure_inference_3pc.modules.conv2d import get_output_shape, conv_2d
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P
 from research.secure_inference_3pc.timer import Timer
-from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter
+from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter, DepthToSpace, SpaceToDepth
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
@@ -130,60 +130,37 @@ class PRFFetcherReLU(PRFFetcherModule):
             return dummy_tensor
 
 
-class SecureBlockReLUClient(SecureModule):
+
+class PRFFetcherBlockReLU(PRFFetcherModule):
 
     def __init__(self, crypto_assets, network_assets, block_sizes):
-        super(SecureBlockReLUClient, self).__init__(crypto_assets, network_assets)
+        super(PRFFetcherBlockReLU, self).__init__(crypto_assets, network_assets)
         self.block_sizes = np.array(block_sizes)
-        self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
+        self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
+        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
 
         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if
                                    0 not in block_size]
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
-    def forward(self, activation):
-        # activation_server = network_assets.receiver_01.get()
-
-        activation = activation.numpy()
-        # desired_out = BlockReLU_V1(self.block_sizes)(activation + activation_server)
-        assert activation.dtype == self.signed_type
-        reshaped_inputs = []
+    def forward(self, dummy_tensor):
+        dummy_arr = dummy_tensor.numpy()
         mean_tensors = []
-        channels = []
-        orig_shapes = []
 
         for block_size in self.active_block_sizes:
             cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
-            cur_input = activation[:, cur_channels]
-            # reshaped_input[0,1,38,31]
+            cur_input = dummy_arr[:, cur_channels]
             reshaped_input = SpaceToDepth(block_size)(cur_input)
-            assert reshaped_input.dtype == self.signed_type
             mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
 
-            channels.append(cur_channels)
-            reshaped_inputs.append(reshaped_input)
-            orig_shapes.append(mean_tensor.shape)
             mean_tensors.append(mean_tensor.flatten())
 
-        cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = np.concatenate(mean_tensors)
-        assert mean_tensors.dtype == self.signed_type
-        activation = activation.astype(self.dtype)
-        sign_tensors = self.DReLU(mean_tensors.astype(self.dtype))
 
-        relu_map = np.ones_like(activation)
-        for i in range(len(self.active_block_sizes)):
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
-            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(
-                sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
+        self.DReLU(mean_tensors.astype(self.dtype))
+        self.mult(dummy_arr[:, ~self.is_identity_channels].astype(self.dtype))
 
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
-                                                              activation[:, ~self.is_identity_channels])
-        activation = activation.astype(self.signed_type)
-        # real_out = network_assets.receiver_01.get() + activation
-        # assert np.all(real_out == desired_out.numpy())
-        return torch.from_numpy(activation)
+        return dummy_tensor
 
 
 class PRFFetcherSecureModel(SecureModule):

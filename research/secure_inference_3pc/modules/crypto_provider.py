@@ -5,7 +5,7 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 from research.secure_inference_3pc.modules.conv2d import get_output_shape, conv_2d
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P
 from research.secure_inference_3pc.timer import Timer
-from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter
+from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter, SpaceToDepth
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
@@ -121,6 +121,36 @@ class PRFFetcherReLU(PRFFetcherModule):
             return dummy_tensor
 
 
+class PRFFetcherBlockReLU(PRFFetcherModule):
+
+    def __init__(self, crypto_assets, network_assets, block_sizes):
+        super(PRFFetcherBlockReLU, self).__init__(crypto_assets, network_assets)
+        self.block_sizes = np.array(block_sizes)
+        self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
+        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+
+        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if
+                                   0 not in block_size]
+        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+
+    def forward(self, dummy_tensor):
+        dummy_arr = dummy_tensor.numpy()
+        mean_tensors = []
+
+        for block_size in self.active_block_sizes:
+            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
+            cur_input = dummy_arr[:, cur_channels]
+            reshaped_input = SpaceToDepth(block_size)(cur_input)
+            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
+
+            mean_tensors.append(mean_tensor.flatten())
+
+        mean_tensors = np.concatenate(mean_tensors)
+
+        self.DReLU(mean_tensors.astype(self.dtype))
+        self.mult(dummy_arr[:, ~self.is_identity_channels].astype(self.dtype))
+
+        return dummy_tensor
 
 class PRFFetcherSecureModel(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
