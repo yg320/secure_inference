@@ -35,7 +35,7 @@ dataset = build_dataset(cfg)
 device = "cuda:0"
 model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
 results = []
-for sample_id in tqdm(range(10)):
+for sample_id in tqdm(range(20)):
     img = dataset[sample_id]['img'].data.unsqueeze(0)[:,:,:256,:256]
     img_meta = dataset[sample_id]['img_metas'].data
 

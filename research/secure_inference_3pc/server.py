@@ -61,8 +61,10 @@ class SecureConv2DServer(SecureModule):
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
 
         out = out_numpy + C_share
-
         out = out // self.trunc
+        # This is the proper way, but it's slower and takes more time
+        # t = out.dtype
+        # out = (out / self.trunc).round().astype(t)
         if self.bias is not None:
             out = out + self.bias
 

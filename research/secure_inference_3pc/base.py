@@ -6,6 +6,7 @@ import time
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from numba import njit, prange
+from research.secure_inference_3pc.const import TRUNC
 num_bit_to_dtype = {
     8: np.ubyte,
     16: np.ushort,
@@ -26,12 +27,12 @@ num_bit_to_torch_dtype = {
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13754
-        self.port_10 = 13755
-        self.port_02 = 13756
-        self.port_20 = 13757
-        self.port_12 = 13758
-        self.port_21 = 13759
+        self.port_01 = 13764
+        self.port_10 = 13765
+        self.port_02 = 13766
+        self.port_20 = 13767
+        self.port_12 = 13768
+        self.port_21 = 13769
 
 
 class NetworkAssets:
@@ -132,7 +133,7 @@ def get_assets(party, repeat, simulated_bandwidth=None):
 
 
 NUM_BITS = 64
-TRUNC = 10000
+
 dtype = num_bit_to_dtype[NUM_BITS]
 powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis][:,::-1]
 moduli = (2 ** powers)
@@ -146,14 +147,6 @@ org_shit = (np.arange(min_org_shit, max_org_shit + 1) % P).astype(np.uint8)
 def module_67(xxx):
     return org_shit[xxx.reshape(-1) - min_org_shit].reshape(xxx.shape)
 
-#     orig_shape = list(value.shape)
-#     value = value.reshape(-1, 1)
-#     r_shift = value >> powers
-#
-#     value_bits = np.zeros(shape=(value.shape[0], 64), dtype=np.int8)
-#     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
-#     return value_bits.reshape(orig_shape + [NUM_BITS])
-
 def decompose(value, out=None, out_mask=None):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
@@ -162,21 +155,6 @@ def decompose(value, out=None, out_mask=None):
     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
     return value_bits.reshape(orig_shape + [NUM_BITS])
 
-#
-
-# def decompose(value):
-#     orig_shape = list(value.shape)
-#     value = value.reshape(-1, value.shape[3])
-#     value_bits = decompose_(value)
-#     return value_bits.reshape(orig_shape + [NUM_BITS])
-#
-# @njit(parallel=True)
-# def decompose_(value):
-#     out = np.zeros(shape=(value.shape[0], value.shape[1], 64), dtype=np.uint8)
-#     for i in range(value.shape[0]):
-#         for j in range(value.shape[1]):
-#             out[i,j] = (value[i,j] & moduli) >> powers
-#     return out
 def sub_mode_p(x, y):
     mask = y > x
     ret = x - y
@@ -184,33 +162,7 @@ def sub_mode_p(x, y):
     ret[mask] = ret_2[mask]
     return ret
 
-# class CryptoAssets:
-#     def __init__(self, prf_01_numpy, prf_02_numpy, prf_12_numpy, prf_01_torch, prf_02_torch, prf_12_torch):
-#
-#         self.prf_12_torch = prf_12_torch
-#         self.prf_02_torch = prf_02_torch
-#         self.prf_01_torch = prf_01_torch
-#         self.prf_12_numpy = prf_12_numpy
-#         self.prf_02_numpy = prf_02_numpy
-#         self.prf_01_numpy = prf_01_numpy
-#
-#         self.private_prf_numpy = np.random.default_rng(seed=31243)
-#         self.private_prf_torch = torch.Generator().manual_seed(31243)
-#
-#         self.numpy_dtype = num_bit_to_dtype[NUM_BITS]
-#         self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
-#         self.trunc = TRUNC
-#
-#         self.numpy_max_val = np.iinfo(self.numpy_dtype).max
-#     def get_random_tensor_over_L(self, shape, prf):
-#         return torch.randint(
-#             low=torch.iinfo(self.torch_dtype).min // 2,
-#             high=torch.iinfo(self.torch_dtype).max // 2 + 1,
-#             size=shape,
-#             dtype=self.torch_dtype,
-#             generator=prf
-#         )
-#
+
 
 
 class SecureModule(torch.nn.Module):
@@ -407,7 +359,7 @@ class TypeConverter:
 
     @staticmethod
     def f2i(data):
-        return (data * TypeConverter.trunc).to(TypeConverter.int_dtype)
+        return (data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)
 
     @staticmethod
     def i2f(data):

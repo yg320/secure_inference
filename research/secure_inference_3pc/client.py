@@ -62,6 +62,9 @@ class SecureConv2DClient(SecureModule):
         out_numpy = out_numpy + C_share
 
         out = out_numpy // self.trunc
+        # This is the proper way, but it's slower and takes more time
+        # t = out_numpy.dtype
+        # out = (out_numpy / self.trunc).round().astype(t)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out.shape, dtype=out.dtype)
 
         return torch.from_numpy(out + mu_0)
