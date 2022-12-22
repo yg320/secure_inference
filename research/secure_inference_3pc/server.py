@@ -242,9 +242,10 @@ class SecureReLUServer(SecureModule):
 
 class SecureBlockReLUServer(SecureModule):
 
-    def __init__(self, crypto_assets, network_assets, block_sizes):
+    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu):
         super(SecureBlockReLUServer, self).__init__(crypto_assets, network_assets)
         self.block_sizes = np.array(block_sizes)
+        self.dummy_relu = dummy_relu
         self.DReLU = SecureDReLUServer(crypto_assets, network_assets)
         self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
 
@@ -253,6 +254,10 @@ class SecureBlockReLUServer(SecureModule):
 
     def forward(self, activation):
         activation = activation.numpy()
+
+        if self.dummy_relu:
+            activation_client = self.network_assets.receiver_01.get()
+            activation = activation + activation_client
         assert activation.dtype == self.signed_type
 
         reshaped_inputs = []
@@ -278,16 +283,22 @@ class SecureBlockReLUServer(SecureModule):
         mean_tensors = np.concatenate(mean_tensors)
         assert mean_tensors.dtype == self.signed_type
 
-        activation = activation.astype(self.dtype)
-        sign_tensors = self.DReLU(mean_tensors.astype(self.dtype))
+        if self.dummy_relu:
+            sign_tensors = (mean_tensors > 0).astype(mean_tensors.dtype)
+        else:
+            activation = activation.astype(self.dtype)
+            sign_tensors = self.DReLU(mean_tensors.astype(self.dtype))
 
         relu_map = np.ones_like(activation)
         for i in range(len(self.active_block_sizes)):
             sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i+1])].reshape(orig_shapes[i])
             relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
 
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
-        activation = activation.astype(self.signed_type)
+        if self.dummy_relu:
+            activation[:, ~self.is_identity_channels] = relu_map[:, ~self.is_identity_channels] * activation[:, ~self.is_identity_channels]
+        else:
+            activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
+            activation = activation.astype(self.signed_type)
 
         return torch.from_numpy(activation)
 

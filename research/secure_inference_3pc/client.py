@@ -268,9 +268,10 @@ class SecureReLUClient(SecureModule):
 
 class SecureBlockReLUClient(SecureModule):
 
-    def __init__(self, crypto_assets, network_assets, block_sizes):
+    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
         super(SecureBlockReLUClient, self).__init__(crypto_assets, network_assets)
         self.block_sizes = np.array(block_sizes)
+        self.dummy_relu = dummy_relu
         self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
@@ -279,6 +280,9 @@ class SecureBlockReLUClient(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
+        if self.dummy_relu:
+            network_assets.sender_01.put(activation)
+            return torch.zeros_like(activation)
 
         activation = activation.numpy()
         assert activation.dtype == self.signed_type
@@ -426,13 +430,13 @@ def full_inference(model, num_images):
                 label_map=dict(),
                 reduce_zero_label=dataset.reduce_zero_label)
         )
-
-    print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+        if sample_id % 10 == 0:
+            print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
 
 
 if __name__ == "__main__":
     party = 0
-
+    assert (Params.RELU_SPEC_FILE is None) or (Params.DUMMY_RELU is False)
     model = get_model(
         config=Params.SECURE_CONFIG_PATH,
         gpu_id=None,

@@ -123,9 +123,11 @@ class PRFFetcherReLU(PRFFetcherModule):
 
 class PRFFetcherBlockReLU(PRFFetcherModule):
 
-    def __init__(self, crypto_assets, network_assets, block_sizes):
+    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
         super(PRFFetcherBlockReLU, self).__init__(crypto_assets, network_assets)
         self.block_sizes = np.array(block_sizes)
+        self.dummy_relu = dummy_relu
+
         self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
         self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
 
@@ -134,6 +136,8 @@ class PRFFetcherBlockReLU(PRFFetcherModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, dummy_tensor):
+        if self.dummy_relu:
+            return dummy_tensor
         dummy_arr = dummy_tensor.numpy()
         mean_tensors = []
 

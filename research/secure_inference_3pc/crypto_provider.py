@@ -205,9 +205,11 @@ class SecureReLUCryptoProvider(SecureModule):
 
 class SecureBlockReLUCryptoProvider(SecureModule):
 
-    def __init__(self, crypto_assets, network_assets, block_sizes):
+    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
         super(SecureBlockReLUCryptoProvider, self).__init__(crypto_assets, network_assets)
         self.block_sizes = np.array(block_sizes)
+        self.dummy_relu = dummy_relu
+
         self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
@@ -215,6 +217,8 @@ class SecureBlockReLUCryptoProvider(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
+        if self.dummy_relu:
+            return activation
 
         activation = activation.numpy()
         assert activation.dtype == self.signed_type
