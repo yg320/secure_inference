@@ -3,7 +3,7 @@ import torch
 
 from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureModule
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS, NUM_OF_COMPARE_BITS
 from research.secure_inference_3pc.timer import Timer
 from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter, SpaceToDepth
 
@@ -34,7 +34,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_0):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[x_bits_0.shape[0]] + [NUM_BITS], dtype=np.int32)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=np.int32)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):

@@ -228,7 +228,6 @@ class SecureReLUServer(SecureModule):
         else:
 
             shape = X_share.shape
-            X_share = X_share.numpy()
             dtype = X_share.dtype
             mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
 
@@ -236,7 +235,7 @@ class SecureReLUServer(SecureModule):
             MSB_0 = self.DReLU(X_share)
             relu_0 = self.mult(X_share, MSB_0).reshape(shape)
             ret = relu_0.astype(SIGNED_DTYPE)
-            return torch.from_numpy(ret + mu_1)
+            return ret + mu_1
 
 
 class SecureBlockReLUServer(SecureModule):

@@ -3,7 +3,7 @@ import torch
 
 from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureModule
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS, NUM_OF_COMPARE_BITS
 from research.secure_inference_3pc.timer import Timer
 from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter, DepthToSpace, SpaceToDepth
 
@@ -33,7 +33,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_0):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[x_bits_0.shape[0]] + [NUM_BITS], dtype=np.int32)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=np.int32)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
@@ -47,7 +47,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.prf_handler[CLIENT, SERVER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
         self.prf_handler[CLIENT, SERVER].integers_fetch(self.min_val, self.max_val, size=dummy_tensor.shape, dtype=self.dtype)
 
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
 
         self.private_compare(dummy_tensor)
 
@@ -79,7 +79,7 @@ class PRFFetcherMSB(PRFFetcherModule):
     def forward(self, dummy_tensor):
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
         self.prf_handler[CLIENT, SERVER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=dummy_tensor.dtype)
 
         self.private_compare(dummy_tensor)

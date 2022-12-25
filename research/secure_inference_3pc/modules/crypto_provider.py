@@ -3,7 +3,7 @@ import torch
 
 from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureModule
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS, NUM_OF_COMPARE_BITS
 from research.secure_inference_3pc.timer import Timer
 from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter, SpaceToDepth
 
@@ -44,7 +44,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
 
     def forward(self, dummy_tensor):
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=dummy_tensor.shape, dtype=self.dtype)
 
         self.private_compare(dummy_tensor)
@@ -77,7 +77,7 @@ class PRFFetcherMSB(PRFFetcherModule):
         size = dummy_tensor.shape
         
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=size, dtype=self.dtype)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=size, dtype=self.dtype)
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=size,dtype=self.dtype)
         self.private_compare(dummy_tensor)

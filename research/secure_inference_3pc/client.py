@@ -7,7 +7,7 @@ from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
 from functools import partial
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS
 from mmseg.ops import resize
 from mmseg.datasets import build_dataset
 
@@ -118,7 +118,7 @@ class ShareConvertClient(SecureModule):
         beta_0 = (a_tild_0 < a_0).astype(self.dtype)
         self.network_assets.sender_02.put(a_tild_0)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_BITS], dtype=np.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
@@ -188,7 +188,7 @@ class SecureMSBClient(SecureModule):
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_BITS], dtype=np.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=a_0.dtype)
 
         x_0 = self.network_assets.receiver_02.get()
@@ -251,7 +251,6 @@ class SecureReLUClient(SecureModule):
         else:
 
             shape = X_share.shape
-            # X_share = X_share.numpy()
             dtype = X_share.dtype
             mu_0 = self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
 

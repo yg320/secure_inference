@@ -6,17 +6,17 @@ import time
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from numba import njit, prange
-from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE
+from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE, NUM_OF_COMPARE_BITS
 
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13404
-        self.port_10 = 13405
-        self.port_02 = 13406
-        self.port_20 = 13407
-        self.port_12 = 13408
-        self.port_21 = 13409
+        self.port_01 = 13514
+        self.port_10 = 13515
+        self.port_02 = 13516
+        self.port_20 = 13517
+        self.port_12 = 13518
+        self.port_21 = 13519
 
 
 class NetworkAssets:
@@ -130,10 +130,11 @@ def module_67(xxx):
 def decompose(value, out=None, out_mask=None):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
-    r_shift = value >> powers
-    value_bits = np.zeros(shape=(value.shape[0], NUM_BITS), dtype=np.int8)
+    r_shift = value >> powers[:,NUM_BITS - NUM_OF_COMPARE_BITS:]
+    value_bits = np.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=np.int8)
     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
-    return value_bits.reshape(orig_shape + [NUM_BITS])
+    ret =  value_bits.reshape(orig_shape + [NUM_OF_COMPARE_BITS])
+    return ret
 
 def sub_mode_p(x, y):
     mask = y > x
