@@ -70,7 +70,7 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
 
     decoder.conv_seg = build_secure_conv(conv_module=decoder.conv_seg, bn_module=None)
     def foo(x):
-        return x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])  # TODO: is this the best way to do this?
+        return (x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])).astype(x.dtype)  # TODO: is this the best way to do this?)
     decoder.image_pool[0].forward = foo
 
 

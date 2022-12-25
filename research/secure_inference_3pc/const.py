@@ -7,12 +7,12 @@ SERVER = 1
 CRYPTO_PROVIDER = 2
 P = 67
 NUM_BITS = 64
-TRUNC = 500000
+TRUNC = 256
 
-UNSIGNED_DTYPE = np.ulonglong
-SIGNED_DTYPE = np.int64
-TORCH_DTYPE = torch.int64
+UNSIGNED_DTYPE = {32: np.uint32, 64: np.uint64}[NUM_BITS]
+SIGNED_DTYPE = {32: np.int32, 64: np.int64}[NUM_BITS]
+TORCH_DTYPE = {32: torch.int32, 64: torch.int64}[NUM_BITS]
 
-MIN_VAL = np.iinfo(np.int64).min
-MAX_VAL = np.iinfo(np.int64).max
+MIN_VAL = np.iinfo(SIGNED_DTYPE).min
+MAX_VAL = np.iinfo(SIGNED_DTYPE).max
 

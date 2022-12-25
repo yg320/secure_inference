@@ -222,9 +222,9 @@ class SecureReLUServer(SecureModule):
     def forward(self, X_share):
         if self.dummy_relu:
             share_client = self.network_assets.receiver_01.get()
-            value = share_client + X_share.numpy()
+            value = share_client + X_share
             value = value * ((value > 0).astype(value.dtype))
-            return torch.from_numpy(value)
+            return value
         else:
 
             shape = X_share.shape

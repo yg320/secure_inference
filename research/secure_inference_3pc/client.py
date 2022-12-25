@@ -247,7 +247,7 @@ class SecureReLUClient(SecureModule):
     def forward_(self, X_share):
         if self.dummy_relu:
             network_assets.sender_01.put(X_share)
-            return torch.zeros_like(X_share)
+            return np.zeros_like(X_share)
         else:
 
             shape = X_share.shape
