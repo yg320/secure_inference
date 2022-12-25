@@ -7,11 +7,12 @@ import torch
 import queue
 import numpy as np
 
+NUMPY_ARR_QUEUE_SIZE = 50
 
 class Receiver(Thread):
     def __init__(self, port):
         super(Receiver, self).__init__()
-        self.numpy_arr_queue = queue.Queue()
+        self.numpy_arr_queue = queue.Queue(maxsize=NUMPY_ARR_QUEUE_SIZE)
         self.port = port
 
         self.lock = threading.Lock()

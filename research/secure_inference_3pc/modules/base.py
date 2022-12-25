@@ -12,13 +12,11 @@ class SecureModule(torch.nn.Module):
         self.network_assets = network_assets
 
         self.trunc = TRUNC
-        self.torch_dtype = torch.int64
         self.dtype = np.ulonglong
 
         self.min_val = np.iinfo(self.dtype).min
         self.max_val = np.iinfo(self.dtype).max
         self.L_minus_1 = 2 ** NUM_BITS - 1
-        self.signed_type = np.int64
 
     def add_mode_L_minus_one(self, a, b):
         ret = a + b

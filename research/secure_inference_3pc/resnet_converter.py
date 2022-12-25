@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+from research.secure_inference_3pc.const import SIGNED_DTYPE
 import pickle
 from research.distortion.utils import ArchUtilsFactory
 from functools import partial
@@ -67,7 +69,9 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
     convert_conv_module(decoder.bottleneck, build_secure_conv, build_secure_relu)
 
     decoder.conv_seg = build_secure_conv(conv_module=decoder.conv_seg, bn_module=None)
-    decoder.image_pool[0].forward = lambda x: x.sum(dim=[2, 3], keepdims=True) // (x.shape[2] * x.shape[3])
+    def foo(x):
+        return x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])  # TODO: is this the best way to do this?
+    decoder.image_pool[0].forward = foo
 
 
 def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
@@ -115,4 +119,4 @@ def init_prf_fetcher(Params, build_secure_conv, build_secure_relu, prf_fetcher_s
         dummy_relu=Params.DUMMY_RELU
     )
 
-    prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=torch.zeros(size=Params.IMAGE_SHAPE, dtype=torch.int64))
+    prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))

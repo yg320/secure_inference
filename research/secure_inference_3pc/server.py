@@ -6,7 +6,7 @@ from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 
 from research.distortion.utils import get_model
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
@@ -18,10 +18,10 @@ class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W.numpy()
+        self.W_share = W
         self.bias = bias
         if self.bias is not None:
-            self.bias = self.bias.unsqueeze(0).unsqueeze(2).unsqueeze(3).numpy()
+            self.bias = self.bias[np.newaxis, :, np.newaxis, np.newaxis]
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
@@ -29,15 +29,14 @@ class SecureConv2DServer(SecureModule):
 
     def forward(self, X_share):
 
-        X_share = X_share.numpy()
-        assert X_share.dtype == self.signed_type
+        assert X_share.dtype == SIGNED_DTYPE
 
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
         assert self.stride[0] == self.stride[1]
 
-        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=X_share.shape, dtype=np.int64)
-        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=self.W_share.shape, dtype=np.int64)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
 
         E_share = X_share - A_share
         F_share = self.W_share - B_share
@@ -58,7 +57,7 @@ class SecureConv2DServer(SecureModule):
         out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
 
-        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out_numpy.shape, dtype=np.int64)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out_numpy.shape, dtype=SIGNED_DTYPE)
 
         out = out_numpy + C_share
         out = out // self.trunc
@@ -68,8 +67,8 @@ class SecureConv2DServer(SecureModule):
         if self.bias is not None:
             out = out + self.bias
 
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(np.int64).min, np.iinfo(np.int64).max, size=out.shape, dtype=out.dtype)
-        return torch.from_numpy(out + mu_1)
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=out.dtype)
+        return out + mu_1
 
 
 class PrivateCompareServer(SecureModule):
@@ -236,7 +235,7 @@ class SecureReLUServer(SecureModule):
             X_share = X_share.astype(self.dtype).flatten()
             MSB_0 = self.DReLU(X_share)
             relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-            ret = relu_0.astype(self.signed_type)
+            ret = relu_0.astype(SIGNED_DTYPE)
             return torch.from_numpy(ret + mu_1)
 
 
@@ -253,12 +252,11 @@ class SecureBlockReLUServer(SecureModule):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
     def forward(self, activation):
-        activation = activation.numpy()
 
         if self.dummy_relu:
             activation_client = self.network_assets.receiver_01.get()
             activation = activation + activation_client
-        assert activation.dtype == self.signed_type
+        assert activation.dtype == SIGNED_DTYPE
 
         reshaped_inputs = []
         mean_tensors = []
@@ -271,7 +269,7 @@ class SecureBlockReLUServer(SecureModule):
             cur_input = activation[:, cur_channels]
 
             reshaped_input = SpaceToDepth(block_size)(cur_input)
-            assert reshaped_input.dtype == self.signed_type
+            assert reshaped_input.dtype == SIGNED_DTYPE
             mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
 
             channels.append(cur_channels)
@@ -281,7 +279,7 @@ class SecureBlockReLUServer(SecureModule):
 
         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = np.concatenate(mean_tensors)
-        assert mean_tensors.dtype == self.signed_type
+        assert mean_tensors.dtype == SIGNED_DTYPE
 
         if self.dummy_relu:
             sign_tensors = (mean_tensors > 0).astype(mean_tensors.dtype)
@@ -298,15 +296,13 @@ class SecureBlockReLUServer(SecureModule):
             activation[:, ~self.is_identity_channels] = relu_map[:, ~self.is_identity_channels] * activation[:, ~self.is_identity_channels]
         else:
             activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
-            activation = activation.astype(self.signed_type)
+            activation = activation.astype(SIGNED_DTYPE)
 
-        return torch.from_numpy(activation)
+        return activation
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DServer
-
-    dtype = np.int64
 
     if bn_module:
         W, B = fuse_conv_bn(conv_module=conv_module, batch_norm_module=bn_module)
@@ -318,13 +314,13 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         W = TypeConverter.f2i(W)
         B = None
     if is_prf_fetcher:
-        W_client = np.zeros(shape=conv_module.weight.shape, dtype=np.int64)
+        W_client = np.zeros(shape=conv_module.weight.shape, dtype=SIGNED_DTYPE)
 
     else:
-        W_client = torch.from_numpy(crypto_assets[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
-                                               high=np.iinfo(dtype).max // 2,
-                                               size=conv_module.weight.shape,
-                                               dtype=dtype))
+        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL // 2,
+                                                          high=MAX_VAL // 2,
+                                                          size=conv_module.weight.shape,
+                                                          dtype=SIGNED_DTYPE)
     W = W - W_client
     return conv_class(
         W=W,
@@ -350,12 +346,11 @@ class SecureModel(SecureModule):
         self.model = model
 
     def forward(self, image_shape):
-        dtype = np.int64
 
-        image = torch.from_numpy(self.prf_handler[CLIENT, SERVER].integers(low=np.iinfo(dtype).min // 2,
-                                                                        high=np.iinfo(dtype).max // 2,
-                                                                               size=image_shape,
-                                                                               dtype=dtype))
+        image = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL // 2,
+                                                          high=MAX_VAL // 2,
+                                                          size=image_shape,
+                                                          dtype=SIGNED_DTYPE)
         out = self.model.decode_head(self.model.backbone(image))
         self.network_assets.sender_01.put(out)
 

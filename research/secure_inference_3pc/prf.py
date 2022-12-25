@@ -33,13 +33,6 @@ class PRFWrapper:
         out = self.non_threaded_prf.permutation(x=data, axis=axis)
         return out
 
-    # def get_random_tensor_over_L(self, shape):
-    #     dtype = np.int64
-    #     rand = self.integers(low=np.iinfo(dtype).min // 2,
-    #                          high=np.iinfo(dtype).max // 2,
-    #                          size=shape,
-    #                          dtype=dtype)
-    #     return torch.from_numpy(rand)
 
 
 class MultiPartyPRFHandler(Thread):

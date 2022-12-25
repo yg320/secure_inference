@@ -58,8 +58,7 @@ class BlockReLU_V1(nn.Module):
         is_normal_inference = type(activation) == torch.Tensor
         if is_normal_inference:
             activation = activation.detach().numpy()
-        # else:
-        #     assert activation.dtype == np.int64
+
 
         reshaped_inputs = []
         mean_tensors = []
@@ -122,15 +121,3 @@ if __name__ == "__main__":
 
     out_numpy = br_1(activation_numpy_float)#.to(torch.float32) #/ 10000
     out_torch = br_1(activation_torch)
-
-    print((out_numpy - out_torch).abs().max())
-
-    print("dsa")
-    # br_0 = BlockRelu(block_sizes['stem_2'])
-    #
-    # out_0 = br_0(x)
-    # out_1 = br_1((x*10000).to(torch.int64)).to(torch.float64) / 10000
-    #
-    # print((out_0 - out_1).abs().max())
-    #
-    # print("fds")

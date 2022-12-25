@@ -6,33 +6,17 @@ import time
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from numba import njit, prange
-from research.secure_inference_3pc.const import TRUNC
-num_bit_to_dtype = {
-    8: np.ubyte,
-    16: np.ushort,
-    32: np.uintc,
-    64: np.ulonglong
-}
-
-num_bit_to_sign_dtype = {
-    32: np.int32,
-    64: np.int64
-}
-
-num_bit_to_torch_dtype = {
-    32: torch.int32,
-    64: torch.int64
-}
+from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE
 
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13854
-        self.port_10 = 13855
-        self.port_02 = 13856
-        self.port_20 = 13857
-        self.port_12 = 13858
-        self.port_21 = 13859
+        self.port_01 = 13354
+        self.port_10 = 13355
+        self.port_02 = 13356
+        self.port_20 = 13357
+        self.port_12 = 13358
+        self.port_21 = 13359
 
 
 class NetworkAssets:
@@ -132,12 +116,8 @@ def get_assets(party, repeat, simulated_bandwidth=None):
     return crypto_assets, network_assets
 
 
-NUM_BITS = 64
-
-dtype = num_bit_to_dtype[NUM_BITS]
-powers = np.arange(NUM_BITS, dtype=num_bit_to_dtype[NUM_BITS])[np.newaxis][:,::-1]
+powers = np.arange(NUM_BITS, dtype=UNSIGNED_DTYPE)[np.newaxis][:,::-1]
 moduli = (2 ** powers)
-P = 67
 
 min_org_shit = -283206
 max_org_shit = 287469
@@ -151,7 +131,7 @@ def decompose(value, out=None, out_mask=None):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
     r_shift = value >> powers
-    value_bits = np.zeros(shape=(value.shape[0], 64), dtype=np.int8)
+    value_bits = np.zeros(shape=(value.shape[0], NUM_BITS), dtype=np.int8)
     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
     return value_bits.reshape(orig_shape + [NUM_BITS])
 
@@ -174,13 +154,12 @@ class SecureModule(torch.nn.Module):
         self.network_assets = network_assets
 
         self.trunc = TRUNC
-        self.torch_dtype = num_bit_to_torch_dtype[NUM_BITS]
-        self.dtype = num_bit_to_dtype[NUM_BITS]
+
+        self.dtype = UNSIGNED_DTYPE
 
         self.min_val = np.iinfo(self.dtype).min
         self.max_val = np.iinfo(self.dtype).max
         self.L_minus_1 = 2 ** NUM_BITS - 1
-        self.signed_type = num_bit_to_sign_dtype[NUM_BITS]
 
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
@@ -261,59 +240,17 @@ def fuse_conv_bn(conv_module, batch_norm_module):
 
 
 def get_c(x_bits, multiplexer_bits, beta, j):
-    t0 = time.time()
     beta = beta[..., np.newaxis]
-    t1 = time.time()
-
-    # multiplexer_bits = r_bits * (1 - beta) + t_bits * beta
-    t2 = time.time()
     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
-    t3 = time.time()
     w_cumsum = w.astype(np.int32)
-    t4 = time.time()
     np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
     np.subtract(w_cumsum, w, out=w_cumsum)
     rrr = w_cumsum
-    # rrr = w.cumsum(axis=-1) - w
-    t5 = time.time()
     zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
-    t6 = time.time()
     ret = rrr + zzz.astype(np.int32)
-    t7 = time.time()
-    # if j == 1:
-    #     print("**************************************")
-    #     print("get_c ", t1 - t0)
-    #     print("get_c ", t2 - t1)
-    #     print("get_c ", t3 - t2)
-    #     print("get_c ", t4 - t3)
-    #     print("get_c ", t5 - t4)
-    #     print("get_c ", t6 - t5)
-    #     print("get_c ", t7 - t6)
-    #     print("**************************************")
 
     return ret
 
-# def get_c_case_0(x_bits, r_bits, j):
-#     x_bits = x_bits.astype(np.int32)
-#     r_bits = r_bits.astype(np.int32)
-#     j = j.astype(np.int32)
-#
-#     w = x_bits + j * r_bits - 2 * r_bits * x_bits
-#     rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
-#     zzz = j + j * r_bits  - x_bits
-#     return ((rrr + zzz) % P).astype(np.uint64)
-#
-#
-# def get_c_case_1(x_bits, t_bits, j):
-#     x_bits = x_bits.astype(np.int32)
-#     t_bits = t_bits.astype(np.int32)
-#     j = j.astype(np.int32)
-#
-#     w = x_bits + j * t_bits - 2 * t_bits * x_bits
-#     rrr = w[..., ::-1].cumsum(axis=-1)[..., ::-1] - w
-#     zzz = j - j * t_bits + x_bits
-#
-#     return (zzz+rrr) % P
 
 def get_c_case_2(u, j):
     c = (P + 1 - j) * (u + 1) + (P-j) * u
@@ -354,13 +291,15 @@ class SpaceToDepth(nn.Module):
 
 class TypeConverter:
     trunc = TRUNC
-    int_dtype = torch.int64
+    int_dtype = TORCH_DTYPE
     float_dtype = torch.float32
 
     @staticmethod
     def f2i(data):
-        return (data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)
-
+        if type(data) in [torch.Tensor, torch.nn.Parameter]:
+            return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
+        else:
+            return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
     @staticmethod
     def i2f(data):
-        return data.to(TypeConverter.float_dtype) / TypeConverter.trunc
+        return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc

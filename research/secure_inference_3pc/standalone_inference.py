@@ -12,9 +12,12 @@ from mmseg.core import intersect_and_union
 import torch
 from tqdm import tqdm
 from mmseg.datasets import build_dataset
+import pickle
+from research.distortion.utils import ArchUtilsFactory
 
 config_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py"
-model_path = "/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
+model_path = "/home/yakir/trained_models/baseline.pth"
+relu_spec_file = None #"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.25.pickle"
 
 cfg = {'type': 'ADE20KDataset',
        'data_root': 'data/ade/ADEChallengeData2016',
@@ -33,9 +36,15 @@ cfg = {'type': 'ADE20KDataset',
 dataset = build_dataset(cfg)
 # TODO: use shared class with distortion
 device = "cuda:0"
-model_baseline = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
+model = get_model(config=config_path, gpu_id=None, checkpoint_path=model_path)
+
+if relu_spec_file is not None:
+    layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+    arch_utils = ArchUtilsFactory()("MobileNetV2")
+    arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
+
 results = []
-for sample_id in tqdm(range(20)):
+for sample_id in tqdm(range(2000)):
     img = dataset[sample_id]['img'].data.unsqueeze(0)[:,:,:256,:256]
     img_meta = dataset[sample_id]['img_metas'].data
 
@@ -44,7 +53,7 @@ for sample_id in tqdm(range(20)):
     seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
     seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
     img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
-    out = model_baseline.decode_head(model_baseline.backbone(img)).to("cpu")
+    out = model.decode_head(model.backbone(img)).to("cpu")
 
     out = resize(
         input=out,
@@ -76,5 +85,5 @@ for sample_id in tqdm(range(20)):
             label_map=dict(),
             reduce_zero_label=dataset.reduce_zero_label)
     )
-
-print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+    if sample_id % 10 == 0:
+        print(dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
