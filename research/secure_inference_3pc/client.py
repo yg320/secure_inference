@@ -326,8 +326,8 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
     if is_prf_fetcher:
         W = np.zeros(shape=conv_module.weight.shape, dtype=SIGNED_DTYPE)
     else:
-        W = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL // 2,
-                                                   high=MAX_VAL // 2,
+        W = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                   high=MAX_VAL,
                                                    size=conv_module.weight.shape,
                                                    dtype=SIGNED_DTYPE)
 
@@ -355,7 +355,7 @@ class SecureModel(SecureModule):
     def forward(self, img, img_meta):
 
         I = TypeConverter.f2i(img)
-        I1 = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL // 2, high=MAX_VAL // 2, dtype=SIGNED_DTYPE, size=img.shape)
+        I1 = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
         I0 = I - I1
         out_0 = self.model.decode_head(self.model.backbone(I0))
         out_1 = self.network_assets.receiver_01.get()

@@ -269,8 +269,8 @@ class SecureModel(SecureModule):
 
     def forward(self, image_shape):
 
-        dummy_image = self.prf_handler[CRYPTO_PROVIDER].integers(low=MIN_VAL // 2,
-                                                                 high=MAX_VAL // 2,
+        dummy_image = self.prf_handler[CRYPTO_PROVIDER].integers(low=MIN_VAL,
+                                                                 high=MAX_VAL,
                                                                  size=image_shape,
                                                                  dtype=SIGNED_DTYPE)
         _ = self.model.decode_head(self.model.backbone(dummy_image))

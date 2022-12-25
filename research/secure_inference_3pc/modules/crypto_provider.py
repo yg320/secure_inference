@@ -161,7 +161,7 @@ class PRFFetcherSecureModel(SecureModule):
         self.model = model
 
     def forward(self, img):
-        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(low=MIN_VAL // 2, high=MAX_VAL // 2, size=img.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=img.shape, dtype=SIGNED_DTYPE)
         out_0 = self.model.decode_head(self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
 
 

@@ -316,8 +316,8 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         W_client = np.zeros(shape=conv_module.weight.shape, dtype=SIGNED_DTYPE)
 
     else:
-        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL // 2,
-                                                          high=MAX_VAL // 2,
+        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                          high=MAX_VAL,
                                                           size=conv_module.weight.shape,
                                                           dtype=SIGNED_DTYPE)
     W = W - W_client
@@ -346,8 +346,8 @@ class SecureModel(SecureModule):
 
     def forward(self, image_shape):
 
-        image = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL // 2,
-                                                          high=MAX_VAL // 2,
+        image = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                          high=MAX_VAL,
                                                           size=image_shape,
                                                           dtype=SIGNED_DTYPE)
         out = self.model.decode_head(self.model.backbone(image))
