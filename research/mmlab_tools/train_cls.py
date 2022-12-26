@@ -19,11 +19,16 @@ from mmcls.models import build_classifier
 from mmcls.utils import (auto_select_device, collect_env, get_root_logger,
                          setup_multi_processes)
 
+from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
+from research.distortion.utils import ArchUtilsFactory
+import pickle
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a model')
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
+    parser.add_argument(
+        '--load-from', help='the checkpoint file to load weights from')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
     parser.add_argument(
@@ -109,6 +114,8 @@ def main():
         # use config filename as default work_dir if cfg.work_dir is None
         cfg.work_dir = osp.join('./work_dirs',
                                 osp.splitext(osp.basename(args.config))[0])
+    if args.load_from is not None:
+        cfg.load_from = args.load_from
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
     if args.gpus is not None:
@@ -174,6 +181,11 @@ def main():
 
     model = build_classifier(cfg.model)
     model.init_weights()
+
+    if cfg.relu_spec_file is not None:
+        layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
+        arch_utils = ArchUtilsFactory()(cfg.model.backbone.type)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
