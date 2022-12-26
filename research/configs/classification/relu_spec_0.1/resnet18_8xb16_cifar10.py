@@ -3,7 +3,7 @@ model = dict(
     type='ImageClassifier',
     backbone=dict(
         type='ResNet_CIFAR_V2',
-        depth=50,
+        depth=18,
         num_stages=4,
         out_indices=(3, ),
         style='pytorch'),
@@ -11,7 +11,7 @@ model = dict(
     head=dict(
         type='LinearClsHead',
         num_classes=10,
-        in_channels=2048,
+        in_channels=512,
         loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
     ))
 
@@ -52,7 +52,7 @@ data = dict(
         test_mode=True))
 
 # optimizer
-optimizer = dict(type='SGD', lr=0.1, momentum=0.9, weight_decay=0.0001)
+optimizer = dict(type='SGD', lr=0.001, momentum=0.9, weight_decay=0.0001)
 optimizer_config = dict(grad_clip=None)
 # learning policy
 lr_config = dict(policy='step', step=[100, 150])
@@ -75,3 +75,7 @@ log_level = 'INFO'
 load_from = None
 resume_from = None
 workflow = [('train', 1)]
+
+relu_spec_file = "/home/yakir/Data2/assets_v4/distortions/tmp/block_size_spec_0.1.pickle"
+load_from = "/home/yakir/PycharmProjects/secure_inference/mmlab_models/classification/resnet18_b16x8_cifar10_20210528-bd6371c8.pth"
+work_dir = "/home/yakir/PycharmProjects/secure_inference/outputs/classification/relu_spec_0.1/resnet18_8xb16_cifar10"
