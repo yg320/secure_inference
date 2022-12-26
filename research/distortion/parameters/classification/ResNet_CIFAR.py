@@ -1,4 +1,4 @@
-from research.parameters.block_sizes import BLOCK_SIZES_32x32, BLOCK_SIZES_16x16, BLOCK_SIZES_8x8, BLOCK_SIZES_4x4
+from research.distortion.parameters.block_sizes import BLOCK_SIZES_32x32, BLOCK_SIZES_16x16, BLOCK_SIZES_8x8, BLOCK_SIZES_4x4
 
 class ResNet50_CIFAR:
     def __init__(self):

@@ -1,4 +1,4 @@
-from research.parameters.base import BLOCK_SIZES_FULL, BLOCK_SIZES_MINI, BLOCK_SIZES_256x256
+from research.distortion.parameters.base import BLOCK_SIZES_FULL, BLOCK_SIZES_MINI, BLOCK_SIZES_256x256
 
 class MobileNetV2_Params:
     def __init__(self):

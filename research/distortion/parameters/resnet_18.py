@@ -1,4 +1,4 @@
-from research.parameters.base import BLOCK_SIZES_96x96, BLOCK_SIZES_192x192
+from research.distortion.parameters.base import BLOCK_SIZES_96x96, BLOCK_SIZES_192x192
 
 
 class ResNet18_Params:
