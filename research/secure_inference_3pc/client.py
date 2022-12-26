@@ -10,9 +10,10 @@ from functools import partial
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS
 from mmseg.ops import resize
 from mmseg.datasets import build_dataset
-
+from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.timer import Timer
 from research.distortion.utils import get_model
+from research.secure_inference_3pc.conv2d_torch import conv2d_torch
 
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
@@ -48,13 +49,14 @@ class SecureConv2DClient(SecureModule):
 
         share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(np.concatenate([E_share.flatten(), F_share.flatten()]))
-        E_share_server, F_share_server = \
-            share_server[:E_share.size].reshape(E_share.shape), share_server[E_share.size:].reshape(F_share.shape)
+        E_share_server, F_share_server = share_server[:E_share.size].reshape(E_share.shape), share_server[E_share.size:].reshape(F_share.shape)
 
         E = E_share_server + E_share
         F = F_share_server + F_share
-
-        out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
+        # out_numpy =  np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
+        out_numpy = conv2d_torch(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out_numpy += conv2d_torch(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        # out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
 
         out_numpy = out_numpy + C_share
 

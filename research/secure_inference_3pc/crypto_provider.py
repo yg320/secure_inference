@@ -5,6 +5,8 @@ from research.secure_inference_3pc.base import P, sub_mode_p, decompose, SpaceTo
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
+from research.secure_inference_3pc.modules.conv2d import get_output_shape
+from research.secure_inference_3pc.conv2d_torch import conv2d_torch
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -26,6 +28,8 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.groups = groups
 
     def forward(self, X_share):
+        # return np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
+
         assert X_share.dtype == SIGNED_DTYPE
         # TODO: intergers should be called without all of these arguments
         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -35,9 +39,10 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
-        C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
+        # C =  np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
+        # C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
 
-        # C = torch.conv2d(A, B, bias=None, stride=self.stride, padding=self.padding, dilation=self.dilation, groups=1)
+        C = conv2d_torch(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
         C_share_0 = C - C_share_1
 

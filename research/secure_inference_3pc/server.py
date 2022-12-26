@@ -2,7 +2,8 @@ import torch
 import numpy as np
 from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d
-
+from research.secure_inference_3pc.modules.conv2d import get_output_shape
+from research.secure_inference_3pc.conv2d_torch import conv2d_torch
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 
 from research.distortion.utils import get_model
@@ -28,6 +29,7 @@ class SecureConv2DServer(SecureModule):
         self.groups = groups
 
     def forward(self, X_share):
+        # return np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
 
         assert X_share.dtype == SIGNED_DTYPE
 
@@ -53,8 +55,12 @@ class SecureConv2DServer(SecureModule):
         F = F_share_client + F_share
 
         new_weight = self.W_share - F
+        # out_numpy =  np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
 
-        out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation, self.groups)
+        out_numpy = conv2d_torch(E, new_weight, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out_numpy += conv2d_torch(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+
+        # out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
 
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out_numpy.shape, dtype=SIGNED_DTYPE)

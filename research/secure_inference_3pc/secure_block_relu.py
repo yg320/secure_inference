@@ -30,7 +30,7 @@ class SpaceToDepth(nn.Module):
         N, C, H, W = x.shape
         # print(N, C, H, W, self.block_size)
         x = x.reshape(N, C, H // self.block_size[0], self.block_size[0], W // self.block_size[1], self.block_size[1])
-        x = x.transpose(0, 1, 2, 4, 3, 5)#.contiguous()
+        x = x.transpose(0, 1, 2, 4, 3, 5)#.contiguous()  # TODO: should we put contiguous back?
         x = x.reshape(N, C, H // self.block_size[0], W // self.block_size[1], self.block_size[0] * self.block_size[1])
         return x
 
