@@ -70,9 +70,9 @@ class ChannelDistortionHandler:
 
             for channel in tqdm(channels_to_run[layer_name], desc=f"Batch={batch_index} Layer={layer_name}"):
                 for block_size_index, block_size in enumerate(block_sizes):
-                    if layer_name == "decode_0":
-                        if np.prod(block_size) > 1:
-                            continue
+                    # if layer_name == "decode_0":
+                    #     if np.prod(block_size) > 1:
+                    #         continue
 
                     orig_block_size = block_size_spec[layer_name][channel].copy()
                     block_size_spec[layer_name][channel] = block_size
@@ -98,14 +98,13 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--batch_index', type=int, default=5)
-    parser.add_argument('--gpu_id', type=int, default=1)
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/baseline/resnet18_8xb16_cifar10.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/classification/resnet18_b16x8_cifar10_20210528-bd6371c8.pth")
-    parser.add_argument('--iter', type=int, default=0)
+    parser.add_argument('--batch_index', type=int, default=0)
+    parser.add_argument('--gpu_id', type=int, default=0)
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/baseline/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth")
     parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp/channel_distortions")
-    parser.add_argument('--batch_size', type=int, default=128)
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_2/channel_distortions")
+    parser.add_argument('--batch_size', type=int, default=8)
 
     args = parser.parse_args()
 
@@ -118,7 +117,6 @@ if __name__ == "__main__":
     output_path = args.output_path
     os.makedirs(output_path, exist_ok=True)
 
-    iteration = args.iter
     layer_names = params.LAYER_NAMES
 
     if args.block_size_spec_file_name and os.path.exists(args.block_size_spec_file_name):

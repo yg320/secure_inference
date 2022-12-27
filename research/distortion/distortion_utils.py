@@ -2,7 +2,8 @@ import torch
 import numpy as np
 
 from research.distortion.utils import get_model, get_data, center_crop, ArchUtilsFactory
-from mmcls.datasets import build_dataset
+from mmcls.datasets import build_dataset as build_dataset_mmcls
+from mmseg.datasets import build_dataset as build_dataset_mmseg
 
 # from mmseg.ops import resize
 # import torch.nn.functional as F
@@ -86,7 +87,14 @@ class DistortionUtils:
             checkpoint_path=self.params.CHECKPOINT
         )
 
-        self.dataset = build_dataset(self.cfg.data.test, default_args=dict(test_mode=True))
+        # TODO: Replaced test with train
+        # TODO: find a more elegant way to do this
+        if self.cfg.model.type == 'ImageClassifier':
+            self.dataset = build_dataset_mmcls(self.cfg.data.train, default_args=dict(test_mode=False))
+        elif self.cfg.model.type == 'EncoderDecoder':
+            self.dataset = build_dataset_mmseg(self.cfg.data.train, default_args=dict(test_mode=False))
+        else:
+            raise NotImplementedError
         np.random.seed(123)
         self.shuffled_indices = np.arange(len(self.dataset))
         np.random.shuffle(self.shuffled_indices)
@@ -105,9 +113,12 @@ class DistortionUtils:
         batch_indices = self.shuffled_indices[batch_indices]
         # TODO: just use normal training datastream.. no need to center crop then
         batch = torch.stack([self.dataset[sample_id]['img'].data for sample_id in batch_indices]).to(self.device)
-        ground_truth = torch.Tensor([self.dataset.gt_labels[sample_id] for sample_id in batch_indices]).to(self.device)
-        # batch = torch.stack([center_crop(self.dataset[sample_id]['img'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
-        # ground_truth = torch.stack([center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
+
+        # TODO: find a more elegant way to do this
+        if self.cfg.model.type == 'ImageClassifier':
+            ground_truth = torch.Tensor([self.dataset.gt_labels[sample_id] for sample_id in batch_indices]).to(self.device)
+        elif self.cfg.model.type == 'EncoderDecoder':
+            ground_truth = torch.stack([self.dataset[sample_id]['gt_semantic_seg'].data for sample_id in batch_indices]).to(self.device)
 
         return batch, ground_truth
 
