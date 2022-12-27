@@ -5,16 +5,20 @@ from tqdm import tqdm
 import numpy as np
 from typing import Dict, List
 import pickle
+import mmcv
 
-from research.parameters.factory import ParamsFactory
+from research.distortion.parameters.factory import param_factory
 from research.distortion.distortion_utils import DistortionUtils
+
+from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 
 
 class ChannelDistortionHandler:
-    def __init__(self, gpu_id, output_path, params):
+    def __init__(self, gpu_id, output_path, params, cfg):
 
         self.params = params
-        self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params)
+        self.cfg = cfg
+        self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params, cfg=self.cfg)
         self.output_path = output_path
 
         self.keys = ["Noise", "Signal", "Distorted Loss", "Baseline Loss"]
@@ -27,7 +31,7 @@ class ChannelDistortionHandler:
                                         seed: int,
                                         num_channels_to_run: int):
 
-
+        # TODO: there is already a function for this in distortion_utils.py
         np.random.seed(seed)
         total_num_channels = sum([self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in self.params.LAYER_NAMES])
         channel_order_to_channel_in_layer_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_DIMS[layer_name][0]) for layer_name in layer_names])
@@ -54,7 +58,7 @@ class ChannelDistortionHandler:
             block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
             layer_num_channels = self.params.LAYER_NAME_TO_DIMS[layer_name][0]
             input_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
-            output_block_name = self.params.IN_LAYER_PROXY_SPEC[layer_name]
+            output_block_name = self.params.BLOCK_NAMES[-2]  # TODO: Why do we have None in last layer
 
             layer_assets = {key: np.zeros(shape=(layer_num_channels, len(block_sizes), batch_size)) for key in
                             self.keys}
@@ -93,33 +97,22 @@ class ChannelDistortionHandler:
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
-    # parser.add_argument('--batch_index', type=int)
-    # parser.add_argument('--gpu_id', type=int)
-    # parser.add_argument('--dataset', type=str)
-    # parser.add_argument('--config', type=str)
-    # parser.add_argument('--checkpoint', type=str)
-    # parser.add_argument('--iter', type=int)
-    # parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    # parser.add_argument('--output_path', type=str, default=None)
-    # parser.add_argument('--params_name', type=str, default=None)
 
-    parser.add_argument('--batch_index', type=int, default=1)
+    parser.add_argument('--batch_index', type=int, default=5)
     parser.add_argument('--gpu_id', type=int, default=1)
-    parser.add_argument('--dataset', type=str, default="ade_20k_256x256")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/baseline.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/baseline/resnet18_8xb16_cifar10.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/classification/resnet18_b16x8_cifar10_20210528-bd6371c8.pth")
     parser.add_argument('--iter', type=int, default=0)
     parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/channel_distortions")
-    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_1_Groups")
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp/channel_distortions")
+    parser.add_argument('--batch_size', type=int, default=128)
 
     args = parser.parse_args()
 
+    cfg = mmcv.Config.fromfile(args.config)
     gpu_id = args.gpu_id
-    params = ParamsFactory()(args.params_name)
-    params.DATASET = args.dataset
-    params.CONFIG = args.config
+    params = param_factory(cfg.model.backbone)
+
     params.CHECKPOINT = args.checkpoint
 
     output_path = args.output_path
@@ -135,7 +128,8 @@ if __name__ == "__main__":
 
     chd = ChannelDistortionHandler(gpu_id=gpu_id,
                                    output_path=output_path,
-                                   params=params)
+                                   params=params,
+                                   cfg=cfg)
 
     chd.extract_deformation_channel_ord(batch_index=args.batch_index,
                                         layer_names=layer_names,

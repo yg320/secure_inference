@@ -2,7 +2,6 @@ from torch.nn import Module
 import mmcv
 from mmcv.cnn.utils import revert_sync_batchnorm
 from mmcv.runner import load_checkpoint
-from mmseg.models import build_segmentor
 from mmseg.utils import get_device, setup_multi_processes
 import torch
 import torch.nn.functional as F
@@ -10,8 +9,15 @@ import numpy as np
 from mmseg.datasets import build_dataset
 from research.bReLU import BlockRelu
 
+from mmcls.models import build_classifier
+from mmseg.models import build_segmentor
+
+# TODO: most of this garbage is not important. Get rid of it
 def get_model(config, gpu_id=None, checkpoint_path=None):
-    cfg = mmcv.Config.fromfile(config)
+    if type(config) == str:
+        cfg = mmcv.Config.fromfile(config)
+    else:
+        cfg = config
 
     setup_multi_processes(cfg)
 
@@ -20,25 +26,31 @@ def get_model(config, gpu_id=None, checkpoint_path=None):
         torch.backends.cudnn.benchmark = True
 
     cfg.model.pretrained = None
-    cfg.data.test.test_mode = True
+    if cfg.model.type != 'ImageClassifier':
+        cfg.data.test.test_mode = True
     if gpu_id is not None:
         cfg.gpu_ids = [gpu_id]
 
     cfg.model.train_cfg = None
-    model = build_segmentor(cfg.model, test_cfg=cfg.get('test_cfg'))
+    if cfg.model.type == 'ImageClassifier':
+        model = build_classifier(cfg.model)
+    else:
+        model = build_segmentor(cfg.model, test_cfg=cfg.get('test_cfg'))
 
     if checkpoint_path is not None:
         checkpoint = load_checkpoint(model, checkpoint_path, map_location='cpu')
 
         model.CLASSES = checkpoint['meta']['CLASSES']
-        model.PALETTE = checkpoint['meta']['PALETTE']
+        if 'PALETTE' in checkpoint['meta']:
+            model.PALETTE = checkpoint['meta']['PALETTE']
 
     # clean gpu memory when starting a new evaluation.
     torch.cuda.empty_cache()
 
     cfg.device = get_device()
+    if cfg.model.type != 'ImageClassifier':
+        model = revert_sync_batchnorm(model)
 
-    model = revert_sync_batchnorm(model)
     if gpu_id is not None:
         model = model.to(f"cuda:{gpu_id}")
     model = model.eval()
@@ -461,11 +473,13 @@ class ResNetUtils(ArchUtils):
 
 class ArchUtilsFactory:
     def __call__(self, arch_name):
+        from research.distortion.arch_utils.ResNet_CIFAR import ResNet_CIFAR_Utils
         if arch_name in ["ResNetV1c", "SecureResNet", "MyResNet", "AvgPoolResNet"]:
             return ResNetUtils()
         elif arch_name == "MobileNetV2":
             return MobileNetUtils()
-
+        elif arch_name == "ResNet_CIFAR_V2":
+            return ResNet_CIFAR_Utils()
         else:
             assert False
 

@@ -2,6 +2,7 @@ import torch
 import numpy as np
 
 from research.distortion.utils import get_model, get_data, center_crop, ArchUtilsFactory
+from mmcls.datasets import build_dataset
 
 # from mmseg.ops import resize
 # import torch.nn.functional as F
@@ -9,6 +10,7 @@ from research.distortion.utils import get_model, get_data, center_crop, ArchUtil
 import contextlib
 from functools import lru_cache
 import ctypes
+import mmcv
 
 @contextlib.contextmanager
 def model_block_relu_transform(model, relu_spec, arch_utils):
@@ -71,21 +73,20 @@ def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8, protocol="Port
 
 
 class DistortionUtils:
-    def __init__(self, gpu_id, params):
+    def __init__(self, gpu_id, params, cfg):
 
         self.gpu_id = gpu_id
         self.device = f"cuda:{gpu_id}"
         self.params = params
-
-        self.arch_utils = ArchUtilsFactory()(self.params.BACKBONE)
+        self.cfg = cfg
+        self.arch_utils = ArchUtilsFactory()(self.cfg.model.backbone.type)
         self.model = get_model(
-            config=self.params.CONFIG,
+            config=self.cfg,
             gpu_id=self.gpu_id,
             checkpoint_path=self.params.CHECKPOINT
         )
 
-        self.ds_name = self.params.DATASET
-        self.dataset = get_data(self.ds_name)
+        self.dataset = build_dataset(self.cfg.data.test, default_args=dict(test_mode=True))
         np.random.seed(123)
         self.shuffled_indices = np.arange(len(self.dataset))
         np.random.shuffle(self.shuffled_indices)
@@ -102,8 +103,12 @@ class DistortionUtils:
 
         batch_indices = np.arange(batch_index * batch_size, batch_index * batch_size + batch_size)
         batch_indices = self.shuffled_indices[batch_indices]
-        batch = torch.stack([center_crop(self.dataset[sample_id]['img'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
-        ground_truth = torch.stack([center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
+        # TODO: just use normal training datastream.. no need to center crop then
+        batch = torch.stack([self.dataset[sample_id]['img'].data for sample_id in batch_indices]).to(self.device)
+        ground_truth = torch.Tensor([self.dataset.gt_labels[sample_id] for sample_id in batch_indices]).to(self.device)
+        # batch = torch.stack([center_crop(self.dataset[sample_id]['img'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
+        # ground_truth = torch.stack([center_crop(self.dataset[sample_id]['gt_semantic_seg'].data, self.dataset.crop_size) for sample_id in batch_indices]).to(self.device)
+
         return batch, ground_truth
 
     @staticmethod
@@ -140,7 +145,7 @@ class DistortionUtils:
                     if block_name in output_block_names:
                         block_name_to_activation[block_name] = activation
 
-                if output_block_names[-1] == "decode":
+                if False: #output_block_names[-1] == self.params.BLOCK_NAMES[-2]:  # TODO: why do we have None in the end of self.BLOCK_NAMES?
                     losses = self.get_loss(activation, ground_truth)
                 else:
                     losses = np.nan * np.ones(shape=(input_tensor.shape[0],))
