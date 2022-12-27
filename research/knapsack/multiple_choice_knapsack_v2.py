@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 import glob
 import os.path
 import time
-
+import mmcv
 import numpy as np
 import torch
 from collections import defaultdict
@@ -14,7 +14,7 @@ import argparse
 import shutil
 from research.distortion.distortion_utils import get_num_relus, get_brelu_bandwidth
 from research.distortion.utils import get_channel_order_statistics
-from research.parameters.factory import ParamsFactory
+from research.distortion.parameters.factory import param_factory
 # from research.share_array import make_shared_array, get_shared_array
 import gc
 import time
@@ -462,10 +462,10 @@ class MultipleChoiceKnapsack:
         self.channel_order_to_layer, self.channel_order_to_channel, self.channel_order_to_dim = \
             get_channel_order_statistics(self.params)
 
-        assert len(set([len(set(tuple(x) for x in self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])) for layer_name in self.params.LAYER_NAMES])) == 1
-        self.block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_names[0]]
-        self.block_sizes = np.array(self.block_sizes[:-1])
-        assert np.max(self.block_sizes) < 255
+        # assert len(set([len(set(tuple(x) for x in self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])) for layer_name in self.params.LAYER_NAMES])) == 1
+        # self.block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_names[0]]
+        # self.block_sizes = np.array(self.block_sizes[:-1])
+        # assert np.max(self.block_sizes) < 255
 
         self.layer_name_to_noise = dict()
         self.read_noise_files()
@@ -538,7 +538,7 @@ class MultipleChoiceKnapsack:
         for layer_name in self.params.LAYER_NAMES:
             glob_pattern = os.path.join(self.channel_distortion_path, f"{layer_name}_*.pickle")
             files = glob.glob(glob_pattern)
-            assert len(files) == 2, glob_pattern
+            assert len(files) > 0, glob_pattern
 
             noise = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
             noise = noise.mean(axis=0).mean(axis=2).T  # noise.shape = [N-block-sizes, N-channels]
@@ -562,11 +562,12 @@ class MultipleChoiceKnapsack:
             channel_index = self.channel_order_to_channel[channel_order]
             layer_dim = self.params.LAYER_NAME_TO_DIMS[layer_name][1]
 
-            W = np.array([get_cost(tuple(block_size), layer_dim, self.cost_type, self.division) for block_size in self.block_sizes])
+            block_sizes = np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])[:-1]  # TODO: either use [1,0] or don't infer it at all
+            W = np.array([get_cost(tuple(block_size), layer_dim, self.cost_type, self.division) for block_size in block_sizes])
             P = self.layer_name_to_noise[layer_name][channel_index]
 
             block_size_groups = defaultdict(list)
-            for block_size_index, block_size in enumerate(self.block_sizes):
+            for block_size_index, block_size in enumerate(block_sizes):
                 cur_cost = get_cost(tuple(block_size), layer_dim, self.cost_type, self.division)  # 1 here to avoid weird stuff
                 block_size_groups[cur_cost].append(block_size_index)
 
@@ -574,7 +575,7 @@ class MultipleChoiceKnapsack:
             W_new = []
             cur_block_size_tracker = []
             for k, v in block_size_groups.items():
-                cur_block_sizes = self.block_sizes[v]
+                cur_block_sizes = block_sizes[v]
 
                 P_same_weight = np.stack([P[row_index] for row_index in v])
                 argmax = P_same_weight.argmax(axis=0)
@@ -638,18 +639,19 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     # parser.add_argument('--iter', type=int)
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/block_size_spec_0.25.pickle")
-    parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/ade_20k_256x256/MobileNetV2/test/channel_distortions")
-    parser.add_argument('--ratio', type=float, default=0.25)
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp/block_size_spec_0.1.pickle")
+    parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/tmp/channel_distortions")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/baseline/resnet18_8xb16_cifar10.py")
+    parser.add_argument('--ratio', type=float, default=0.1)
     parser.add_argument('--seed', type=float, default=123)
     parser.add_argument('--num_channels', type=float, default=None)
-    parser.add_argument('--params_name', type=str, default="MobileNetV2_256_Params_1_Groups")
     parser.add_argument('--cost_type', type=str, default="Bandwidth")
-    parser.add_argument('--division', type=int, default=512)
+    parser.add_argument('--division', type=int, default=128)
     parser.add_argument('--shuffle', type=bool, default=False)
     args = parser.parse_args()
+    cfg = mmcv.Config.fromfile(args.config)
 
-    params = ParamsFactory()(args.params_name)
+    params = param_factory(cfg.model.backbone)
     layer_names = params.LAYER_NAMES
     ratio = args.ratio
 
