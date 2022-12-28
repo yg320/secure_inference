@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 13924
-        self.port_10 = 13925
-        self.port_02 = 13926
-        self.port_20 = 13927
-        self.port_12 = 13928
-        self.port_21 = 13929
+        self.port_01 = 14154
+        self.port_10 = 14155
+        self.port_02 = 14156
+        self.port_20 = 14157
+        self.port_12 = 14158
+        self.port_21 = 14159
 
 
 class NetworkAssets:
@@ -148,8 +148,7 @@ def sub_mode_p(x, y):
 
 class SecureModule(torch.nn.Module):
     def __init__(self, crypto_assets, network_assets):
-
-        super(SecureModule, self).__init__()
+        torch.nn.Module.__init__(self)
 
         self.prf_handler = crypto_assets
         self.network_assets = network_assets

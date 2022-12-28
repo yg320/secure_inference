@@ -7,6 +7,7 @@ from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
+from research.bReLU import NumpySecureOptimizedBlockReLU
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -205,46 +206,30 @@ class SecureReLUCryptoProvider(SecureModule):
             self.mult(X_share_np.shape)
             return X_share
 
+class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU):
+    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
+        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        self.secure_DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
+        self.secure_mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
-class SecureBlockReLUCryptoProvider(SecureModule):
-
-    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
-        super(SecureBlockReLUCryptoProvider, self).__init__(crypto_assets, network_assets)
-        self.block_sizes = np.array(block_sizes)
         self.dummy_relu = dummy_relu
 
-        self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
-
-        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
-        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+    def mult(self, x, y):
+        self.secure_mult(x.astype(self.dtype).shape)
+        return x
+    def DReLU(self, activation):
+        return self.secure_DReLU(activation.astype(self.dtype))
 
     def forward(self, activation):
         if self.dummy_relu:
             return activation
 
-        assert activation.dtype == SIGNED_DTYPE
-
-        mean_tensors = []
-
-        for block_size in self.active_block_sizes:
-
-            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
-            cur_input = activation[:, cur_channels]
-
-            reshaped_input = SpaceToDepth(block_size)(cur_input)
-            assert reshaped_input.dtype == SIGNED_DTYPE
-
-            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
-
-            mean_tensors.append(mean_tensor.flatten())
-
-        mean_tensors = np.concatenate(mean_tensors)
-        assert mean_tensors.dtype == SIGNED_DTYPE
-        self.DReLU(mean_tensors.astype(self.dtype))
-        self.mult(activation[:, ~self.is_identity_channels].shape)
+        NumpySecureOptimizedBlockReLU.forward(self, activation)
         activation = activation.astype(SIGNED_DTYPE)
+
         return activation
+
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):

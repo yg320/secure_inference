@@ -14,6 +14,7 @@ from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.timer import Timer
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
+from research.bReLU import NumpySecureOptimizedBlockReLU
 
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
@@ -265,56 +266,28 @@ class SecureReLUClient(SecureModule):
             return ret + mu_0
 
 
-class SecureBlockReLUClient(SecureModule):
 
-    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
-        super(SecureBlockReLUClient, self).__init__(crypto_assets, network_assets)
-        self.block_sizes = np.array(block_sizes)
+class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
+    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
+        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        self.secure_DReLU = SecureDReLUClient(crypto_assets, network_assets)
+        self.secure_mult = SecureMultiplicationClient(crypto_assets, network_assets)
+
         self.dummy_relu = dummy_relu
-        self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
-        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if
-                                   0 not in block_size]
-        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+    def mult(self, x, y):
+        return self.secure_mult(x.astype(self.dtype), y.astype(self.dtype))
+
+    def DReLU(self, activation):
+        return self.secure_DReLU(activation.astype(self.dtype))
 
     def forward(self, activation):
         if self.dummy_relu:
             network_assets.sender_01.put(activation)
             return torch.zeros_like(activation)
 
-        assert activation.dtype == SIGNED_DTYPE
-        reshaped_inputs = []
-        mean_tensors = []
-        channels = []
-        orig_shapes = []
-
-        for block_size in self.active_block_sizes:
-            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
-            cur_input = activation[:, cur_channels]
-            reshaped_input = SpaceToDepth(block_size)(cur_input)
-            assert reshaped_input.dtype == SIGNED_DTYPE
-            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
-
-            channels.append(cur_channels)
-            reshaped_inputs.append(reshaped_input)
-            orig_shapes.append(mean_tensor.shape)
-            mean_tensors.append(mean_tensor.flatten())
-
-        cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
-        mean_tensors = np.concatenate(mean_tensors)
-        assert mean_tensors.dtype == SIGNED_DTYPE
-        activation = activation.astype(self.dtype)
-        sign_tensors = self.DReLU(mean_tensors.astype(self.dtype))
-
-        relu_map = np.ones_like(activation)
-        for i in range(len(self.active_block_sizes)):
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
-            relu_map[:, channels[i]] = DepthToSpace(self.active_block_sizes[i])(
-                sign_tensor.repeat(reshaped_inputs[i].shape[-1], axis=-1))
-
-        # with Timer("Mult in BlockRelu"):
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
+        activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
         activation = activation.astype(SIGNED_DTYPE)
 
         return activation
