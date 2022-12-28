@@ -3,7 +3,7 @@ import numpy as np
 from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.conv2d_torch import conv2d_torch
+from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 
 from research.distortion.utils import get_model
@@ -27,6 +27,7 @@ class SecureConv2DServer(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
+        self.conv2d_handler = Conv2DHandler("cuda:1")
 
     def forward(self, X_share):
         # return np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
@@ -57,8 +58,8 @@ class SecureConv2DServer(SecureModule):
         new_weight = self.W_share - F
         # out_numpy =  np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
 
-        out_numpy = conv2d_torch(E, new_weight, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-        out_numpy += conv2d_torch(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out_numpy = self.conv2d_handler.conv2d(E, new_weight, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out_numpy += self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
 
         # out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
@@ -397,3 +398,6 @@ if __name__ == "__main__":
         out = model(Params.IMAGE_SHAPE)
 
     network_assets.done()
+
+    print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)
+    print("Num of bytes sent 1 -> 2", network_assets.sender_12.num_of_bytes_sent)

@@ -9,20 +9,18 @@ from research.distortion.distortion_utils import get_brelu_bandwidth
 Porthos = "Porthos"
 SecureNN = "SecureNN"
 
+
 class CommunicationHandler:
-    def __init__(self, protocol=Porthos, with_prf=True, disable_relus=False,
-                 force_max_pool_instead_of_avg_pool=False, include_head=True, unoptimized_prothos=False, scalar_vector_optimization=False):
-        self.protocol = protocol
-        self.with_prf = with_prf
+    def __init__(self,
+                 disable_relus=False,
+                 force_max_pool_instead_of_avg_pool=False,
+                 include_head=True,
+                 scalar_vector_optimization=False):
         self.disable_relus = disable_relus
         self.force_max_pool_instead_of_avg_pool = force_max_pool_instead_of_avg_pool
         self.include_head = include_head
-        self.unoptimized_prothos = unoptimized_prothos
         self.scalar_vector_optimization = scalar_vector_optimization
         self.l = 8
-
-        if protocol == Porthos:
-            assert with_prf, "I think Porthos default behaviour is PRF"
 
     def get_conv_cost(self, tensor_shape, conv_module):
         assert conv_module.kernel_size[0] == conv_module.kernel_size[1]
@@ -36,40 +34,22 @@ class CommunicationHandler:
         i = conv_module.in_channels
         o = conv_module.out_channels
         f = conv_module.kernel_size[0]
-        # We use padding therefore q = m
-        q = m - f + 1
-        if groups == 1:
-            if self.protocol == Porthos:
-                assert self.with_prf
-                if self.with_prf:
-                    if self.unoptimized_prothos:
-                        cost_01 = m ** 2 * f ** 2 * i + f ** 2 * o * i
-                        cost_10 = m ** 2 * f ** 2 * i + f ** 2 * o * i
-                        cost_21 = m ** 2 * o
-                    else:
-                        if stride > 1:
-                            m_ = m * stride + f - 1
-                            cost_01 = m_ ** 2 * i + f ** 2 * o * i
-                            cost_10 = m_ ** 2 * i + f ** 2 * o * i
-                        else:
-                            cost_01 = m ** 2 * i + f ** 2 * o * i
-                            cost_10 = m ** 2 * i + f ** 2 * o * i
-                        cost_21 = m ** 2 * o
-                    cost = cost_01 + cost_10 + cost_21
+        q = m
+        # We use padding therefore q = m (and not q = m - f + 1)
 
-            elif self.protocol == SecureNN:
-                cost = 2 * m ** 2 * f ** 2 * i + 2 * f ** 2 * o * i + m ** 2 * o
-                if not self.with_prf:
-                    cost *= 2
+        if groups == 1:
+            if stride > 1:
+                m_ = m * stride + f - 1
+                cost_01 = m_ ** 2 * i + f ** 2 * o * i
+                cost_10 = m_ ** 2 * i + f ** 2 * o * i
             else:
-                assert False
+                cost_01 = m ** 2 * i + f ** 2 * o * i
+                cost_10 = m ** 2 * i + f ** 2 * o * i
+            cost_21 = m ** 2 * o
+            cost = cost_01 + cost_10 + cost_21
         else:
-            assert False
             assert groups == o == i
-            if self.protocol == Porthos:
-                cost = groups * (2 * m ** 2 + 2 * f ** 2 + q ** 2)
-            else:
-                assert False, "Just write the formula"
+            cost = groups * (2 * m ** 2 + 2 * f ** 2 + q ** 2)
 
         return cost * self.l, [m, o]
 
@@ -84,12 +64,8 @@ class CommunicationHandler:
                 get_brelu_bandwidth(block_size=tuple(block_size), activation_dim=int(m), protocol=self.protocol, scalar_vector_optimization=self.scalar_vector_optimization, with_prf=self.with_prf) for block_size in
                 relu_module.block_sizes)
         else:
-            if self.protocol == Porthos:
-                communication_cost = self.l * (((6 * log_p + 19) * m ** 2) * tensor_shape[1])
-            elif self.protocol == SecureNN:
-                communication_cost = self.l * (((8 * log_p + 24) * m ** 2) * tensor_shape[1])
-            else:
-                assert False
+            communication_cost = self.l * (((6 * log_p + 19) * m ** 2) * tensor_shape[1])
+
         if self.disable_relus:
             return 0, tensor_shape
         else:

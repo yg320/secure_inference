@@ -6,7 +6,7 @@ from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.conv2d_torch import conv2d_torch
+from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -27,6 +27,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.padding = padding
         self.groups = groups
 
+        self.conv2d_handler = Conv2DHandler("cuda:0")
     def forward(self, X_share):
         # return np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
 
@@ -42,7 +43,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         # C =  np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
         # C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
 
-        C = conv2d_torch(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
         C_share_0 = C - C_share_1
 
@@ -317,3 +318,6 @@ if __name__ == "__main__":
         out = model(Params.IMAGE_SHAPE)
 
     network_assets.done()
+
+    print("Num of bytes sent 2 -> 0", network_assets.sender_02.num_of_bytes_sent)
+    print("Num of bytes sent 2 -> 1", network_assets.sender_12.num_of_bytes_sent)

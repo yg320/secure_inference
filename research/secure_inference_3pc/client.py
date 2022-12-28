@@ -13,7 +13,7 @@ from mmseg.datasets import build_dataset
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.timer import Timer
 from research.distortion.utils import get_model
-from research.secure_inference_3pc.conv2d_torch import conv2d_torch
+from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
@@ -33,6 +33,7 @@ class SecureConv2DClient(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
+        self.conv2d_handler = Conv2DHandler("cuda:0")
 
     def forward_(self, X_share):
 
@@ -54,8 +55,8 @@ class SecureConv2DClient(SecureModule):
         E = E_share_server + E_share
         F = F_share_server + F_share
         # out_numpy =  np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
-        out_numpy = conv2d_torch(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-        out_numpy += conv2d_torch(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out_numpy = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out_numpy += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         # out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
 
         out_numpy = out_numpy + C_share
@@ -464,3 +465,6 @@ if __name__ == "__main__":
     full_inference(model, Params.NUM_IMAGES)
 
     network_assets.done()
+
+    print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
+    print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)

@@ -8,6 +8,6 @@ class Params:
     # RELU_SPEC_FILE = "/storage/yakir/secure_inference/block_size_spec_0.15.pickle"
     IMAGE_SHAPE = (1, 3, 256, 256)
     NUM_IMAGES = 1
-    DUMMY_RELU = True
+    DUMMY_RELU = False
     PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

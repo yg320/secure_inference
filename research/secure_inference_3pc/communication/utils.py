@@ -45,9 +45,10 @@ class Sender(Thread):
         self.numpy_arr_queue = queue.Queue()
         self.port = port
         self.simulated_bandwidth = simulated_bandwidth #100000000  #bits/second
+        self.num_of_bytes_sent = 0
 
     def run(self):
-        num_bytes_send = 0
+
         total_sleep_time = 0
 
         with NumpySocket() as s:
@@ -70,7 +71,7 @@ class Sender(Thread):
 
                 arr_size_bytes = data.size * data.itemsize
 
-                num_bytes_send += arr_size_bytes
+                self.num_of_bytes_sent += arr_size_bytes
 
                 if self.simulated_bandwidth:
                     arr_size_bits = 8 * arr_size_bytes
@@ -84,10 +85,6 @@ class Sender(Thread):
                 else:
                     s.sendall(data)
                     s.recv(1)
-        print('===================')
-        print(self.port, num_bytes_send)
-        print(self.port, total_sleep_time)
-        print('===================')
 
     def put(self, arr):
         self.numpy_arr_queue.put(arr)
