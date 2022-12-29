@@ -74,11 +74,7 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
     decoder.image_pool[0].forward = foo
 
 
-def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
-
-    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
-    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
-    secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets)
+def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
 
     convert_conv_module(model.backbone.conv1, build_secure_conv, build_secure_relu)
 
@@ -90,7 +86,50 @@ def securify_mobilenetv2_model(model, build_secure_conv, build_secure_relu, secu
 
     convert_decoder(model.decode_head, build_secure_conv, build_secure_relu)
 
+
+    return model
+
+def securify_resnet_cifar(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+    model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
+    model.backbone.bn1 = torch.nn.Identity()
+    model.backbone.relu = build_secure_relu()
+
+    for layer in [1, 2, 3, 4]:
+        for block in [0, 1]:
+            cur_res_layer = getattr(model.backbone, f"layer{layer}")
+
+            cur_res_layer[block].conv1 = build_secure_conv(conv_module=cur_res_layer[block].conv1, bn_module=cur_res_layer[block].bn1)
+            cur_res_layer[block].bn1 = torch.nn.Identity()
+            cur_res_layer[block].relu_1 = build_secure_relu()
+
+            cur_res_layer[block].conv2 = build_secure_conv(conv_module=cur_res_layer[block].conv2, bn_module=cur_res_layer[block].bn2)
+            cur_res_layer[block].bn2 = torch.nn.Identity()
+            cur_res_layer[block].relu_2 = build_secure_relu()
+
+            if cur_res_layer[block].downsample:
+                cur_res_layer[block].downsample = build_secure_conv(conv_module=cur_res_layer[block].downsample[0], bn_module=cur_res_layer[block].downsample[1])
+
+
+def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets)
+
+    model = get_model(
+        config=cfg,
+        gpu_id=None,
+        checkpoint_path=checkpoint_path
+    )
+    # arr = model.backbone(torch.load("/home/yakir/tmp.pt"))[0]
+    # print(model.head.fc(model.neck(arr)).argmax())
+    if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "MobileNetV2":
+        securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+    if cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
+        securify_resnet_cifar(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+
     if relu_spec_file:
+        assert False
         block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))

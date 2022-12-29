@@ -12,11 +12,13 @@ from research.bReLU import NumpySecureOptimizedBlockReLU
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
+from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherBlockReLU
 
 from functools import partial
+import mmcv
+from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 
 class SecureConv2DCryptoProvider(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
@@ -253,9 +255,9 @@ def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy
 
 
 
-class SecureModel(SecureModule):
+class SecureModelSegmentation(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModel, self).__init__( crypto_assets, network_assets)
+        super(SecureModelSegmentation, self).__init__( crypto_assets, network_assets)
         self.model = model
 
     def forward(self, image_shape):
@@ -267,22 +269,32 @@ class SecureModel(SecureModule):
         _ = self.model.decode_head(self.model.backbone(dummy_image))
 
 
+class SecureModelClassification(SecureModule):
+    def __init__(self, model,  crypto_assets, network_assets):
+        super(SecureModelClassification, self).__init__( crypto_assets, network_assets)
+        self.model = model
+
+    def forward(self, image_shape):
+
+        dummy_image = self.prf_handler[CRYPTO_PROVIDER].integers(low=MIN_VAL,
+                                                                 high=MAX_VAL,
+                                                                 size=image_shape,
+                                                                 dtype=SIGNED_DTYPE)
+        _ = self.model.backbone(dummy_image)
+
+
 if __name__ == "__main__":
     party = 2
-
-    model = get_model(
-        config=Params.SECURE_CONFIG_PATH,
-        gpu_id=None,
-        checkpoint_path=None
-    )
+    cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
     crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
-    model = securify_mobilenetv2_model(
-        model,
+    model = get_secure_model(
+        cfg,
+        checkpoint_path=None,
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
-        secure_model_class=SecureModel,
+        secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUCryptoProvider,
         relu_spec_file=Params.RELU_SPEC_FILE,
         crypto_assets=crypto_assets,

@@ -10,11 +10,13 @@ from research.distortion.utils import get_model
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
-from research.secure_inference_3pc.resnet_converter import securify_mobilenetv2_model, init_prf_fetcher
+from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.server import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherBlockReLU
 from functools import partial
 from research.bReLU import NumpySecureOptimizedBlockReLU
+import mmcv
+from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
@@ -63,6 +65,8 @@ class SecureConv2DServer(SecureModule):
         out_numpy += self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
 
         # out_numpy = conv_2d(E, new_weight, X_share, F, self.padding, self.stride, self.dilation, self.groups)
+        # out_numpy = torch.conv2d(torch.from_numpy(E), torch.from_numpy(new_weight), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
+        # out_numpy += torch.conv2d(torch.from_numpy(X_share), torch.from_numpy(F), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
 
 
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out_numpy.shape, dtype=SIGNED_DTYPE)
@@ -311,9 +315,9 @@ def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy
 
 
 
-class SecureModel(SecureModule):
+class SecureModelSegmentation(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModel, self).__init__( crypto_assets, network_assets)
+        super(SecureModelSegmentation, self).__init__( crypto_assets, network_assets)
         self.model = model
 
     def forward(self, image_shape):
@@ -325,23 +329,34 @@ class SecureModel(SecureModule):
         out = self.model.decode_head(self.model.backbone(image))
         self.network_assets.sender_01.put(out)
 
+class SecureModelClassification(SecureModule):
+    def __init__(self, model,  crypto_assets, network_assets):
+        super(SecureModelClassification, self).__init__( crypto_assets, network_assets)
+        self.model = model
+
+    def forward(self, image_shape):
+
+        image = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                          high=MAX_VAL,
+                                                          size=image_shape,
+                                                          dtype=SIGNED_DTYPE)
+
+        out = self.model.backbone(image)[0]
+        self.network_assets.sender_01.put(out)
+
 
 if __name__ == "__main__":
     party = 1
-
-    model = get_model(
-        config=Params.SECURE_CONFIG_PATH,
-        gpu_id=None,
-        checkpoint_path=Params.MODEL_PATH
-    )
+    cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
     crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
-    model = securify_mobilenetv2_model(
-        model,
+    model = get_secure_model(
+        cfg,
+        checkpoint_path=Params.MODEL_PATH,
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
-        secure_model_class=SecureModel,
+        secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUServer,
         relu_spec_file=Params.RELU_SPEC_FILE,
         crypto_assets=crypto_assets,
