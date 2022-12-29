@@ -1,0 +1,64 @@
+- Leetcode, Algo1, tabs
+
+============================================= Research Major =============================================
+
+- Start analysis (Analysis with noise to KnapSack matrix)
+- Consult Shai about the unfairness of finetuning
+- ImageNet classification - compare with Porthos
+- Explore 32bits, use trunc and understand when things go wrong
+- Consider what is best, torch or numpy - avoid converting between them.
+- Classification and Detection
+- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
+
+============================================= Implementation Major =============================================
+
+- Finish GlobalAveragePooling and Fully Connected implementation in classification
+- Make a Unified bReLU - make it a symmetric one.
+- Vector2Scalar multiplication. (for the bReLU)
+- Implement Load Balancing in ReLU (same as Porthos)
+
+
+============================================= Reading =============================================
+- Understand our Security level
+- Understand Porthos float2int and int2float methods
+- Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
+- Go over protocols again
+- Understand the math behind the protocols
+
+============================================= Implementation Minor =============================================
+- Can we add more LUTs?
+- Can we convert more ops into inplace ones?
+- Understand the += issue
+- Do we always send minimal data types?
+- Consider MultiThreaded ReLU
+- Verify that everything is sent as soon as we have it
+- Can we optimize beta in P0/P1/P2?
+- Try to make float conv2 with numba. If it works - verify that group conv is optimized
+- Consider to further optimize Numba if it's still relevant
+- Make sure all protocols are
+- Is GLOO slowing us down?
+- Clean up threads
+- Consider to implement PRF fetcher in a different approach
+- Verify L and L-1
+- Verify that there aren't any fetches that crypto_provider can do (that hinder us)
+- Major refactoring - Bunch of redundancies
+- Verify fetchers are not slowing us down. Also verify that they are really needed
+- Can some ReLU ops be fetched?
+- Implement get_c in Numba! (And maybe even other ops)
+
+============================================= Paper notes =============================================
+- Float implementation
+- Stochastic ReLU
+- Non matmul implementation
+- Remove negligble ops (such as test for 1/2**64)
+- We set real benchmark on (Datasets) and Tasks
+- We deliver a secure package over MMLab project
+- Runtime as Function of Bandwidth
+
+============================================= Research Minor =============================================
+- Add quantization noise
+- Can we fuze mobilenet 1x1 and 3x3 convolutions?
+- Clip TRUNC every k'th conv
+- Why first image is slow
+- Soft training?
+- CRF
