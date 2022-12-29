@@ -129,11 +129,10 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
         securify_resnet_cifar(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
 
     if relu_spec_file:
-        assert False
         block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-        arch_utils = ArchUtilsFactory()("MobileNetV2")
+        arch_utils = ArchUtilsFactory()(cfg.model.backbone.type)
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
 
     return secure_model_class(model)

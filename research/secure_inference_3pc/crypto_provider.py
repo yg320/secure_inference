@@ -45,7 +45,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         B = B_share_0 + B_share_1
         # C =  np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
         # C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
-
+        # C = torch.conv2d(torch.from_numpy(A), torch.from_numpy(B), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
         C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
         C_share_0 = C - C_share_1

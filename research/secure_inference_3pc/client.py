@@ -385,14 +385,18 @@ class SecureModelSegmentation(SecureModule):
 
 def full_inference_classification(cfg, model, num_images):
     dataset = build_data(cfg, train=False)
-    results = []
+    results_gt = []
+    results_pred = []
     model.eval()
     for sample_id in tqdm(range(num_images)):
         img = dataset[sample_id]['img'].data[np.newaxis]
-        out = model(img)
+        with Timer("Inference"):
+            out = model(img)
         gt = dataset.gt_labels[sample_id]
-        print(out, gt)
-        print('fds')
+        results_gt.append(gt)
+        results_pred.append(out)
+    print((np.array(results_gt) == np.array(results_pred)).mean())
+
 
 def full_inference(model, num_images):
 
