@@ -79,7 +79,7 @@ class DistortionUtils:
         self.device = f"cuda:{gpu_id}"
         self.params = params
         self.cfg = cfg
-        self.arch_utils = ArchUtilsFactory()(self.cfg.model)
+        self.arch_utils = ArchUtilsFactory()(self.cfg)
         self.model = get_model(
             config=self.cfg,
             gpu_id=self.gpu_id,
@@ -112,7 +112,7 @@ class DistortionUtils:
 
         # TODO: find a more elegant way to do this
         if self.cfg.model.type == 'ImageClassifier':
-            ground_truth = torch.Tensor([self.dataset.gt_labels[sample_id] for sample_id in batch_indices]).to(self.device)
+            ground_truth = torch.Tensor([self.dataset[sample_id]["gt_label"] for sample_id in batch_indices]).to(self.device)
         elif self.cfg.model.type == 'EncoderDecoder':
             ground_truth = torch.stack([self.dataset[sample_id]['gt_semantic_seg'].data for sample_id in batch_indices]).to(self.device)
         elif self.cfg.model.type == 'SingleStageDetector':
@@ -130,8 +130,10 @@ class DistortionUtils:
             distorted = block_name_to_activation_distorted[k]
             baseline = block_name_to_activation_baseline[k]
 
-            noises[k] = ((distorted - baseline) ** 2).mean(dim=[1, 2, 3]).cpu().numpy()
-            signals[k] = (baseline ** 2).mean(dim=[1, 2, 3]).cpu().numpy()
+            dim = [1] if distorted.dim() == 2 else [1, 2, 3]
+
+            noises[k] = ((distorted - baseline) ** 2).mean(dim=dim).cpu().numpy()
+            signals[k] = (baseline ** 2).mean(dim=dim).cpu().numpy()
 
         return noises, signals
 

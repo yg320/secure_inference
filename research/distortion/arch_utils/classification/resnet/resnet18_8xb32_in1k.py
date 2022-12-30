@@ -1,15 +1,21 @@
 from research.distortion.utils import ArchUtils
 
 
-class ResNet_CIFAR_Utils(ArchUtils):
+class Utils(ArchUtils):
     def __init__(self):
-        super(ResNet_CIFAR_Utils, self).__init__()
+        super(Utils, self).__init__()
 
     def run_model_block(self, model, activation, block_name):
         if block_name == "stem":
             activation = model.backbone.conv1(activation)
             activation = model.backbone.norm1(activation)
             activation = model.backbone.relu(activation)
+            activation = model.backbone.maxpool(activation)
+        elif block_name == "layer4_1":
+            activation = model.backbone.layer4[1](activation)
+            activation = model.neck(activation)
+            activation = model.head.pre_logits(activation)
+            activation = model.head.fc(activation)
         else:
             res_layer_name, block_name = block_name.split("_")
             layer = getattr(model.backbone, res_layer_name)

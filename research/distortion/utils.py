@@ -426,14 +426,15 @@ class ResNetUtils(ArchUtils):
             setattr(res_block, f"relu_{relu_name}", block_relu)
 
 
-from research.distortion.arch_utils.classification.ResNet_CIFAR import ResNet_CIFAR_Utils as ResNet_CIFAR_Classification_Utils
+from research.distortion.arch_utils.classification.resnet.resnet18_8xb32_in1k import Utils as resnet18_8xb32_in1k_Utils
 from research.distortion.arch_utils.detection.ssd.ssdlite_mobilenetv2_scratch_600e_coco import MobileNetV2_Utils as MobileNetV2_Detection_Utils
 from research.distortion.arch_utils.segmentation.MobileNetV2 import MobileNetV2_Utils as MobileNetV2_Segmentation_Utils
 
 class ArchUtilsFactory:
-    def __call__(self, model_cfg):
-        arch_name = model_cfg.backbone.type
-        model_type = model_cfg.type
+    def __call__(self, cfg):
+
+        if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type == 'ResNet' and cfg.model.backbone.depth == 18:
+            return resnet18_8xb32_in1k_Utils()
 
         if model_type == "SingleStageDetector" and arch_name == "MobileNetV2":
             return MobileNetV2_Detection_Utils()
