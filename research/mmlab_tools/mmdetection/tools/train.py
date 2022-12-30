@@ -18,7 +18,7 @@ from mmdet.apis import init_random_seed, set_random_seed, train_detector
 from mmdet.datasets import build_dataset
 from mmdet.models import build_detector
 from mmdet.utils import (collect_env, get_device, get_root_logger,
-                         replace_cfg_vals, rfnext_init_model,
+                         replace_cfg_vals,# rfnext_init_model,
                          setup_multi_processes, update_data_root)
 
 
@@ -216,7 +216,7 @@ def main():
     model.init_weights()
 
     # init rfnext if 'RFSearchHook' is defined in cfg
-    rfnext_init_model(model, cfg=cfg)
+    #rfnext_init_model(model, cfg=cfg)
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:

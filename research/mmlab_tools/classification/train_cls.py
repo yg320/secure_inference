@@ -182,7 +182,7 @@ def main():
     model = build_classifier(cfg.model)
     model.init_weights()
 
-    if cfg.relu_spec_file is not None:
+    if hasattr(cfg, "relu_spec_file") and cfg.relu_spec_file is not None:
         layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
         arch_utils = ArchUtilsFactory()(cfg.model.backbone.type)
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
