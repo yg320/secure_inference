@@ -6,4 +6,5 @@ outputs/
 mmlab_models/
 work_dirs/
 data/
+relu_spec_files/
 *.py[cod]

@@ -9,9 +9,11 @@
 - Consider what is best, torch or numpy - avoid converting between them.
 - Classification and Detection
 - How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
+- Replace Max Pool with Avg Pool with correction
 
 ============================================= Implementation Major =============================================
 
+- Reorganize configs (from scratch) as well as models, parametrs and MMLab tools (Just download everything once more)
 - Finish GlobalAveragePooling and Fully Connected implementation in classification
 - Make a Unified bReLU - make it a symmetric one.
 - Vector2Scalar multiplication. (for the bReLU)
@@ -54,7 +56,8 @@
 - We set real benchmark on (Datasets) and Tasks
 - We deliver a secure package over MMLab project
 - Runtime as Function of Bandwidth
-
+- Added CUDA implementation
+- People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
 ============================================= Research Minor =============================================
 - Add quantization noise
 - Can we fuze mobilenet 1x1 and 3x3 convolutions?
