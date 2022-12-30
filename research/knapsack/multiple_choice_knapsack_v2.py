@@ -484,7 +484,7 @@ class MultipleChoiceKnapsack:
 
     @staticmethod
     def run_multiple_choice(Ws, Ps, num_rows, num_columns):
-        device = torch.device("cuda:1")
+        device = torch.device("cuda:0")
         Ws = torch.from_numpy(Ws)
         Ps = torch.from_numpy(Ps)
 
@@ -545,8 +545,8 @@ class MultipleChoiceKnapsack:
 
             signal = np.stack([pickle.load(open(f, 'rb'))["Signal"] for f in files])
             signal = signal.mean(axis=0).mean(axis=2).T
-            if layer_name == "decode_0":
-                signal[:] = signal[0]
+            # if layer_name == "decode_0":
+            #     signal[:] = signal[0]
 
             noise = noise / signal
             noise = noise[:-1]
@@ -639,10 +639,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     # parser.add_argument('--iter', type=int)
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp/block_size_spec_0.1.pickle")
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/PycharmProjects/secure_inference/relu_spec_files/classification/block_size_spec_0.05.pickle")
     parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/tmp/channel_distortions")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/baseline/resnet18_8xb16_cifar10.py")
-    parser.add_argument('--ratio', type=float, default=0.1)
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet18_8xb16_cifar10/resnet18_8xb16_cifar10.py")
+    parser.add_argument('--ratio', type=float, default=0.05)
     parser.add_argument('--seed', type=float, default=123)
     parser.add_argument('--num_channels', type=float, default=None)
     parser.add_argument('--cost_type', type=str, default="Bandwidth")
