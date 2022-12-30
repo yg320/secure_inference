@@ -2,8 +2,7 @@ import torch
 import numpy as np
 
 from research.distortion.utils import get_model, get_data, center_crop, ArchUtilsFactory
-from mmcls.datasets import build_dataset as build_dataset_mmcls
-from mmseg.datasets import build_dataset as build_dataset_mmseg
+from research.utils import build_data
 
 # from mmseg.ops import resize
 # import torch.nn.functional as F
@@ -80,7 +79,7 @@ class DistortionUtils:
         self.device = f"cuda:{gpu_id}"
         self.params = params
         self.cfg = cfg
-        self.arch_utils = ArchUtilsFactory()(self.cfg.model.backbone.type)
+        self.arch_utils = ArchUtilsFactory()(self.cfg.model)
         self.model = get_model(
             config=self.cfg,
             gpu_id=self.gpu_id,
@@ -89,12 +88,9 @@ class DistortionUtils:
 
         # TODO: Replaced test with train
         # TODO: find a more elegant way to do this
-        if self.cfg.model.type == 'ImageClassifier':
-            self.dataset = build_dataset_mmcls(self.cfg.data.train, default_args=dict(test_mode=False))
-        elif self.cfg.model.type == 'EncoderDecoder':
-            self.dataset = build_dataset_mmseg(self.cfg.data.train, default_args=dict(test_mode=False))
-        else:
-            raise NotImplementedError
+        # TODO: this is copied again and again
+        self.dataset = build_data(self.cfg, train=True)
+
         np.random.seed(123)
         self.shuffled_indices = np.arange(len(self.dataset))
         np.random.shuffle(self.shuffled_indices)
@@ -119,6 +115,8 @@ class DistortionUtils:
             ground_truth = torch.Tensor([self.dataset.gt_labels[sample_id] for sample_id in batch_indices]).to(self.device)
         elif self.cfg.model.type == 'EncoderDecoder':
             ground_truth = torch.stack([self.dataset[sample_id]['gt_semantic_seg'].data for sample_id in batch_indices]).to(self.device)
+        elif self.cfg.model.type == 'SingleStageDetector':
+            ground_truth = [self.dataset[sample_id]['gt_labels'].data.to(self.device) for sample_id in batch_indices]
 
         return batch, ground_truth
 

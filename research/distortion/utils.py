@@ -11,6 +11,7 @@ from research.bReLU import BlockRelu
 
 from mmcls.models import build_classifier
 from mmseg.models import build_segmentor
+from mmdet.models import build_detector
 
 # TODO: most of this garbage is not important. Get rid of it
 def get_model(config, gpu_id=None, checkpoint_path=None):
@@ -34,9 +35,15 @@ def get_model(config, gpu_id=None, checkpoint_path=None):
     cfg.model.train_cfg = None
     if cfg.model.type == 'ImageClassifier':
         model = build_classifier(cfg.model)
-    else:
+    elif cfg.model.type == 'EncoderDecoder':
         model = build_segmentor(cfg.model, test_cfg=cfg.get('test_cfg'))
-
+    elif cfg.model.type == 'SingleStageDetector':
+        model = build_detector(
+            cfg.model,
+            train_cfg=cfg.get('train_cfg'),
+            test_cfg=cfg.get('test_cfg'))
+    else:
+        raise NotImplementedError
     if checkpoint_path is not None:
         checkpoint = load_checkpoint(model, checkpoint_path, map_location='cpu')
 
@@ -229,57 +236,6 @@ class ArchUtils:
                                 for layer_name, block_sizes in layer_name_to_block_sizes.items()}
         self.set_layers(model, layer_name_to_layers)
 
-class MobileNetUtils(ArchUtils):
-    def __init__(self):
-        pass
-
-    def run_model_block(self, model, activation, block_name):
-        if block_name == "conv1":
-            activation = model.backbone.conv1(activation)
-        elif block_name == "decode":
-            activation = model.decode_head([None, None, None, activation])
-        else:
-            res_layer_name, block_name = block_name.split("_")
-            layer = getattr(model.backbone, res_layer_name)
-            activation = layer[int(block_name)](activation)
-        return activation
-
-    def get_layer(self, model, layer_name):
-        if "decode" in layer_name:
-            if layer_name == "decode_0":
-                return model.decode_head.image_pool[1].activate
-            elif layer_name == "decode_5":
-                return model.decode_head.bottleneck.activate
-            else:
-                _, relu_name = layer_name.split("_")
-                relu_index = int(relu_name)
-                assert relu_index in [1, 2, 3, 4]
-                return model.decode_head.aspp_modules[relu_index - 1].activate
-        elif layer_name == "conv1":
-            return model.backbone.conv1.activate
-        else:
-            layer_name, inverted_residual_block, conv_module = layer_name.split("_")
-            layer = getattr(model.backbone, layer_name)
-            return layer[int(inverted_residual_block)].conv[int(conv_module)].activate
-
-    def set_layer(self, model, layer_name, block_relu):
-        if "decode" in layer_name:
-            if layer_name == "decode_0":
-                model.decode_head.image_pool[1].activate = block_relu
-            elif layer_name == "decode_5":
-                model.decode_head.bottleneck.activate = block_relu
-            else:
-                _, relu_name = layer_name.split("_")
-                relu_index = int(relu_name)
-                assert relu_index in [1, 2, 3, 4]
-                model.decode_head.aspp_modules[relu_index - 1].activate = block_relu
-        elif layer_name == "conv1":
-            model.backbone.conv1.activate = block_relu
-        else:
-            layer_name, inverted_residual_block, conv_module = layer_name.split("_")
-            layer = getattr(model.backbone, layer_name)
-            layer[int(inverted_residual_block)].conv[int(conv_module)].activate = block_relu
-
 class ResNetUtils(ArchUtils):
     def __init__(self):
         pass
@@ -470,18 +426,31 @@ class ResNetUtils(ArchUtils):
             setattr(res_block, f"relu_{relu_name}", block_relu)
 
 
+from research.distortion.arch_utils.classification.ResNet_CIFAR import ResNet_CIFAR_Utils as ResNet_CIFAR_Classification_Utils
+from research.distortion.arch_utils.detection.ssd.ssdlite_mobilenetv2_scratch_600e_coco import MobileNetV2_Utils as MobileNetV2_Detection_Utils
+from research.distortion.arch_utils.segmentation.MobileNetV2 import MobileNetV2_Utils as MobileNetV2_Segmentation_Utils
 
 class ArchUtilsFactory:
-    def __call__(self, arch_name):
-        from research.distortion.arch_utils.ResNet_CIFAR import ResNet_CIFAR_Utils
-        if arch_name in ["ResNetV1c", "SecureResNet", "MyResNet", "AvgPoolResNet"]:
-            return ResNetUtils()
-        elif arch_name == "MobileNetV2":
-            return MobileNetUtils()
-        elif arch_name == "ResNet_CIFAR_V2":
-            return ResNet_CIFAR_Utils()
-        else:
-            assert False
+    def __call__(self, model_cfg):
+        arch_name = model_cfg.backbone.type
+        model_type = model_cfg.type
+
+        if model_type == "SingleStageDetector" and arch_name == "MobileNetV2":
+            return MobileNetV2_Detection_Utils()
+        if model_type == 'ImageClassifier' and arch_name == 'ResNet_CIFAR':
+            return ResNet_CIFAR_Classification_Utils()
+        if model_type == "EncoderDecoder" and arch_name == "MobileNetV2":
+            return MobileNetV2_Segmentation_Utils()
+
+        assert False
+        # if arch_name in ["ResNetV1c", "SecureResNet", "MyResNet", "AvgPoolResNet"]:
+        #     return ResNetUtils()
+        # elif arch_name == "MobileNetV2":
+        #     return MobileNetUtils()
+        # elif arch_name == "ResNet_CIFAR_V2":
+        #     return ResNet_CIFAR_Utils()
+        # else:
+        #     assert False
 
 
 if __name__ == "__main__":
