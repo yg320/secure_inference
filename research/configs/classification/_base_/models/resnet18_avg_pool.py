@@ -2,7 +2,7 @@
 model = dict(
     type='ImageClassifier',
     backbone=dict(
-        type='MyResNet',
+        type='AvgPoolResNet',
         depth=18,
         num_stages=4,
         out_indices=(3, ),
