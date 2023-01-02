@@ -7,7 +7,7 @@ import torch
 import queue
 import numpy as np
 
-NUMPY_ARR_QUEUE_SIZE = 50
+NUMPY_ARR_QUEUE_SIZE = 10
 
 class Receiver(Thread):
     def __init__(self, port):
@@ -70,7 +70,7 @@ class Sender(Thread):
                     data = data.numpy()
 
                 arr_size_bytes = data.size * data.itemsize
-
+                assert arr_size_bytes >= 64
                 self.num_of_bytes_sent += arr_size_bytes
 
                 if self.simulated_bandwidth:
@@ -80,11 +80,11 @@ class Sender(Thread):
                     total_sleep_time += send_time
                     time.sleep(send_time)
                     s.sendall(data)
-                    s.recv(1)
+                    s.recv(10)
                     Sender.lock.release()
                 else:
                     s.sendall(data)
-                    s.recv(1)
+                    s.recv(10)
 
     def put(self, arr):
         # TODO: why is this copy needed (related to the monster threading bug)

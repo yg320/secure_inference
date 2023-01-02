@@ -10,10 +10,11 @@ logger = logging.getLogger('simple client')
 logger.setLevel(logging.INFO)
 
 with NumpySocket() as s:
-    s.connect(("localhost", 9999))
+    s.connect(("localhost", 11111))
     
     logger.info("sending numpy array:")
-    frame = np.random.random((10000000))
+    frame = np.random.random((1000, ))
     print(time.time())
     s.sendall(frame)
+    s.recv(10)
 

@@ -16,34 +16,24 @@ class NumpySocket(socket.socket):
         logging.debug("frame sent")
 
 
-    def recv(self, bufsize=1024):
-        length = None
-        frameBuffer = bytearray()
-        while True:
-            data = super().recv(bufsize)
-            if len(data) == 0:
-                return np.array([])
+    def recv(self, bufsize=4096):
+
+        data = super().recv(bufsize)
+
+        if len(data) == 0:
+            return np.array([])
+        else:
+            frameBuffer = bytearray()
+            length_str, ignored, data = data.partition(b':')
+            length = int(length_str)
+
             frameBuffer += data
-            if len(frameBuffer) == length:
-                break
-            while True:
-                if length is None:
-                    if b':' not in frameBuffer:
-                        break
-                    # remove the length bytes from the front of frameBuffer
-                    # leave any remaining bytes in the frameBuffer!
-                    length_str, ignored, frameBuffer = frameBuffer.partition(b':')
-                    length = int(length_str)
-                if len(frameBuffer) < length:
-                    break
-                # split off the full message from the remaining bytes
-                # leave any remaining bytes in the frameBuffer!
-                frameBuffer = frameBuffer[length:]
-                length = None
-                break
-        #         frame = np.load(BytesIO(frameBuffer), allow_pickle=True)['frame']
+
+            while len(frameBuffer) < length:
+                data = super().recv(bufsize)
+                frameBuffer += data
+
         frame = np.load(BytesIO(frameBuffer), allow_pickle=True)['frame']
-        logging.debug("frame received")
         return frame
 
     def accept(self):
