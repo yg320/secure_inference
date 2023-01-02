@@ -651,11 +651,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
 
-    params = param_factory(cfg.model.backbone)
+    params = param_factory(cfg)
     layer_names = params.LAYER_NAMES
     ratio = args.ratio
 
     mck = MultipleChoiceKnapsack(params, args.cost_type, args.division, args.ratio, args.seed, args.num_channels, args.channel_distortion_path, args.shuffle)
     block_size_spec = mck.get_optimal_block_sizes()
+
+    if not os.path.exists(os.path.dirname(args.block_size_spec_file_name)):
+        os.makedirs(os.path.dirname(args.block_size_spec_file_name))
+
     with open(args.block_size_spec_file_name, "wb") as f:
         pickle.dump(obj=block_size_spec, file=f)

@@ -22,7 +22,7 @@ from mmcls.utils import (auto_select_device, collect_env, get_root_logger,
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 
-from research.distortion.utils import ArchUtilsFactory
+from research.distortion.arch_utils.factory import arch_utils_factory
 import pickle
 
 def parse_args():
@@ -186,7 +186,7 @@ def main():
 
     if hasattr(cfg, "relu_spec_file") and cfg.relu_spec_file is not None:
         layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
-        arch_utils = ArchUtilsFactory()(cfg)
+        arch_utils = arch_utils_factory(cfg)
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
     datasets = [build_dataset(cfg.data.train)]
