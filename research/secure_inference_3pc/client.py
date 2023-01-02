@@ -330,7 +330,11 @@ class SecureMaxPoolClient(SecureModule):
             beta = self.dReLU(w.astype(self.dtype))
             self.network_assets.sender_01.put(beta)
             beta_recon = self.network_assets.receiver_01.get() + beta
-            a = (beta_recon * x[i].astype(self.dtype))
+            a_version0 = beta_recon * x[i].astype(self.dtype)
+            a_version1 = self.select_share.secure_multiplication(np.zeros_like(beta_recon), x[i].astype(self.dtype))
+            self.network_assets.sender_01.put(a_version0)
+            self.network_assets.sender_01.put(a_version1)
+            a = a_version0
             b = (1-beta_recon) * max_.astype(self.dtype)
             # a = self.select_share.secure_multiplication(beta, x[i].astype(self.dtype))
             # self.network_assets.sender_01.put(a)

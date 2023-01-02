@@ -277,7 +277,7 @@ class SecureMaxPoolCryptoProvider(SecureModule):
         max_ = x[0].astype(self.dtype)
         for i in range(1, 9):
             self.dReLU(max_)
-            # self.select_share.secure_multiplication(max_.shape)
+            self.select_share.secure_multiplication(max_.shape)
             # self.select_share.secure_multiplication(max_.shape)
         return max_.reshape(out_shape).astype(x.dtype)
 
