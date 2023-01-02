@@ -1,7 +1,13 @@
 - Leetcode, Algo1, tabs
 
 ============================================= Research Major =============================================
-
+- Stochastic DReLU - I don't think we convert it properly, try ignoring first/second bits and see what happens1
+- Should FC and GAP be part of distortion?
+- Classification - 32bits
+- Use blocksize [1,0] or discard!
+- Float16? uint8?
+- Use random weight in each inference!
+- Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
 - Start analysis (Analysis with noise to KnapSack matrix)
 - Consult Shai about the unfairness of finetuning
 - ImageNet classification - compare with Porthos
@@ -10,22 +16,51 @@
 - Classification and Detection
 - How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
 - Replace Max Pool with Avg Pool with correction
+- Allow for softmax via maxpool derivative (Or FALCON implementation)
 
 ============================================= Implementation Major =============================================
-
+- Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
+- Use newer torch version with inplace << and bit_wise and
+- Instead of TRUNC, consider less <<
 - Reorganize configs (from scratch) as well as models, parametrs and MMLab tools (Just download everything once more)
 - Finish GlobalAveragePooling and Fully Connected implementation in classification
 - Make a Unified bReLU - make it a symmetric one.
 - Vector2Scalar multiplication. (for the bReLU)
 - Implement Load Balancing in ReLU (same as Porthos)
+- Consider transfering to CUDA also ReLU stuff
 
 
 ============================================= Reading =============================================
+- FALCON, 2pc, 3pc, OT, HE
+- ABY3
+- How can 3PC be converted to 2PC? (Using OT)
 - Understand our Security level
 - Understand Porthos float2int and int2float methods
 - Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
 - Go over protocols again
 - Understand the math behind the protocols
+- Understand detection and propose protocols for special layers
+
+============================================= Paper notes =============================================
+- Mention that most of our contributions are not related directly to the protocol, and are relevant to many other protocols. (E.g. FALCON)
+- Float implementation
+- Stochastic ReLU
+- Non matmul implementation
+- Remove negligble ops (such as test for 1/2**64)
+- We set real benchmark on (Datasets) and Tasks
+- We deliver a secure package over MMLab project
+- Runtime as Function of Bandwidth
+- Added CUDA implementation
+- People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
+
+============================================= Research Minor =============================================
+- Add quantization noise (to allow for 32bit inference) - QAT
+- Distortion extraction that already uses AvgPool
+- Can we fuze mobilenet 1x1 and 3x3 convolutions?
+- Clip TRUNC every k'th conv
+- Why first image is slow
+- Soft training?
+- CRF
 
 ============================================= Implementation Minor =============================================
 - Can we add more LUTs?
@@ -47,21 +82,3 @@
 - Verify fetchers are not slowing us down. Also verify that they are really needed
 - Can some ReLU ops be fetched?
 - Implement get_c in Numba! (And maybe even other ops)
-
-============================================= Paper notes =============================================
-- Float implementation
-- Stochastic ReLU
-- Non matmul implementation
-- Remove negligble ops (such as test for 1/2**64)
-- We set real benchmark on (Datasets) and Tasks
-- We deliver a secure package over MMLab project
-- Runtime as Function of Bandwidth
-- Added CUDA implementation
-- People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
-============================================= Research Minor =============================================
-- Add quantization noise
-- Can we fuze mobilenet 1x1 and 3x3 convolutions?
-- Clip TRUNC every k'th conv
-- Why first image is slow
-- Soft training?
-- CRF
