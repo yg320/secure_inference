@@ -284,6 +284,76 @@ class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
         return activation
 
 
+class SecureSelectShareServer(SecureModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(SecureSelectShareServer, self).__init__(crypto_assets, network_assets)
+        self.secure_multiplication = SecureMultiplicationServer(crypto_assets, network_assets)
+
+    def forward(self, alpha, x, y):
+        dtype = alpha.dtype
+        shape = alpha.shape
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+
+        w = y - x
+        c = self.secure_multiplication(alpha, w)
+        z = x + c
+        return z + mu_1
+
+
+class SecureMaxPoolServer(SecureModule):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets):
+        super(SecureMaxPoolServer, self).__init__(crypto_assets, network_assets)
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.select_share = SecureSelectShareServer(crypto_assets, network_assets)
+        self.dReLU = SecureDReLUServer(crypto_assets, network_assets)
+
+        assert self.kernel_size == 3
+        assert self.stride == 2
+        assert self.padding == 1
+
+    def forward(self, x):
+        x_client = self.network_assets.receiver_01.get()
+        x_rec = x_client + x
+        out_desired = torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy()
+        assert x.shape[2] == 112
+        assert x.shape[3] == 112
+
+        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+                      x[:, :, 0:-1:2, 1:-1:2],
+                      x[:, :, 0:-1:2, 2::2],
+                      x[:, :, 1:-1:2, 0:-1:2],
+                      x[:, :, 1:-1:2, 1:-1:2],
+                      x[:, :, 1:-1:2, 2::2],
+                      x[:, :, 2::2, 0:-1:2],
+                      x[:, :, 2::2, 1:-1:2],
+                      x[:, :, 2::2, 2::2]])
+
+        out_shape = x.shape[1:]
+        x = x.reshape((x.shape[0], -1))
+
+        # x_reshaped_recon = self.network_assets.receiver_01.get() + x
+        max_ = x[0]
+        for i in range(1, 9):
+            w = x[i] - max_
+            beta = self.dReLU(w.astype(self.dtype))
+            self.network_assets.sender_01.put(beta)
+            beta_recon = self.network_assets.receiver_01.get() + beta
+            a = (beta_recon * x[i].astype(self.dtype))
+            b = (1-beta_recon) * max_.astype(self.dtype)
+            # a = self.select_share.secure_multiplication(beta, x[i].astype(self.dtype))
+            # a_recon = self.network_assets.receiver_01.get() + a
+
+            max_ = a + b
+
+        ret = max_.reshape(out_shape).astype(x.dtype)
+        ret_client = self.network_assets.receiver_01.get()
+        ret_recon = ret + ret_client
+        return ret
+
+
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DServer
 
@@ -399,6 +469,7 @@ if __name__ == "__main__":
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
         build_secure_fully_connected=build_secure_fully_connected,
+        max_pool=SecureMaxPoolServer,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUServer,
         relu_spec_file=Params.RELU_SPEC_FILE,

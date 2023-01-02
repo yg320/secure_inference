@@ -233,6 +233,53 @@ class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU)
 
         return activation
 
+class SecureSelectShareCryptoProvider(SecureModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(SecureSelectShareCryptoProvider, self).__init__(crypto_assets, network_assets)
+        self.secure_multiplication = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+
+    def forward(self, share):
+
+        self.secure_multiplication(share.shape)
+        return share
+
+
+class SecureMaxPoolCryptoProvider(SecureModule):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets):
+        super(SecureMaxPoolCryptoProvider, self).__init__(crypto_assets, network_assets)
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        self.select_share = SecureSelectShareCryptoProvider(crypto_assets, network_assets)
+        self.dReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
+
+        assert self.kernel_size == 3
+        assert self.stride == 2
+        assert self.padding == 1
+
+    def forward(self, x):
+        assert x.shape[2] == 112
+        assert x.shape[3] == 112
+
+        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+                      x[:, :, 0:-1:2, 1:-1:2],
+                      x[:, :, 0:-1:2, 2::2],
+                      x[:, :, 1:-1:2, 0:-1:2],
+                      x[:, :, 1:-1:2, 1:-1:2],
+                      x[:, :, 1:-1:2, 2::2],
+                      x[:, :, 2::2, 0:-1:2],
+                      x[:, :, 2::2, 1:-1:2],
+                      x[:, :, 2::2, 2::2]])
+
+        out_shape = x.shape[1:]
+        x = x.reshape((x.shape[0], -1))
+        max_ = x[0].astype(self.dtype)
+        for i in range(1, 9):
+            self.dReLU(max_)
+            # self.select_share.secure_multiplication(max_.shape)
+            # self.select_share.secure_multiplication(max_.shape)
+        return max_.reshape(out_shape).astype(x.dtype)
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
@@ -309,6 +356,7 @@ if __name__ == "__main__":
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
         build_secure_fully_connected=build_secure_fully_connected,
+        max_pool=SecureMaxPoolCryptoProvider,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUCryptoProvider,
         relu_spec_file=Params.RELU_SPEC_FILE,
