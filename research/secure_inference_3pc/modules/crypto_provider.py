@@ -5,7 +5,7 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS, NUM_OF_COMPARE_BITS
 from research.secure_inference_3pc.timer import Timer
-from research.secure_inference_3pc.base import decompose, get_c, module_67, TypeConverter, SpaceToDepth
+from research.secure_inference_3pc.base import  SpaceToDepth
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
