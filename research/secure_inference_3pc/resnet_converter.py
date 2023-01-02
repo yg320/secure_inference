@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from research.secure_inference_3pc.const import SIGNED_DTYPE
 import pickle
-from research.distortion.utils import ArchUtilsFactory
+from research.distortion.arch_utils.factory import arch_utils_factory
 from functools import partial
 from research.distortion.utils import get_model
 
@@ -52,7 +52,7 @@ def securify_resnet18_model(model, build_secure_conv, build_secure_relu, crypto_
     if relu_spec_file:
         SecureBlockReLUClient_partial = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets)
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-        arch_utils = ArchUtilsFactory()('AvgPoolResNet')
+        arch_utils = arch_utils_factory('AvgPoolResNet')
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=SecureBlockReLUClient_partial)
 
 def convert_conv_module(module, build_secure_conv, build_secure_relu):
@@ -71,6 +71,8 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
     decoder.conv_seg = build_secure_conv(conv_module=decoder.conv_seg, bn_module=None)
     def foo(x):
         return (x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])).astype(x.dtype)  # TODO: is this the best way to do this?)
+
+    # TODO: replace with SecureGlobalAveragePooling2d
     decoder.image_pool[0].forward = foo
 
 
@@ -88,31 +90,49 @@ def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, 
 
 
     return model
+import torch.nn as nn
 
-def securify_resnet_cifar(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+class SecureGlobalAveragePooling2d(nn.Module):
+    def __init__(self):
+        super(SecureGlobalAveragePooling2d, self).__init__()
+
+    # TODO: is this the best way to do this?)
+    def forward(self, x):
+        return ((x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])).astype(x.dtype))
+
+def securify_resnet_cifar(model, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
     model.backbone.bn1 = torch.nn.Identity()
     model.backbone.relu = build_secure_relu()
 
     for layer in [1, 2, 3, 4]:
-        for block in [0, 1]:
-            cur_res_layer = getattr(model.backbone, f"layer{layer}")
+        cur_res_layer = getattr(model.backbone, f"layer{layer}")
+        for block in cur_res_layer:
 
-            cur_res_layer[block].conv1 = build_secure_conv(conv_module=cur_res_layer[block].conv1, bn_module=cur_res_layer[block].bn1)
-            cur_res_layer[block].bn1 = torch.nn.Identity()
-            cur_res_layer[block].relu_1 = build_secure_relu()
+            block.conv1 = build_secure_conv(conv_module=block.conv1, bn_module=block.bn1)
+            block.bn1 = torch.nn.Identity()
+            block.relu_1 = build_secure_relu()
 
-            cur_res_layer[block].conv2 = build_secure_conv(conv_module=cur_res_layer[block].conv2, bn_module=cur_res_layer[block].bn2)
-            cur_res_layer[block].bn2 = torch.nn.Identity()
-            cur_res_layer[block].relu_2 = build_secure_relu()
+            block.conv2 = build_secure_conv(conv_module=block.conv2, bn_module=block.bn2)
+            block.bn2 = torch.nn.Identity()
+            block.relu_2 = build_secure_relu()
 
-            if cur_res_layer[block].downsample:
-                cur_res_layer[block].downsample = build_secure_conv(conv_module=cur_res_layer[block].downsample[0], bn_module=cur_res_layer[block].downsample[1])
+            if hasattr(block, "conv3"):
+                block.conv3 = build_secure_conv(conv_module=block.conv3, bn_module=block.bn3)
+                block.bn3 = torch.nn.Identity()
+                block.relu_3 = build_secure_relu()
 
+            if block.downsample:
+                block.downsample = build_secure_conv(conv_module=block.downsample[0], bn_module=block.downsample[1])
 
-def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+    model.head.fc = build_secure_fully_connected(conv_module=model.head.fc, bn_module=None)
+
+    model.neck = SecureGlobalAveragePooling2d()
+
+def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
     secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets)
 
@@ -125,14 +145,17 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     # print(model.head.fc(model.neck(arr)).argmax())
     if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "MobileNetV2":
         securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
-    if cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
-        securify_resnet_cifar(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
-
+    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
+        securify_resnet_cifar(model, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet"]:
+        securify_resnet_cifar(model, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+    else:
+        raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
     if relu_spec_file:
         block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-        arch_utils = ArchUtilsFactory()(cfg.model.backbone.type)
+        arch_utils = ArchUtilsFactory()(cfg)
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
 
     return secure_model_class(model)

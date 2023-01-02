@@ -1,10 +1,11 @@
 import torch
 import numpy as np
-from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
+from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c_party_1, module_67, DepthToSpace, SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
+from research.secure_inference_3pc.timer import Timer
 
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -17,6 +18,7 @@ from functools import partial
 from research.bReLU import NumpySecureOptimizedBlockReLU
 import mmcv
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
+from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
@@ -88,6 +90,9 @@ class PrivateCompareServer(SecureModule):
         super(PrivateCompareServer, self).__init__(crypto_assets, network_assets)
 
     def forward(self, x_bits_1, r, beta):
+        # with Timer("PrivateCompareServer"):
+        return self._forward(x_bits_1, r, beta)
+    def _forward(self, x_bits_1, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=np.int32)
         # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
@@ -95,7 +100,7 @@ class PrivateCompareServer(SecureModule):
         r[beta] += 1
         bits = decompose(r)
 
-        c_bits_1 = get_c(x_bits_1, bits, beta, np.int8(1))
+        c_bits_1 = get_c_party_1(x_bits_1, bits, beta, np.int8(1))
 
         np.multiply(s, c_bits_1, out=s)
 
@@ -112,6 +117,9 @@ class ShareConvertServer(SecureModule):
         self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
 
     def forward(self, a_1):
+        # with Timer("ShareConvertServer"):
+        return self._forward(a_1)
+    def _forward(self, a_1):
 
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
@@ -286,6 +294,7 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
 
     else:
         W = conv_module.weight
+        assert conv_module.bias is None
         W = TypeConverter.f2i(W)
         B = None
     if is_prf_fetcher:
@@ -304,6 +313,37 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         dilation=conv_module.dilation,
         padding=conv_module.padding,
         groups=conv_module.groups,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets
+    )
+
+def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DServer
+
+    assert bn_module is None
+    stride = (1, 1)
+    dilation = (1, 1)
+    padding = (0, 0)
+    groups = 1
+
+    W = TypeConverter.f2i(conv_module.weight.unsqueeze(2).unsqueeze(3))
+    B = TypeConverter.f2i(conv_module.bias)
+
+    if is_prf_fetcher:
+        W_client = np.zeros(shape=W.shape, dtype=SIGNED_DTYPE)
+    else:
+        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                          high=MAX_VAL,
+                                                          size=W.shape,
+                                                          dtype=SIGNED_DTYPE)
+    W = W - W_client
+    return conv_class(
+        W=W,
+        bias=B,
+        stride=stride,
+        dilation=dilation,
+        padding=padding,
+        groups=groups,
         crypto_assets=crypto_assets,
         network_assets=network_assets
     )
@@ -342,6 +382,8 @@ class SecureModelClassification(SecureModule):
                                                           dtype=SIGNED_DTYPE)
 
         out = self.model.backbone(image)[0]
+        out = self.model.neck(out)
+        out = self.model.head.fc(out)
         self.network_assets.sender_01.put(out)
 
 
@@ -356,6 +398,7 @@ if __name__ == "__main__":
         checkpoint_path=Params.MODEL_PATH,
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
+        build_secure_fully_connected=build_secure_fully_connected,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUServer,
         relu_spec_file=Params.RELU_SPEC_FILE,

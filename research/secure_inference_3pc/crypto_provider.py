@@ -19,6 +19,7 @@ from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherSecu
 from functools import partial
 import mmcv
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
+from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 
 class SecureConv2DCryptoProvider(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
@@ -247,6 +248,18 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         network_assets=network_assets
     )
 
+def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DCryptoProvider
+
+    return conv_class(
+        W_shape=tuple(conv_module.weight.shape) + (1, 1),
+        stride=(1, 1),
+        dilation=(1, 1),
+        padding=(0, 0),
+        groups=1,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets
+    )
 
 
 def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
@@ -280,8 +293,9 @@ class SecureModelClassification(SecureModule):
                                                                  high=MAX_VAL,
                                                                  size=image_shape,
                                                                  dtype=SIGNED_DTYPE)
-        _ = self.model.backbone(dummy_image)
-
+        out = self.model.backbone(dummy_image)[0]
+        out = self.model.neck(out)
+        out = self.model.head.fc(out)
 
 if __name__ == "__main__":
     party = 2
@@ -294,6 +308,7 @@ if __name__ == "__main__":
         checkpoint_path=None,
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
+        build_secure_fully_connected=build_secure_fully_connected,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUCryptoProvider,
         relu_spec_file=Params.RELU_SPEC_FILE,

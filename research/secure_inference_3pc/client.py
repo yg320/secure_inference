@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import os
-from research.secure_inference_3pc.base import SecureModule, decompose, get_c, P, module_67, DepthToSpace, \
+from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, DepthToSpace, \
     SpaceToDepth, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
@@ -19,6 +19,7 @@ from research.bReLU import NumpySecureOptimizedBlockReLU
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
+from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
 from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel, PRFFetcherBlockReLU
@@ -97,7 +98,7 @@ class PrivateCompareClient(SecureModule):
         r[beta] += 1
         bits = decompose(r)
 
-        c_bits_0 = get_c(x_bits_0, bits, beta, np.int8(0))
+        c_bits_0 = get_c_party_0(x_bits_0, bits, beta, np.int8(0))
         np.multiply(s, c_bits_0, out=s)
         d_bits_0 = module_67(s)
 
@@ -299,6 +300,32 @@ class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
         return activation
 
 
+def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+    conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
+    shape = tuple(conv_module.weight.shape) + (1, 1)
+
+    stride = (1, 1)
+    dilation = (1, 1)
+    padding = (0, 0)
+    groups = 1
+
+    if is_prf_fetcher:
+        W = np.zeros(shape=shape, dtype=SIGNED_DTYPE)
+    else:
+        W = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                   high=MAX_VAL,
+                                                   size=shape,
+                                                   dtype=SIGNED_DTYPE)
+
+    return conv_class(
+        W=W,
+        stride=stride,
+        dilation=dilation,
+        padding=padding,
+        groups=groups,
+        crypto_assets=crypto_assets,
+        network_assets=network_assets
+    )
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
@@ -337,12 +364,14 @@ class SecureModelClassification(SecureModule):
         I = TypeConverter.f2i(img)
         I1 = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
         I0 = I - I1
-        out_0 = self.model.backbone(I0)[0]
+        out = self.model.backbone(I0)[0]
+        out = self.model.neck(out)
+        out_0 = self.model.head.fc(out)
         out_1 = self.network_assets.receiver_01.get()
         out = out_1 + out_0
         out = TypeConverter.i2f(out)
-        out = self.model.neck((out,))
-        out = self.model.head.fc(out[0]).argmax()
+        out = out.argmax()
+
         return out
 
 class SecureModelSegmentation(SecureModule):
@@ -390,38 +419,42 @@ def full_inference_classification(cfg, model, num_images):
     model.eval()
     for sample_id in tqdm(range(num_images)):
         img = dataset[sample_id]['img'].data[np.newaxis]
+        gt = dataset.get_gt_labels()[sample_id]
+
         with Timer("Inference"):
             out = model(img)
-        gt = dataset.gt_labels[sample_id]
+    #     # gt = dataset.gt_labels[sample_id]
         results_gt.append(gt)
         results_pred.append(out)
     print((np.array(results_gt) == np.array(results_pred)).mean())
 
 
-def full_inference(model, num_images):
+def full_inference(cfg, model, num_images):
+    dataset = build_data(cfg, train=False)
 
-    dataset = build_dataset({'type': 'ADE20KDataset',
-           'data_root': 'data/ade/ADEChallengeData2016',
-           'img_dir': 'images/validation',
-           'ann_dir': 'annotations/validation',
-           'pipeline': [
-               {'type': 'LoadImageFromFile'},
-               {'type': 'LoadAnnotations', 'reduce_zero_label': True},
-               {'type': 'Resize', 'img_scale': (1024, 256), 'keep_ratio': True},
-               {'type': 'RandomFlip', 'prob': 0.0},
-               {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
-               {'type': 'DefaultFormatBundle'},
-               {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
-           })
+    # dataset = build_dataset({'type': 'ADE20KDataset',
+    #        'data_root': 'data/ade/ADEChallengeData2016',
+    #        'img_dir': 'images/validation',
+    #        'ann_dir': 'annotations/validation',
+    #        'pipeline': [
+    #            {'type': 'LoadImageFromFile'},
+    #            {'type': 'LoadAnnotations', 'reduce_zero_label': True},
+    #            {'type': 'Resize', 'img_scale': (1024, 256), 'keep_ratio': True},
+    #            {'type': 'RandomFlip', 'prob': 0.0},
+    #            {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
+    #            {'type': 'DefaultFormatBundle'},
+    #            {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
+    #        })
     results = []
     for sample_id in tqdm(range(num_images)):
-        img = dataset[sample_id]['img'].data.unsqueeze(0)[:, :, :256, :256]
-        img_meta = dataset[sample_id]['img_metas'].data
-
-        img_meta['img_shape'] = (256, 256, 3)
+        img = dataset[sample_id]['img'][0].data.unsqueeze(0)
+        img_meta = dataset[sample_id]['img_metas'][0].data
         seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
-        seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
-        img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
+
+        # img_meta['img_shape'] = (256, 256, 3)
+        # img = img[:, :, :256, :256]
+        # seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
+        # img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
 
         with Timer("Inference"):
             seg_pred = model(img.numpy(), img_meta)
@@ -451,6 +484,7 @@ if __name__ == "__main__":
         checkpoint_path=Params.MODEL_PATH,  # TODO: implement fc
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
+        build_secure_fully_connected=build_secure_fully_connected,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,        block_relu=SecureBlockReLUClient,
         relu_spec_file=Params.RELU_SPEC_FILE,
         crypto_assets=crypto_assets,
@@ -467,7 +501,7 @@ if __name__ == "__main__":
                          crypto_assets=crypto_assets,
                          network_assets=network_assets)
     if cfg.model.type == "EncoderDecoder":
-        full_inference(model, Params.NUM_IMAGES)
+        full_inference(cfg, model, Params.NUM_IMAGES)
     else:
         full_inference_classification(cfg, model, Params.NUM_IMAGES)
 
