@@ -1,9 +1,9 @@
 import torch
 import numpy as np
 
-from research.distortion.utils import get_model, get_data, center_crop, ArchUtilsFactory
+from research.distortion.utils import get_model, get_data
 from research.utils import build_data
-
+from research.distortion.arch_utils.factory import arch_utils_factory
 # from mmseg.ops import resize
 # import torch.nn.functional as F
 # from mmseg.core import intersect_and_union
@@ -79,7 +79,7 @@ class DistortionUtils:
         self.device = f"cuda:{gpu_id}"
         self.params = params
         self.cfg = cfg
-        self.arch_utils = ArchUtilsFactory()(self.cfg)
+        self.arch_utils = arch_utils_factory(self.cfg)
         self.model = get_model(
             config=self.cfg,
             gpu_id=self.gpu_id,
@@ -204,21 +204,3 @@ class DistortionUtils:
         }
         return assets
 
-
-if __name__ == "__main__":
-    import matplotlib
-    matplotlib.use("TkAgg")
-    from matplotlib import pyplot as plt
-
-    from research.parameters.base import ParamsFactory
-    from research.parameters.base import BLOCK_SIZES_FULL
-    params = ParamsFactory()("MobileNetV2_256_Params_2_Groups")
-
-    dim_32_bandwidth = []
-    dim_32_num_relus = []
-    for dim in [32, 64, 128]:
-        for block_size in BLOCK_SIZES_FULL:
-            dim_32_bandwidth.append(get_brelu_bandwidth(tuple(block_size), dim))
-            dim_32_num_relus.append(get_num_relus(tuple(block_size), dim))
-
-    plt.scatter(dim_32_num_relus, dim_32_bandwidth)
