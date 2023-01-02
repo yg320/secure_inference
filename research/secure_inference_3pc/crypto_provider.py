@@ -252,12 +252,14 @@ class SecureMaxPoolCryptoProvider(SecureModule):
         self.padding = padding
         self.select_share = SecureSelectShareCryptoProvider(crypto_assets, network_assets)
         self.dReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
+        self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
         assert self.kernel_size == 3
         assert self.stride == 2
         assert self.padding == 1
 
     def forward(self, x):
+        assert x.shape[2] == 112
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
@@ -273,13 +275,16 @@ class SecureMaxPoolCryptoProvider(SecureModule):
                       x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1))
-        max_ = x[0].astype(self.dtype)
+        x = x.reshape((x.shape[0], -1)).astype(self.dtype)
+
+        max_ = x[0]
         for i in range(1, 9):
+
             self.dReLU(max_)
-            self.select_share.secure_multiplication(max_.shape)
-            # self.select_share.secure_multiplication(max_.shape)
-        return max_.reshape(out_shape).astype(x.dtype)
+            self.mult(max_.shape)
+            self.mult(max_.shape)
+
+        return max_.reshape(out_shape)
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
