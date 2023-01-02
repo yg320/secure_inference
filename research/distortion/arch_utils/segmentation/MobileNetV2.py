@@ -1,4 +1,5 @@
-from research.distortion.utils import ArchUtils
+from research.distortion.arch_utils.base import ArchUtils
+
 
 class MobileNetV2_Utils(ArchUtils):
     def __init__(self):

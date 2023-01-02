@@ -11,7 +11,7 @@ class Utils(ArchUtils):
             activation = model.backbone.norm1(activation)
             activation = model.backbone.relu(activation)
             activation = model.backbone.maxpool(activation)
-        elif block_name == "layer4_1":
+        elif block_name == "layer4_2":
             activation = model.backbone.layer4[1](activation)
             activation = model.neck(activation)
             activation = model.head.pre_logits(activation)
