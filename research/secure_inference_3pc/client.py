@@ -305,7 +305,7 @@ class SecureMaxPoolClient(SecureModule):
         assert self.padding == 1
 
     def forward(self, x):
-        self.network_assets.sender_01.put(x)
+        # self.network_assets.sender_01.put(x)
 
         assert x.shape[2] == 112
         assert x.shape[3] == 112
@@ -328,14 +328,17 @@ class SecureMaxPoolClient(SecureModule):
         for i in range(1, 9):
             w = x[i] - max_
             beta = self.dReLU(w)
-            a = self.mult(beta, x[i])
-            b = self.mult((1 - beta), max_)
-            max_ = a + b
+            max_ = self.select_share(beta, max_, x[i])
+            #
+            # a = self.mult(beta, x[i])
+            # b = self.mult((1 - beta), max_)
+            # max_ = a + b
 
-        ret = max_.reshape(out_shape)
-        self.network_assets.sender_01.put(ret)
+        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        # self.network_assets.sender_01.put(ret)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
 
-        return max_.reshape(out_shape)
+        return ret + mu_0
 
 
 class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):

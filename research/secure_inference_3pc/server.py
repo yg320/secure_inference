@@ -314,9 +314,9 @@ class SecureMaxPoolServer(SecureModule):
         assert self.padding == 1
 
     def forward(self, x):
-        x_client = self.network_assets.receiver_01.get()
-        x_rec = x_client + x
-        out_desired = torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy()
+        # x_client = self.network_assets.receiver_01.get()
+        # x_rec = x_client + x
+        # out_desired = torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy()
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
@@ -338,13 +338,16 @@ class SecureMaxPoolServer(SecureModule):
         for i in range(1, 9):
             w = x[i] - max_
             beta = self.dReLU(w)
-            a = self.mult(beta, x[i])
-            b = self.mult(-beta, max_)
-            max_ = a + b
+            max_ = self.select_share(beta, max_, x[i])
+            # a = self.mult(beta, x[i])
+            # b = self.mult(-beta, max_)
+            # max_ = a + b
 
-        ret = max_.reshape(out_shape)
-        ret_client = self.network_assets.receiver_01.get()
-        ret_recon = ret + ret_client
+        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        # ret_client = self.network_assets.receiver_01.get()
+        # ret_recon = ret + ret_client
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
+        ret = ret + mu_1
         return ret
 
 

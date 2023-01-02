@@ -281,10 +281,10 @@ class SecureMaxPoolCryptoProvider(SecureModule):
         for i in range(1, 9):
 
             self.dReLU(max_)
-            self.mult(max_.shape)
-            self.mult(max_.shape)
+            self.select_share(max_)
 
-        return max_.reshape(out_shape)
+
+        return max_.reshape(out_shape).astype(SIGNED_DTYPE)
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
