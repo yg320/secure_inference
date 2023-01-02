@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 15421
-        self.port_10 = 15422
-        self.port_02 = 15423
-        self.port_20 = 15424
-        self.port_12 = 15425
-        self.port_21 = 15426
+        self.port_01 = 16021
+        self.port_10 = 16022
+        self.port_02 = 16023
+        self.port_20 = 16024
+        self.port_12 = 16025
+        self.port_21 = 16026
 
 
 class NetworkAssets:
@@ -125,7 +125,10 @@ org_shit = (np.arange(min_org_shit, max_org_shit + 1) % P).astype(np.uint8)
 
 
 def module_67(xxx):
-    return org_shit[xxx.reshape(-1) - min_org_shit].reshape(xxx.shape)
+    orig_shape = xxx.shape
+    xxx = xxx.reshape(-1)
+    np.subtract(xxx, min_org_shit, out=xxx)
+    return org_shit[xxx].reshape(orig_shape)
 
 def decompose(value, out=None, out_mask=None):
     orig_shape = list(value.shape)
@@ -237,6 +240,42 @@ def fuse_conv_bn(conv_module, batch_norm_module):
     return W, B
 
 
+def get_c_party_0(x_bits, multiplexer_bits, beta, j):
+    beta = beta[..., np.newaxis]
+    beta = 2 * beta  # Not allowed to change beta inplace
+    np.subtract(beta, 1, out=beta)
+    np.multiply(multiplexer_bits, x_bits, out=multiplexer_bits)
+    np.multiply(multiplexer_bits, -2, out=multiplexer_bits)
+    np.add(multiplexer_bits, x_bits, out=multiplexer_bits)
+
+    w_cumsum = multiplexer_bits.astype(np.int32)
+    np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+    np.subtract(w_cumsum, multiplexer_bits, out=w_cumsum)
+    np.multiply(x_bits, beta, out=x_bits)
+    np.add(w_cumsum, x_bits, out=w_cumsum)
+
+    return w_cumsum
+
+def get_c_party_1(x_bits, multiplexer_bits, beta, j):
+    beta = beta[..., np.newaxis]
+    beta = -2 * beta  # Not allowed to change beta inplace
+    np.add(beta, 1, out=beta)
+
+    w = multiplexer_bits * x_bits
+    np.multiply(w, -2, out=w)
+    np.add(w, x_bits, out=w)
+    np.add(w, multiplexer_bits, out=w)
+
+    w_cumsum = w.astype(np.int32)
+    np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+    np.subtract(w_cumsum, w, out=w_cumsum)
+
+    np.subtract(multiplexer_bits, x_bits, out=multiplexer_bits)
+    np.multiply(multiplexer_bits, beta, out=multiplexer_bits)
+    np.add(multiplexer_bits, 1, out=multiplexer_bits)
+    np.add(w_cumsum, multiplexer_bits, out=w_cumsum)
+
+    return w_cumsum
 
 
 def get_c(x_bits, multiplexer_bits, beta, j):
