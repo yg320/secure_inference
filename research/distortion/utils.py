@@ -11,7 +11,7 @@ from research.bReLU import BlockRelu
 
 from mmcls.models import build_classifier
 from mmseg.models import build_segmentor
-from mmdet.models import build_detector
+# from mmdet.models import build_detector
 
 # TODO: most of this garbage is not important. Get rid of it
 def get_model(config, gpu_id=None, checkpoint_path=None):
@@ -433,8 +433,10 @@ from research.distortion.arch_utils.segmentation.MobileNetV2 import MobileNetV2_
 class ArchUtilsFactory:
     def __call__(self, cfg):
 
-        if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type == 'ResNet' and cfg.model.backbone.depth == 18:
+        if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type in ['MyResNet', 'AvgPoolResNet'] and cfg.model.backbone.depth == 18:
             return resnet18_8xb32_in1k_Utils()
+        if cfg.model.type == 'EncoderDecoder' and cfg.model.backbone.type in ['MobileNetV2']:
+            return MobileNetV2_Segmentation_Utils()
 
         if model_type == "SingleStageDetector" and arch_name == "MobileNetV2":
             return MobileNetV2_Detection_Utils()
