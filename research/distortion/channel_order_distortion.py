@@ -11,6 +11,7 @@ from research.distortion.parameters.factory import param_factory
 from research.distortion.distortion_utils import DistortionUtils
 
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
+from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 
 
 class ChannelDistortionHandler:

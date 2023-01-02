@@ -8,7 +8,7 @@ class ParamsFactory:
         pass
 
     def __call__(self, cfg):
-        if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type == 'ResNet' and cfg.model.backbone.depth == 18:
+        if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type == 'MyResNet' and cfg.model.backbone.depth == 18:
             return resnet18_8xb32_in1k_Params()
 
         if cfg.type == 'ResNet_CIFAR_V2':

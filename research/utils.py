@@ -1,6 +1,6 @@
 from mmcls.datasets import build_dataset as build_dataset_mmcls
 from mmseg.datasets import build_dataset as build_dataset_mmseg
-from mmdet.datasets import build_dataset as build_dataset_mmdet
+# from mmdet.datasets import build_dataset as build_dataset_mmdet
 def build_data(cfg, train):
 
     data_cfg = cfg.data.train if train else cfg.data.test
