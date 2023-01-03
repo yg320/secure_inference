@@ -6,17 +6,17 @@ import time
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from numba import njit, prange
-from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE, NUM_OF_COMPARE_BITS
+from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
 
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 17091
-        self.port_10 = 17092
-        self.port_02 = 17093
-        self.port_20 = 17094
-        self.port_12 = 17095
-        self.port_21 = 17096
+        self.port_01 = 17301
+        self.port_10 = 17302
+        self.port_02 = 17303
+        self.port_20 = 17304
+        self.port_12 = 17305
+        self.port_21 = 17306
 
 
 class NetworkAssets:
@@ -133,7 +133,8 @@ def module_67(xxx):
 def decompose(value, out=None, out_mask=None):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
-    r_shift = value >> powers[:,NUM_BITS - NUM_OF_COMPARE_BITS:]
+    end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
+    r_shift = value >> powers[:,NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
     value_bits = np.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=np.int8)
     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
     ret =  value_bits.reshape(orig_shape + [NUM_OF_COMPARE_BITS])
@@ -296,36 +297,6 @@ def get_c_case_2(u, j):
     c[..., 0] = u[...,0] * (P-1) ** j
     return c % P
 
-import torch.nn as nn
-
-class DepthToSpace(nn.Module):
-
-    def __init__(self, block_size):
-        super().__init__()
-        self.block_size = block_size
-
-    def forward(self, x):
-        N, C, H, W, _ = x.shape
-        # print(N, C, H, W, self.block_size)
-        x = x.reshape(N, C, H, W, self.block_size[0], self.block_size[1])
-        x = x.transpose(0, 1, 2, 4, 3, 5)#.contiguous()
-        x = x.reshape(N, C, H * self.block_size[0], W * self.block_size[1])
-        return x
-
-
-class SpaceToDepth(nn.Module):
-
-    def __init__(self, block_size):
-        super().__init__()
-        self.block_size = block_size
-
-    def forward(self, x):
-        N, C, H, W = x.shape
-        # print(N, C, H, W, self.block_size)
-        x = x.reshape(N, C, H // self.block_size[0], self.block_size[0], W // self.block_size[1], self.block_size[1])
-        x = x.transpose(0, 1, 2, 4, 3, 5)#.contiguous()
-        x = x.reshape(N, C, H // self.block_size[0], W // self.block_size[1], self.block_size[0] * self.block_size[1])
-        return x
 
 
 class TypeConverter:
