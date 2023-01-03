@@ -130,7 +130,7 @@ def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu,
 
     model.neck = SecureGlobalAveragePooling2d()
 
-def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, max_pool, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, max_pool, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_fetcher=None):
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
@@ -160,26 +160,45 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
         arch_utils = ArchUtilsFactory()(cfg)
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
 
-    return secure_model_class(model)
+    ret = secure_model_class(model)
+    ret.prf_fetcher = prf_fetcher
+    return ret
 
 
-def init_prf_fetcher(Params, build_secure_conv, build_secure_relu, prf_fetcher_secure_model, secure_block_relu, crypto_assets, network_assets):
+def init_prf_fetcher(Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu):
+
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets)
+    prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets)
+
     prf_fetcher_model = get_model(
         config=Params.SECURE_CONFIG_PATH,
         gpu_id=None,
         checkpoint_path=None
     )
 
-    prf_fetcher_model = securify_mobilenetv2_model(
-        prf_fetcher_model,
+    securify_resnet_cifar(
+        model=prf_fetcher_model,
+        max_pool=max_pool,
         build_secure_conv=partial(build_secure_conv, is_prf_fetcher=True),
         build_secure_relu=partial(build_secure_relu, is_prf_fetcher=True),
+        build_secure_fully_connected=partial(build_secure_fully_connected, is_prf_fetcher=True),
         secure_model_class=prf_fetcher_secure_model,
-        block_relu=secure_block_relu,
-        relu_spec_file=Params.RELU_SPEC_FILE,
         crypto_assets=crypto_assets,
         network_assets=network_assets,
-        dummy_relu=Params.DUMMY_RELU
-    )
+        dummy_relu=dummy_relu,
+        block_relu=secure_block_relu,
+        relu_spec_file=relu_spec_file)
 
-    prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
+
+    if relu_spec_file:
+        secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+
+        layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
+        arch_utils = ArchUtilsFactory()(cfg)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
+    prf_fetcher_model = prf_fetcher_secure_model(prf_fetcher_model)
+    return prf_fetcher_model
+    # prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))

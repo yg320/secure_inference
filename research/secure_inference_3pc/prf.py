@@ -9,8 +9,9 @@ import queue
 
 class PRFWrapper:
     def __init__(self, seed, queue):
-        self.prf = np.random.default_rng(seed=seed)
-        self.non_threaded_prf = np.random.default_rng(seed=seed)  # TODO: change seed to random.number something
+        self.seed = seed
+        self.prf = np.random.default_rng(seed=self.seed)
+        self.non_threaded_prf = np.random.default_rng(seed=self.seed)  # TODO: change seed to random.number something
         self.queue = queue
         self.fetch = False
 

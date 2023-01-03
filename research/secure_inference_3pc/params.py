@@ -46,5 +46,5 @@ class Params:
 
     NUM_IMAGES = 1
     DUMMY_RELU = False
-    PRF_PREFETCH = False
+    PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

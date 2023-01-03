@@ -22,7 +22,7 @@ from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
-from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherSecureModel, PRFFetcherBlockReLU
+from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
 from research.secure_inference_3pc.params import Params
 import mmcv
 from research.utils import build_data
@@ -487,8 +487,9 @@ def full_inference_classification(cfg, model, num_images):
     for sample_id in tqdm(range(num_images)):
         img = dataset[sample_id]['img'].data[np.newaxis]
         gt = dataset.get_gt_labels()[sample_id]
-
         with Timer("Inference"):
+            if model.prf_fetcher:
+                model.prf_fetcher.prf_handler.fetch(repeat=1, model=model.prf_fetcher, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
             out = model(img)
     #     # gt = dataset.gt_labels[sample_id]
         results_gt.append(gt)
@@ -546,6 +547,22 @@ if __name__ == "__main__":
 
     crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
+    if Params.PRF_PREFETCH:
+        prf_fetcher = init_prf_fetcher(
+            Params=Params,
+            max_pool=PRFFetcherMaxPool,
+            build_secure_conv=build_secure_conv,
+            build_secure_relu=build_secure_relu,
+            build_secure_fully_connected=build_secure_fully_connected,
+            prf_fetcher_secure_model=PRFFetcherSecureModelSegmentation if cfg.model.type == "EncoderDecoder" else PRFFetcherSecureModelClassification,
+            secure_block_relu=PRFFetcherBlockReLU,
+            relu_spec_file=Params.RELU_SPEC_FILE,
+            crypto_assets=crypto_assets,
+            network_assets=network_assets,
+            dummy_relu=Params.DUMMY_RELU)
+    else:
+        prf_fetcher = None
+
     model = get_secure_model(
         cfg,
         checkpoint_path=Params.MODEL_PATH,  # TODO: implement fc
@@ -553,22 +570,17 @@ if __name__ == "__main__":
         build_secure_relu=build_secure_relu,
         build_secure_fully_connected=build_secure_fully_connected,
         max_pool=SecureMaxPoolClient,
-
-        secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,        block_relu=SecureBlockReLUClient,
+        secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
+        block_relu=SecureBlockReLUClient,
         relu_spec_file=Params.RELU_SPEC_FILE,
         crypto_assets=crypto_assets,
         network_assets=network_assets,
-        dummy_relu=Params.DUMMY_RELU
+        dummy_relu=Params.DUMMY_RELU,
+        prf_fetcher=prf_fetcher
     )
 
-    if Params.PRF_PREFETCH:
-        init_prf_fetcher(Params=Params,
-                         build_secure_conv=build_secure_conv,
-                         build_secure_relu=build_secure_relu,
-                         prf_fetcher_secure_model=PRFFetcherSecureModel,
-                         secure_block_relu=PRFFetcherBlockReLU,
-                         crypto_assets=crypto_assets,
-                         network_assets=network_assets)
+
+
     if cfg.model.type == "EncoderDecoder":
         full_inference(cfg, model, Params.NUM_IMAGES)
     else:

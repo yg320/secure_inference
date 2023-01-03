@@ -14,7 +14,7 @@ from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
-from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherSecureModel, PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherBlockReLU
+from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
 
 from functools import partial
 import mmcv
@@ -355,6 +355,22 @@ if __name__ == "__main__":
 
     crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
+    if Params.PRF_PREFETCH:
+        prf_fetcher = init_prf_fetcher(
+            Params=Params,
+            max_pool=PRFFetcherMaxPool,
+            build_secure_conv=build_secure_conv,
+            build_secure_relu=build_secure_relu,
+            build_secure_fully_connected=build_secure_fully_connected,
+            prf_fetcher_secure_model=PRFFetcherSecureModelSegmentation if cfg.model.type == "EncoderDecoder" else PRFFetcherSecureModelClassification,
+            secure_block_relu=PRFFetcherBlockReLU,
+            relu_spec_file=Params.RELU_SPEC_FILE,
+            crypto_assets=crypto_assets,
+            network_assets=network_assets,
+            dummy_relu=Params.DUMMY_RELU)
+    else:
+        prf_fetcher = None
+
     model = get_secure_model(
         cfg,
         checkpoint_path=None,
@@ -367,19 +383,13 @@ if __name__ == "__main__":
         relu_spec_file=Params.RELU_SPEC_FILE,
         crypto_assets=crypto_assets,
         network_assets=network_assets,
-        dummy_relu=Params.DUMMY_RELU
+        dummy_relu=Params.DUMMY_RELU,
+        prf_fetcher=prf_fetcher
     )
-    if Params.PRF_PREFETCH:
-
-        init_prf_fetcher(Params=Params,
-                         build_secure_conv=build_secure_conv,
-                         build_secure_relu=build_secure_relu,
-                         prf_fetcher_secure_model=PRFFetcherSecureModel,
-                         secure_block_relu=PRFFetcherBlockReLU,
-                         crypto_assets=crypto_assets,
-                         network_assets=network_assets)
 
     for _ in range(Params.NUM_IMAGES):
+        if model.prf_fetcher:
+            model.prf_fetcher.prf_handler.fetch(repeat=1, model=model.prf_fetcher, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
         out = model(Params.IMAGE_SHAPE)
 
     network_assets.done()

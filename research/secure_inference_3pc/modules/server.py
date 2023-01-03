@@ -68,6 +68,20 @@ class PRFFetcherMultiplication(PRFFetcherModule):
 
         return dummy_tensor
 
+class PRFFetcherSelectShare(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets):
+        super(PRFFetcherSelectShare, self).__init__(crypto_assets, network_assets)
+        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+
+
+    def forward(self, dummy_tensor):
+        dtype = dummy_tensor.dtype
+        shape = dummy_tensor.shape
+
+        self.prf_handler[CLIENT, SERVER].integers_fetch(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+        self.mult(dummy_tensor)
+        return dummy_tensor
+
 
 class PRFFetcherMSB(PRFFetcherModule):
     def __init__(self, crypto_assets, network_assets):
@@ -126,7 +140,41 @@ class PRFFetcherReLU(PRFFetcherModule):
             self.mult(dummy_arr)
             return dummy_tensor
 
+class PRFFetcherMaxPool(PRFFetcherModule):
+    def __init__(self, crypto_assets, network_assets, kernel_size=3, stride=2, padding=1):
+        super(PRFFetcherMaxPool, self).__init__(crypto_assets, network_assets)
 
+        self.select_share = PRFFetcherSelectShare(crypto_assets, network_assets)
+        self.dReLU = PRFFetcherDReLU(crypto_assets, network_assets)
+        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+
+    def forward(self, x):
+        assert x.shape[2] == 112
+        assert x.shape[3] == 112
+
+        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+                      x[:, :, 0:-1:2, 1:-1:2],
+                      x[:, :, 0:-1:2, 2::2],
+                      x[:, :, 1:-1:2, 0:-1:2],
+                      x[:, :, 1:-1:2, 1:-1:2],
+                      x[:, :, 1:-1:2, 2::2],
+                      x[:, :, 2::2, 0:-1:2],
+                      x[:, :, 2::2, 1:-1:2],
+                      x[:, :, 2::2, 2::2]])
+
+        out_shape = x.shape[1:]
+        x = x.reshape((x.shape[0], -1)).astype(self.dtype)
+
+        max_ = x[0]
+        for i in range(1, 9):
+            self.dReLU(max_)
+            self.select_share(max_)
+
+        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
+
+        return ret
 class PRFFetcherBlockReLU(PRFFetcherModule):
 
     def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
@@ -162,9 +210,9 @@ class PRFFetcherBlockReLU(PRFFetcherModule):
 
         return dummy_tensor
 
-class PRFFetcherSecureModel(SecureModule):
+class PRFFetcherSecureModelSegmentation(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
-        super(PRFFetcherSecureModel, self).__init__(crypto_assets, network_assets)
+        super(PRFFetcherSecureModelSegmentation, self).__init__(crypto_assets, network_assets)
         self.model = model
 
     def forward(self, img):
@@ -173,3 +221,14 @@ class PRFFetcherSecureModel(SecureModule):
         out_0 = self.model.decode_head(self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
 
 
+class PRFFetcherSecureModelClassification(SecureModule):
+    def __init__(self, model,  crypto_assets, network_assets):
+        super(PRFFetcherSecureModelClassification, self).__init__( crypto_assets, network_assets)
+        self.model = model
+
+    def forward(self, img):
+
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
+        out = self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
+        out = self.model.neck(out)
+        out_0 = self.model.head.fc(out)
