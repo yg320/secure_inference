@@ -5,8 +5,8 @@ import numpy as np
 
 class SecureModule(torch.nn.Module):
     def __init__(self, crypto_assets, network_assets):
-
-        super(SecureModule, self).__init__()
+        torch.nn.Module.__init__(self)
+        # super(SecureModule, self).__init__()
 
         self.prf_handler = crypto_assets
         self.network_assets = network_assets

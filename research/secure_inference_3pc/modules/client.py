@@ -5,8 +5,7 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, P, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_BITS, NUM_OF_COMPARE_BITS
 from research.secure_inference_3pc.timer import Timer
-from research.secure_inference_3pc.base import SpaceToDepth
-
+from research.bReLU import NumpySecureOptimizedBlockReLU
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
     def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets):
@@ -183,40 +182,30 @@ class PRFFetcherMaxPool(PRFFetcherModule):
 
         return ret
 
-class PRFFetcherBlockReLU(PRFFetcherModule):
 
-    def __init__(self, crypto_assets, network_assets, block_sizes, dummy_relu=False):
-        super(PRFFetcherBlockReLU, self).__init__(crypto_assets, network_assets)
-        self.block_sizes = np.array(block_sizes)
+class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
+    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
+        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        self.secure_DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
+        self.secure_mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+
         self.dummy_relu = dummy_relu
-        self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
 
-        self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if
-                                   0 not in block_size]
-        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+    def mult(self, x, y):
+        return self.secure_mult(x.astype(self.dtype))
 
-    def forward(self, dummy_tensor):
+    def DReLU(self, activation):
+        return self.secure_DReLU(activation.astype(self.dtype))
+
+    def forward(self, activation):
         if self.dummy_relu:
-            return dummy_tensor
-        dummy_arr = dummy_tensor
-        mean_tensors = []
+            return torch.zeros_like(activation)
 
-        for block_size in self.active_block_sizes:
-            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
-            cur_input = dummy_arr[:, cur_channels]
-            reshaped_input = SpaceToDepth(block_size)(cur_input)
-            mean_tensor = np.sum(reshaped_input, axis=-1, keepdims=True)
+        activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
+        activation = activation.astype(SIGNED_DTYPE)
 
-            mean_tensors.append(mean_tensor.flatten())
-
-        mean_tensors = np.concatenate(mean_tensors)
-
-        self.DReLU(mean_tensors.astype(self.dtype))
-        self.mult(dummy_arr[:, ~self.is_identity_channels].astype(self.dtype))
-
-        return dummy_tensor
-
+        return activation
 
 class PRFFetcherSecureModelSegmentation(SecureModule):
     def __init__(self, model,  crypto_assets, network_assets):
@@ -235,7 +224,7 @@ class PRFFetcherSecureModelClassification(SecureModule):
         self.model = model
 
     def forward(self, img):
-        print(f"PRFFetcherSecureModelClassification - {img.shape}")
+        # print(f"PRFFetcherSecureModelClassification - {img.shape}")
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
         out = self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
         out = self.model.neck(out)
