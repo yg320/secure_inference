@@ -12,17 +12,18 @@ class PRFFetcherConv2D(PRFFetcherModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets):
         super(PRFFetcherConv2D, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W
+        self.W_shape = W.shape
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
 
     def forward(self, X_share):
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
 
-        out_shape = get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride)
+        out_shape = get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride)
 
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=X_share.dtype)
 

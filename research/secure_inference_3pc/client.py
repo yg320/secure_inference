@@ -31,10 +31,10 @@ from research.utils import build_data
 class SecureConv2DClient(SecureModule):
     # forward_num = 0
     # out_path = "/home/yakir/debug/client"
-    def __init__(self, W, stride, dilation, padding, groups, crypto_assets, network_assets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W
+        self.W_shape = W_shape
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
@@ -42,7 +42,10 @@ class SecureConv2DClient(SecureModule):
         self.conv2d_handler = Conv2DHandler("cuda:0")
 
     def forward_(self, X_share):
-        # SecureConv2DClient.forward_num += 1
+        self.W_share = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                              high=MAX_VAL,
+                                                              size=self.W_shape,
+                                                              dtype=SIGNED_DTYPE)
         assert X_share.dtype == SIGNED_DTYPE
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
@@ -376,16 +379,8 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
     padding = (0, 0)
     groups = 1
 
-    if is_prf_fetcher:
-        W = np.zeros(shape=shape, dtype=SIGNED_DTYPE)
-    else:
-        W = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
-                                                   high=MAX_VAL,
-                                                   size=shape,
-                                                   dtype=SIGNED_DTYPE)
-
     return conv_class(
-        W=W,
+        W_shape=shape,
         stride=stride,
         dilation=dilation,
         padding=padding,
@@ -399,16 +394,8 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
 
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
 
-    if is_prf_fetcher:
-        W = np.zeros(shape=conv_module.weight.shape, dtype=SIGNED_DTYPE)
-    else:
-        W = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
-                                                   high=MAX_VAL,
-                                                   size=conv_module.weight.shape,
-                                                   dtype=SIGNED_DTYPE)
-
     return conv_class(
-        W=W,
+        W_shape=conv_module.weight.shape,
         stride=conv_module.stride,
         dilation=conv_module.dilation,
         padding=conv_module.padding,

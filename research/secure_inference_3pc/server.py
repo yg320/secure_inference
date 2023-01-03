@@ -24,7 +24,7 @@ class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
 
-        self.W_share = W
+        self.W_plaintext = W
         self.bias = bias
         if self.bias is not None:
             self.bias = self.bias[np.newaxis, :, np.newaxis, np.newaxis]
@@ -36,7 +36,12 @@ class SecureConv2DServer(SecureModule):
 
     def forward(self, X_share):
         # return np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
+        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                          high=MAX_VAL,
+                                                          size=self.W_plaintext.shape,
+                                                          dtype=SIGNED_DTYPE)
 
+        self.W_share = self.W_plaintext - W_client
         assert X_share.dtype == SIGNED_DTYPE
 
         assert self.W_share.shape[2] == self.W_share.shape[3]
@@ -364,15 +369,7 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         assert conv_module.bias is None
         W = TypeConverter.f2i(W)
         B = None
-    if is_prf_fetcher:
-        W_client = np.zeros(shape=conv_module.weight.shape, dtype=SIGNED_DTYPE)
 
-    else:
-        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
-                                                          high=MAX_VAL,
-                                                          size=conv_module.weight.shape,
-                                                          dtype=SIGNED_DTYPE)
-    W = W - W_client
     return conv_class(
         W=W,
         bias=B,
@@ -396,14 +393,6 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
     W = TypeConverter.f2i(conv_module.weight.unsqueeze(2).unsqueeze(3))
     B = TypeConverter.f2i(conv_module.bias)
 
-    if is_prf_fetcher:
-        W_client = np.zeros(shape=W.shape, dtype=SIGNED_DTYPE)
-    else:
-        W_client = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
-                                                          high=MAX_VAL,
-                                                          size=W.shape,
-                                                          dtype=SIGNED_DTYPE)
-    W = W - W_client
     return conv_class(
         W=W,
         bias=B,
