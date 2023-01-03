@@ -1,4 +1,5 @@
 import torch.nn as nn
+# import torch
 import torch.utils.checkpoint as cp
 
 from mmcls.models.builder import BACKBONES
@@ -106,7 +107,6 @@ class MyResNet(ResNet):
     def __init__(self, *args, **kwargs):
         super(MyResNet, self).__init__(*args, **kwargs)
 
-# import torch
 #
 # class MyAvgPool(nn.Module):
 #
@@ -118,15 +118,14 @@ class MyResNet(ResNet):
 #         x = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)(x)
 #         x = x.numpy()
 #         return x
-#
-#
-# @BACKBONES.register_module()
-# class AvgPoolResNet(MyResNet):
-#
-#     def __init__(self, *args, **kwargs):
-#         super(AvgPoolResNet, self).__init__(*args, **kwargs)
-#
-#     def _make_stem_layer(self, *args, **kwargs):
-#         ResNet._make_stem_layer(self, *args, **kwargs)
-#         # self.maxpool = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
-#         self.maxpool = MyAvgPool()
+
+
+@BACKBONES.register_module()
+class AvgPoolResNet(MyResNet):
+
+    def __init__(self, *args, **kwargs):
+        super(AvgPoolResNet, self).__init__(*args, **kwargs)
+
+    def _make_stem_layer(self, *args, **kwargs):
+        ResNet._make_stem_layer(self, *args, **kwargs)
+        self.maxpool = nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
