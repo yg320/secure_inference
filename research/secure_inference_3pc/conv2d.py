@@ -383,7 +383,7 @@ def double_conv_2d(A, B, C, D, padding, stride, dilation, groups=1):
     elif B.shape[2] == B.shape[3] == 1:
         out = numba_double_conv2d_1x1(A_, B, C_, D, nb_rows_out, nb_cols_out, stride)
     else:
-        assert False
+        # assert False
         out = numba_double_conv2d(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
     return out[np.newaxis]
 
@@ -411,7 +411,7 @@ def single_conv_2d(A, B, padding, stride, dilation, groups=1):
     elif B.shape[2] == B.shape[3] == 1:
         out = numba_single_conv2d_1x1(A_, B, nb_rows_out, nb_cols_out, stride)
     else:
-        assert False
+        # assert False
         out = numba_single_conv2d(A_, B, nb_rows_out, nb_cols_out, stride, dilation)
     return out[np.newaxis]
 

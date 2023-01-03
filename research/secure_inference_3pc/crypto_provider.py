@@ -245,8 +245,9 @@ class SecureSelectShareCryptoProvider(SecureModule):
 
 
 class SecureMaxPoolCryptoProvider(SecureModule):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool=False):
         super(SecureMaxPoolCryptoProvider, self).__init__(crypto_assets, network_assets)
+        self.dummy_max_pool = dummy_max_pool
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -259,6 +260,8 @@ class SecureMaxPoolCryptoProvider(SecureModule):
         assert self.padding == 1
 
     def forward(self, x):
+        if self.dummy_max_pool:
+            return x[:, :, ::2, ::2]
         assert x.shape[2] == 112
         assert x.shape[2] == 112
         assert x.shape[3] == 112
@@ -367,7 +370,8 @@ if __name__ == "__main__":
             relu_spec_file=Params.RELU_SPEC_FILE,
             crypto_assets=crypto_assets,
             network_assets=network_assets,
-            dummy_relu=Params.DUMMY_RELU)
+            dummy_relu=Params.DUMMY_RELU,
+            dummy_max_pool=Params.DUMMY_MAX_POOL)
     else:
         prf_fetcher = None
 
@@ -384,6 +388,7 @@ if __name__ == "__main__":
         crypto_assets=crypto_assets,
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
+        dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher
     )
 

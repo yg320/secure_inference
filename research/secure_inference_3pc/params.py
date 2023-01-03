@@ -45,6 +45,7 @@ class Params:
     IMAGE_SHAPE = (1, 3, 224, 224)
 
     NUM_IMAGES = 1
-    DUMMY_RELU = False
+    DUMMY_RELU = True
+    DUMMY_MAX_POOL = True
     PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

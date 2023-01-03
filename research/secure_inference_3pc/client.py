@@ -294,8 +294,9 @@ class SecureReLUClient(SecureModule):
 
 
 class SecureMaxPoolClient(SecureModule):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool=False):
         super(SecureMaxPoolClient, self).__init__(crypto_assets, network_assets)
+        self.dummy_max_pool = dummy_max_pool
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -308,6 +309,9 @@ class SecureMaxPoolClient(SecureModule):
         assert self.padding == 1
 
     def forward(self, x):
+        if self.dummy_max_pool:
+            network_assets.sender_01.put(x)
+            return np.zeros_like(x[:,:,::2,::2])
         # self.network_assets.sender_01.put(x)
 
         assert x.shape[2] == 112
@@ -546,7 +550,9 @@ if __name__ == "__main__":
             relu_spec_file=Params.RELU_SPEC_FILE,
             crypto_assets=crypto_assets,
             network_assets=network_assets,
-            dummy_relu=Params.DUMMY_RELU)
+            dummy_relu=Params.DUMMY_RELU,
+            dummy_max_pool=Params.DUMMY_MAX_POOL
+        )
     else:
         prf_fetcher = None
 
@@ -563,6 +569,7 @@ if __name__ == "__main__":
         crypto_assets=crypto_assets,
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
+        dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher
     )
 

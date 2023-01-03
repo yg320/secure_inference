@@ -146,14 +146,16 @@ class PRFFetcherReLU(PRFFetcherModule):
 
 
 class PRFFetcherMaxPool(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets, kernel_size=3, stride=2, padding=1):
+    def __init__(self, crypto_assets, network_assets, kernel_size=3, stride=2, padding=1, dummy_max_pool=False):
         super(PRFFetcherMaxPool, self).__init__(crypto_assets, network_assets)
-
+        self.dummy_max_pool = dummy_max_pool
         self.select_share = PRFFetcherSelectShare(crypto_assets, network_assets)
         self.dReLU = PRFFetcherDReLU(crypto_assets, network_assets)
         self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
 
     def forward(self, x):
+        if self.dummy_max_pool:
+            return x[:,:,::2,::2]
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 

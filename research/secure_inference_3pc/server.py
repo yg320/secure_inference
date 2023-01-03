@@ -306,8 +306,9 @@ class SecureSelectShareServer(SecureModule):
 
 
 class SecureMaxPoolServer(SecureModule):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
         super(SecureMaxPoolServer, self).__init__(crypto_assets, network_assets)
+        self.dummy_max_pool = dummy_max_pool
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
@@ -319,9 +320,11 @@ class SecureMaxPoolServer(SecureModule):
         assert self.padding == 1
 
     def forward(self, x):
-        # x_client = self.network_assets.receiver_01.get()
-        # x_rec = x_client + x
-        # out_desired = torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy()
+        if self.dummy_max_pool:
+            x_client = self.network_assets.receiver_01.get()
+            x_rec = x_client + x
+            return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy().astype(x.dtype)
+
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
@@ -461,7 +464,8 @@ if __name__ == "__main__":
             relu_spec_file=Params.RELU_SPEC_FILE,
             crypto_assets=crypto_assets,
             network_assets=network_assets,
-            dummy_relu=Params.DUMMY_RELU)
+            dummy_relu=Params.DUMMY_RELU,
+            dummy_max_pool=Params.DUMMY_MAX_POOL)
     else:
         prf_fetcher = None
 
@@ -478,6 +482,7 @@ if __name__ == "__main__":
         crypto_assets=crypto_assets,
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
+        dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher
     )
 
