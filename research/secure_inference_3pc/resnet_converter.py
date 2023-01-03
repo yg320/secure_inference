@@ -136,6 +136,8 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
     max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool)
+    block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+
     secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets)
 
     model = get_model(
@@ -157,7 +159,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
         block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-        arch_utils = ArchUtilsFactory()(cfg)
+        arch_utils = arch_utils_factory(cfg)
         arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
 
     ret = secure_model_class(model)
@@ -165,12 +167,13 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     return ret
 
 
-def init_prf_fetcher(Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool):
+def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool):
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
     max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool)
+    secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
     prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets)
 
     prf_fetcher_model = get_model(
@@ -197,8 +200,8 @@ def init_prf_fetcher(Params, max_pool, build_secure_conv, build_secure_relu, bui
         secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
 
         layer_name_to_block_sizes = pickle.load(open(relu_spec_file, 'rb'))
-        arch_utils = ArchUtilsFactory()(cfg)
-        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes, block_relu_class=block_relu)
+        arch_utils = arch_utils_factory(cfg)
+        arch_utils.set_bReLU_layers(prf_fetcher_model, layer_name_to_block_sizes, block_relu_class=secure_block_relu)
     prf_fetcher_model = prf_fetcher_secure_model(prf_fetcher_model)
     return prf_fetcher_model
     # prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
