@@ -6,10 +6,8 @@
 - Classification - 32bits
 - Use blocksize [1,0] or discard!
 - Float16? uint8?
-- Use random weight in each inference!
 - Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
 - Start analysis (Analysis with noise to KnapSack matrix)
-- Consult Shai about the unfairness of finetuning
 - ImageNet classification - compare with Porthos
 - Explore 32bits, use trunc and understand when things go wrong
 - Consider what is best, torch or numpy - avoid converting between them.
@@ -28,7 +26,8 @@
 - Vector2Scalar multiplication. (for the bReLU)
 - Implement Load Balancing in ReLU (same as Porthos)
 - Consider transfering to CUDA also ReLU stuff
-
+- If all ReLUs are [0,1] - fuse with next layer
+- MaxPool/ReLU flip
 
 ============================================= Reading =============================================
 - FALCON, 2pc, 3pc, OT, HE
@@ -52,6 +51,7 @@
 - Runtime as Function of Bandwidth
 - Added CUDA implementation
 - People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
+- We chose not to decompose to offline/online, but this can be done.
 
 ============================================= Research Minor =============================================
 - Add quantization noise (to allow for 32bit inference) - QAT
@@ -82,3 +82,32 @@
 - Verify fetchers are not slowing us down. Also verify that they are really needed
 - Can some ReLU ops be fetched?
 - Implement get_c in Numba! (And maybe even other ops)
+
+
+== SHAI ==
+
+Improvements:
+    - Block ReLU + KnapSack
+    - Stochastic DReLU
+    - CUDA implementation - general
+    - CUDA implementation - conv2d (int64 => float)
+    - MaxPool?
+    - 32Bits?
+
+- Implementation (Probably 50-80%)
+- HP etc. (How many)
+- Detection?
+- Analysis
+
+
+Movie
+3PC
+Security
+A bunch of reading and intro. work (Convert to 2PC), relevant to other protocols
+
+- Comparison to Porthos
+- Finetuning not fair
+- No online
+- Go over paper achievements and discuss with Shai
+- Show table and say that in 10 Working days effort we can reduce by x2 or x3
+- Say about classification and detection

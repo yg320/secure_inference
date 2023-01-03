@@ -164,7 +164,9 @@ class SecureOptimizedBlockReLU(Module):
     #     return a * b
 
     def forward(self, activation):
-
+        # TODO: fuse with next layer
+        if np.all(self.block_sizes == [0, 1]):
+            return activation
         reshaped_inputs = []
         mean_tensors = []
         channels = []
