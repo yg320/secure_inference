@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-from research.secure_inference_3pc.base import P, sub_mode_p, decompose, SpaceToDepth, get_assets
+from research.secure_inference_3pc.base import P, sub_mode_p, decompose, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -360,6 +360,7 @@ if __name__ == "__main__":
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
+            cfg=cfg,
             Params=Params,
             max_pool=PRFFetcherMaxPool,
             build_secure_conv=build_secure_conv,
@@ -391,10 +392,11 @@ if __name__ == "__main__":
         dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher
     )
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=model.prf_fetcher,
+                                            image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
 
     for _ in range(Params.NUM_IMAGES):
-        if model.prf_fetcher:
-            model.prf_fetcher.prf_handler.fetch(repeat=1, model=model.prf_fetcher, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
         out = model(Params.IMAGE_SHAPE)
 
     network_assets.done()

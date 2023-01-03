@@ -2,8 +2,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import os
-from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, DepthToSpace, \
-    SpaceToDepth, get_assets, TypeConverter
+from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, get_assets, TypeConverter
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from functools import partial
@@ -99,13 +98,16 @@ class PrivateCompareClient(SecureModule):
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=np.int32)
         # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
         r[beta] += 1
+        # with Timer("decompose(r)"):
         bits = decompose(r)
-
+        # with Timer("get_c_party_0(x_bits_0, bits, beta, np.int8(0))"):
         c_bits_0 = get_c_party_0(x_bits_0, bits, beta, np.int8(0))
         np.multiply(s, c_bits_0, out=s)
+        # with Timer("module_67(s)"):
         d_bits_0 = module_67(s)
-
+        # with Timer("permutation"):
         d_bits_0 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_0, axis=-1)
+        # with Timer("self.network_assets.sender_02.put(d_bits_0)"):
         self.network_assets.sender_02.put(d_bits_0)
 
         return
@@ -475,12 +477,14 @@ def full_inference_classification(cfg, model, num_images):
     results_gt = []
     results_pred = []
     model.eval()
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher,
+                                            image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
     for sample_id in tqdm(range(num_images)):
         img = dataset[sample_id]['img'].data[np.newaxis]
         gt = dataset.get_gt_labels()[sample_id]
+
         with Timer("Inference"):
-            if model.prf_fetcher:
-                model.prf_fetcher.prf_handler.fetch(repeat=1, model=model.prf_fetcher, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
             out = model(img)
     #     # gt = dataset.gt_labels[sample_id]
         results_gt.append(gt)
@@ -540,6 +544,7 @@ if __name__ == "__main__":
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
+            cfg=cfg,
             Params=Params,
             max_pool=PRFFetcherMaxPool,
             build_secure_conv=build_secure_conv,
