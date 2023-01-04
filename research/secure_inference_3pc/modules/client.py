@@ -8,7 +8,7 @@ from research.secure_inference_3pc.timer import Timer
 from research.bReLU import NumpySecureOptimizedBlockReLU
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
         super(PRFFetcherConv2D, self).__init__(crypto_assets, network_assets)
 
         self.W_shape = W_shape

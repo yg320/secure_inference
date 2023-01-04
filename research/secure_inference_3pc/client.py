@@ -30,7 +30,7 @@ from research.utils import build_data
 class SecureConv2DClient(SecureModule):
     # forward_num = 0
     # out_path = "/home/yakir/debug/client"
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
         self.W_shape = W_shape
@@ -39,7 +39,7 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
         self.groups = groups
         self.conv2d_handler = Conv2DHandler("cuda:0")
-
+        self.device = device
     def forward_(self, X_share):
         self.W_share = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
                                                               high=MAX_VAL,
@@ -62,10 +62,19 @@ class SecureConv2DClient(SecureModule):
 
         E = E_share_server + E_share
         F = F_share_server + F_share
-        # out_numpy =  np.zeros(get_output_shape(X_share, self.W_share, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
-        out_numpy = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-        out_numpy += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-        # out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
+
+        if self.device == "cpu":
+            out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
+        else:
+            #
+            # mult = F.shape[1] * F.shape[2] * F.shape[3]
+            # if mult >= 4096 or mult < 256:
+            #     print("X_share.shape", X_share.shape)
+            #     print("F.shape", F.shape)
+            #     print("Mult", F.shape[1] * F.shape[2] * F.shape[3])
+            out_numpy = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+            out_numpy += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+
         # out_numpy = torch.conv2d(torch.from_numpy(X_share), torch.from_numpy(F), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
         # out_numpy += torch.conv2d(torch.from_numpy(E), torch.from_numpy(self.W_share), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
 
@@ -396,7 +405,7 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
     )
 
 
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
 
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
 
@@ -407,7 +416,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         padding=conv_module.padding,
         groups=conv_module.groups,
         crypto_assets=crypto_assets,
-        network_assets=network_assets
+        network_assets=network_assets,
+        device=device
+
     )
 
 
@@ -556,7 +567,7 @@ if __name__ == "__main__":
             crypto_assets=crypto_assets,
             network_assets=network_assets,
             dummy_relu=Params.DUMMY_RELU,
-            dummy_max_pool=Params.DUMMY_MAX_POOL
+            dummy_max_pool=Params.DUMMY_MAX_POOL,
         )
     else:
         prf_fetcher = None
@@ -575,7 +586,8 @@ if __name__ == "__main__":
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
         dummy_max_pool=Params.DUMMY_MAX_POOL,
-        prf_fetcher=prf_fetcher
+        prf_fetcher=prf_fetcher,
+        device=Params.DEVICE
     )
 
 

@@ -22,7 +22,7 @@ from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 
 class SecureConv2DCryptoProvider(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets):
+    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets, device="cpu"):
         super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
 
         self.W_shape = W_shape
@@ -32,6 +32,8 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.groups = groups
 
         self.conv2d_handler = Conv2DHandler("cuda:0")
+        self.device = device
+
     def forward(self, X_share):
         # return np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
 
@@ -44,10 +46,10 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
-        # C =  np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
-        # C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
-        # C = torch.conv2d(torch.from_numpy(A), torch.from_numpy(B), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
-        C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        if self.device == "cpu":
+            C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
+        else:
+            C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
         C_share_0 = C - C_share_1
 
@@ -290,7 +292,7 @@ class SecureMaxPoolCryptoProvider(SecureModule):
         return max_.reshape(out_shape).astype(SIGNED_DTYPE)
 
 
-def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DCryptoProvider
 
     return conv_class(
@@ -300,7 +302,8 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         padding=conv_module.padding,
         groups=conv_module.groups,
         crypto_assets=crypto_assets,
-        network_assets=network_assets
+        network_assets=network_assets,
+        device=device
     )
 
 def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
@@ -390,7 +393,9 @@ if __name__ == "__main__":
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
         dummy_max_pool=Params.DUMMY_MAX_POOL,
-        prf_fetcher=prf_fetcher
+        prf_fetcher=prf_fetcher,
+        device=Params.DEVICE
+
     )
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=model.prf_fetcher,
