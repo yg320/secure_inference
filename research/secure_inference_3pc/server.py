@@ -275,26 +275,8 @@ class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
     def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
         SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.secure_DReLU = SecureDReLUServer(crypto_assets, network_assets)
-        self.secure_mult = SecureMultiplicationServer(crypto_assets, network_assets)
-
-        self.dummy_relu = dummy_relu
-
-    def mult(self, x, y):
-        return self.secure_mult(x.astype(SIGNED_DTYPE), y.astype(SIGNED_DTYPE)).astype(x.dtype)
-
-    def DReLU(self, activation):
-        return self.secure_DReLU(activation)
-
-    def forward(self, activation):
-        if self.dummy_relu:
-            activation_client = self.network_assets.receiver_01.get()
-            activation = activation + activation_client
-
-        activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
-        activation = activation.astype(SIGNED_DTYPE)
-
-        return activation
+        self.DReLU = SecureDReLUServer(crypto_assets, network_assets)
+        self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
 
 
 class SecureSelectShareServer(SecureModule):

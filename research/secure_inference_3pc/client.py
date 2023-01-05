@@ -296,6 +296,7 @@ class SecureReLUClient(SecureModule):
 
             return ret + mu_0
 
+
 class SecureMaxPoolClient(SecureMaxPool):
     def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
         super(SecureMaxPoolClient, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
@@ -318,27 +319,8 @@ class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
     def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
         SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.secure_DReLU = SecureDReLUClient(crypto_assets, network_assets)
-        self.secure_mult = SecureMultiplicationClient(crypto_assets, network_assets)
-
-        self.dummy_relu = dummy_relu
-
-    def mult(self, x, y):
-        return self.secure_mult(x.astype(SIGNED_DTYPE), y.astype(SIGNED_DTYPE)).astype(x.dtype)
-
-    def DReLU(self, activation):
-        return self.secure_DReLU(activation)
-
-    def forward(self, activation):
-        if self.dummy_relu:
-            assert False
-            network_assets.sender_01.put(activation)
-            return torch.zeros_like(activation)
-
-        activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
-        activation = activation.astype(SIGNED_DTYPE)
-
-        return activation
+        self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
+        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
 
 
 def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):

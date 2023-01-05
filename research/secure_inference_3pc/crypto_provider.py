@@ -208,26 +208,14 @@ class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU)
     def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
         SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.secure_DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
         self.secure_mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
-
-        self.dummy_relu = dummy_relu
 
     def mult(self, x, y):
         self.secure_mult(x.shape)
         return x
 
-    def DReLU(self, activation):
-        return self.secure_DReLU(activation)
 
-    def forward(self, activation):
-        if self.dummy_relu:
-            return activation
-
-        NumpySecureOptimizedBlockReLU.forward(self, activation)
-        activation = activation.astype(SIGNED_DTYPE)
-
-        return activation
 
 class SecureSelectShareCryptoProvider(SecureModule):
     def __init__(self, crypto_assets, network_assets):
