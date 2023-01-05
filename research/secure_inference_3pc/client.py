@@ -274,13 +274,13 @@ class SecureDReLUClient(SecureModule):
         self.msb = SecureMSBClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        assert X_share.dtype == self.dtype
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=X_share.dtype)
+        X_share = X_share.astype(SIGNED_DTYPE)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
 
-        X0_converted = self.share_convert((self.dtype(2) * X_share).astype(SIGNED_DTYPE))
-        MSB_0 = self.msb(X0_converted).astype(self.dtype)
+        X0_converted = self.share_convert(X_share)
+        MSB_0 = self.msb(X0_converted)
 
-        return -MSB_0+mu_0
+        return (-MSB_0+mu_0).astype(self.dtype)
 
 
 class SecureReLUClient(SecureModule):
