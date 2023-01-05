@@ -169,12 +169,12 @@ class SecureMultiplicationServer(SecureModule):
         super(SecureMultiplicationServer, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
-        assert X_share.dtype == self.dtype
-        assert Y_share.dtype == self.dtype
+        X_share = X_share.astype(SIGNED_DTYPE)
+        Y_share = Y_share.astype(SIGNED_DTYPE)
 
-        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
-        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
-        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=self.dtype)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         E_share = X_share - A_share
         F_share = Y_share - B_share
 
@@ -186,9 +186,9 @@ class SecureMultiplicationServer(SecureModule):
         E = E_share_client + E_share
         F = F_share_client + F_share
         out = - E * F + X_share * F + Y_share * E + C_share
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(X_share.dtype).min, np.iinfo(X_share.dtype).max, size=out.shape, dtype=X_share.dtype)
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=X_share.dtype)
 
-        return out + mu_1
+        return (out + mu_1).astype(self.dtype)
 
 
 class SecureMSBServer(SecureModule):
