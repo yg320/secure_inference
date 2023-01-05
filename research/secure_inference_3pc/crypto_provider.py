@@ -88,7 +88,7 @@ class ShareConvertCryptoProvider(SecureModule):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=np.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
-        delta = (x.astype(self.dtype) < a_tild_0.astype(self.dtype)).astype(SIGNED_DTYPE)
+        delta = (0 < a_tild_0 - x).astype(SIGNED_DTYPE)
 
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         delta_0 = self.sub_mode_L_minus_one(delta, delta_1)

@@ -144,10 +144,10 @@ class ShareConvertClient(SecureModule):
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
 
-        alpha = (r.astype(self.dtype) < r_0.astype(self.dtype)).astype(SIGNED_DTYPE)
+        alpha = (0 < r_0 - r).astype(SIGNED_DTYPE)
 
         a_tild_0 = a_0 + r_0
-        beta_0 = (a_tild_0.astype(self.dtype) < a_0.astype(self.dtype)).astype(SIGNED_DTYPE)
+        beta_0 = (0 < a_0 - a_tild_0).astype(SIGNED_DTYPE)
         self.network_assets.sender_02.put(a_tild_0)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)

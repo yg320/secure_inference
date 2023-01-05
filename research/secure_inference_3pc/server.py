@@ -142,7 +142,7 @@ class ShareConvertServer(SecureModule):
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
         r_1 = r - r_0
         a_tild_1 = a_1 + r_1
-        beta_1 = (a_tild_1.astype(self.dtype) < a_1.astype(self.dtype)).astype(SIGNED_DTYPE)
+        beta_1 = (0 < a_1 - a_tild_1).astype(SIGNED_DTYPE)
 
         self.network_assets.sender_12.put(a_tild_1)
         # x_bits_1 = torch.from_numpy(self.network_assets.receiver_12.get().astype(np.int8)).to("cuda:1")
