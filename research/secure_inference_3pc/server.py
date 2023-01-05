@@ -169,8 +169,6 @@ class SecureMultiplicationServer(SecureModule):
         super(SecureMultiplicationServer, self).__init__(crypto_assets, network_assets)
 
     def forward(self, X_share, Y_share):
-        X_share = X_share.astype(SIGNED_DTYPE)
-        Y_share = Y_share.astype(SIGNED_DTYPE)
 
         A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -188,7 +186,7 @@ class SecureMultiplicationServer(SecureModule):
         out = - E * F + X_share * F + Y_share * E + C_share
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=X_share.dtype)
 
-        return (out + mu_1).astype(self.dtype)
+        return out + mu_1
 
 
 class SecureMSBServer(SecureModule):
@@ -223,7 +221,7 @@ class SecureMSBServer(SecureModule):
         gamma_1 = beta_p_1 + (1 * beta) - (2 * beta * beta_p_1)
         delta_1 = x_bit_0_1 + r_mod_2 - (2 * r_mod_2 * x_bit_0_1)
 
-        theta_1 = self.mult(gamma_1.astype(self.dtype), delta_1.astype(self.dtype)).astype(SIGNED_DTYPE)
+        theta_1 = self.mult(gamma_1, delta_1)
 
         alpha_1 = gamma_1 + delta_1 - 2 * theta_1
         alpha_1 = alpha_1 + mu_1
@@ -269,7 +267,7 @@ class SecureReLUServer(SecureModule):
 
             X_share = X_share.astype(self.dtype).flatten()
             MSB_0 = self.DReLU(X_share)
-            relu_0 = self.mult(X_share, MSB_0).reshape(shape)
+            relu_0 = self.mult(X_share.astype(SIGNED_DTYPE), MSB_0.astype(SIGNED_DTYPE)).reshape(shape).astype(self.dtype)
             ret = relu_0.astype(SIGNED_DTYPE)
             return ret + mu_1
 
@@ -284,7 +282,7 @@ class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
         self.dummy_relu = dummy_relu
 
     def mult(self, x, y):
-        return self.secure_mult(x.astype(self.dtype), y.astype(self.dtype))
+        return self.secure_mult(x.astype(SIGNED_DTYPE), y.astype(SIGNED_DTYPE)).astype(x.dtype)
 
     def DReLU(self, activation):
         return self.secure_DReLU(activation.astype(self.dtype))

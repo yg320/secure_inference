@@ -214,7 +214,7 @@ class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU)
         self.dummy_relu = dummy_relu
 
     def mult(self, x, y):
-        self.secure_mult(x.astype(self.dtype).shape)
+        self.secure_mult(x.shape)
         return x
     def DReLU(self, activation):
         return self.secure_DReLU(activation.astype(self.dtype))
