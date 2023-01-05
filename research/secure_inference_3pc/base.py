@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 18021
-        self.port_10 = 18022
-        self.port_02 = 18023
-        self.port_20 = 18024
-        self.port_12 = 18025
-        self.port_21 = 18026
+        self.port_01 = 18041
+        self.port_10 = 18042
+        self.port_02 = 18043
+        self.port_20 = 18044
+        self.port_12 = 18045
+        self.port_21 = 18046
 
 
 class NetworkAssets:
@@ -170,30 +170,6 @@ def sub_mode_p(x, y):
     ret_2 = x + (P - y)
     ret[mask] = ret_2[mask]
     return ret
-
-
-
-
-class SecureModule(torch.nn.Module):
-    def __init__(self, crypto_assets, network_assets, is_prf_fetcher=False):
-        torch.nn.Module.__init__(self)
-
-        self.is_prf_fetcher = is_prf_fetcher
-        self.prf_handler = crypto_assets
-        self.network_assets = network_assets
-
-        self.trunc = TRUNC
-
-    def add_mode_L_minus_one(self, a, b):
-        ret = a + b
-        ret[ret.astype(np.uint64, copy=False) < a.astype(np.uint64, copy=False)] += 1
-        ret[ret == - 1] = 0   # If ret were uint64, then the condition would be ret == 2**64 - 1
-        return ret
-
-    def sub_mode_L_minus_one(self, a, b):
-        ret = a - b
-        ret[b.astype(np.uint64, copy=False) > a.astype(np.uint64, copy=False)] -= 1
-        return ret
 
 
 def fuse_conv_bn(conv_module, batch_norm_module):

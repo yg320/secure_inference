@@ -7,7 +7,8 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS
 
-from research.secure_inference_3pc.base import decompose, get_c_party_1, module_67,  SecureModule, NetworkAssets, get_c_party_1_torch, decompose_torch_1
+from research.secure_inference_3pc.modules.base import SecureModule
+from research.secure_inference_3pc.base import decompose, get_c_party_1, module_67, NetworkAssets, get_c_party_1_torch, decompose_torch_1
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool

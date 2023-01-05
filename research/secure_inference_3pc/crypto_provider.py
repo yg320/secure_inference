@@ -3,7 +3,8 @@ import numpy as np
 
 from research.secure_inference_3pc.base import P, sub_mode_p, decompose, get_assets
 from research.secure_inference_3pc.conv2d import conv_2d
-from research.secure_inference_3pc.base import SecureModule, NetworkAssets
+from research.secure_inference_3pc.modules.base import SecureModule
+from research.secure_inference_3pc.base import NetworkAssets
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler

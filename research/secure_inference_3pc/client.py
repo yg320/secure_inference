@@ -2,7 +2,8 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import os
-from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
+from research.secure_inference_3pc.modules.base import SecureModule
+from research.secure_inference_3pc.base import decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool

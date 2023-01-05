@@ -1,5 +1,5 @@
 import numpy as np
-from research.secure_inference_3pc.base import SecureModule
+from research.secure_inference_3pc.modules.base import SecureModule
 
 
 class SecureMaxPool(SecureModule):
