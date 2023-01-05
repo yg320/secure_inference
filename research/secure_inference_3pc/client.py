@@ -5,6 +5,7 @@ import os
 from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
+from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from functools import partial
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS
 from mmseg.ops import resize
@@ -28,8 +29,7 @@ from research.utils import build_data
 
 
 class SecureConv2DClient(SecureModule):
-    # forward_num = 0
-    # out_path = "/home/yakir/debug/client"
+
     def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
         super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
 
@@ -40,6 +40,7 @@ class SecureConv2DClient(SecureModule):
         self.groups = groups
         self.conv2d_handler = Conv2DHandler("cuda:0")
         self.device = device
+
     def forward_(self, X_share):
         self.W_share = crypto_assets[CLIENT, SERVER].integers(low=MIN_VAL,
                                                               high=MAX_VAL,
@@ -52,7 +53,7 @@ class SecureConv2DClient(SecureModule):
         A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
         C_share = self.network_assets.receiver_02.get()
-        # np.save(file=os.path.join(SecureConv2DClient.out_path, f"A_{SecureConv2DClient.forward_num}.npy"))
+
         E_share = X_share - A_share
         F_share = self.W_share - B_share
 
@@ -66,17 +67,8 @@ class SecureConv2DClient(SecureModule):
         if self.device == "cpu":
             out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
         else:
-            #
-            # mult = F.shape[1] * F.shape[2] * F.shape[3]
-            # if mult >= 4096 or mult < 256:
-            #     print("X_share.shape", X_share.shape)
-            #     print("F.shape", F.shape)
-            #     print("Mult", F.shape[1] * F.shape[2] * F.shape[3])
             out_numpy = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
             out_numpy += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-
-        # out_numpy = torch.conv2d(torch.from_numpy(X_share), torch.from_numpy(F), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
-        # out_numpy += torch.conv2d(torch.from_numpy(E), torch.from_numpy(self.W_share), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
 
         out_numpy = out_numpy + C_share
 
@@ -101,7 +93,7 @@ class PrivateCompareClient(SecureModule):
         return self.forward_(x_bits_0, r, beta)
 
     def forward_(self, x_bits_0, r, beta):
-        # r = r.astype(np.int64)
+
         if np.any(r == np.iinfo(r.dtype).max):
             assert False
         # with Timer("PrivateCompareClient - Random"):
@@ -270,7 +262,6 @@ class SecureDReLUClient(SecureModule):
 
     def forward(self, X_share):
 
-
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
 
         X0_converted = self.share_convert(X_share)
@@ -305,57 +296,19 @@ class SecureReLUClient(SecureModule):
 
             return ret + mu_0
 
-
-class SecureMaxPoolClient(SecureModule):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool=False):
-        super(SecureMaxPoolClient, self).__init__(crypto_assets, network_assets)
-        self.dummy_max_pool = dummy_max_pool
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.padding = padding
+class SecureMaxPoolClient(SecureMaxPool):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
+        super(SecureMaxPoolClient, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
         self.select_share = SecureSelectShareClient(crypto_assets, network_assets)
-        self.dReLU =  SecureDReLUClient(crypto_assets, network_assets)
+        self.dReLU = SecureDReLUClient(crypto_assets, network_assets)
         self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
-
-        assert self.kernel_size == 3
-        assert self.stride == 2
-        assert self.padding == 1
 
     def forward(self, x):
         if self.dummy_max_pool:
             network_assets.sender_01.put(x)
-            return np.zeros_like(x[:,:,::2,::2])
-        # self.network_assets.sender_01.put(x)
+            return np.zeros_like(x[:, :, ::2, ::2])
 
-        assert x.shape[2] == 112
-        assert x.shape[3] == 112
-
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
-                      x[:, :, 0:-1:2, 1:-1:2],
-                      x[:, :, 0:-1:2, 2::2],
-                      x[:, :, 1:-1:2, 0:-1:2],
-                      x[:, :, 1:-1:2, 1:-1:2],
-                      x[:, :, 1:-1:2, 2::2],
-                      x[:, :, 2::2, 0:-1:2],
-                      x[:, :, 2::2, 1:-1:2],
-                      x[:, :, 2::2, 2::2]])
-
-        out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1))
-
-        max_ = x[0]
-        for i in range(1, 9):
-            w = x[i] - max_
-            beta = self.dReLU(w)
-            max_ = self.select_share(beta, max_, x[i])
-            #
-            # a = self.mult(beta, x[i])
-            # b = self.mult((1 - beta), max_)
-            # max_ = a + b
-
-        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
-        # self.network_assets.sender_01.put(ret)
+        ret = super(SecureMaxPoolClient, self).forward(x)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
 
         return ret + mu_0
@@ -378,6 +331,7 @@ class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
 
     def forward(self, activation):
         if self.dummy_relu:
+            assert False
             network_assets.sender_01.put(activation)
             return torch.zeros_like(activation)
 
@@ -484,6 +438,7 @@ class SecureModelSegmentation(SecureModule):
         seg_pred = seg_pred.cpu().numpy()[0]
 
         return seg_pred
+
 
 def full_inference_classification(cfg, model, num_images):
     dataset = build_data(cfg, train=False)

@@ -213,3 +213,5 @@ class PRFFetcherSecureModelClassification(SecureModule):
         out = self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
         out = self.model.neck(out)
         out_0 = self.model.head.fc(out)
+
+

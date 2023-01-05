@@ -8,6 +8,7 @@ from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER,
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.bReLU import NumpySecureOptimizedBlockReLU
+from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 
 from research.distortion.utils import get_model
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -233,56 +234,22 @@ class SecureSelectShareCryptoProvider(SecureModule):
         super(SecureSelectShareCryptoProvider, self).__init__(crypto_assets, network_assets)
         self.secure_multiplication = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
-    def forward(self, share):
+    def forward(self, share, dummy0=None, dummy1=None):
 
         self.secure_multiplication(share.shape)
         return share
 
-
-class SecureMaxPoolCryptoProvider(SecureModule):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool=False):
-        super(SecureMaxPoolCryptoProvider, self).__init__(crypto_assets, network_assets)
-        self.dummy_max_pool = dummy_max_pool
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.padding = padding
+class SecureMaxPoolCryptoProvider(SecureMaxPool):
+    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
+        super(SecureMaxPoolCryptoProvider, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
         self.select_share = SecureSelectShareCryptoProvider(crypto_assets, network_assets)
         self.dReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
         self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
 
-        assert self.kernel_size == 3
-        assert self.stride == 2
-        assert self.padding == 1
-
     def forward(self, x):
         if self.dummy_max_pool:
             return x[:, :, ::2, ::2]
-        assert x.shape[2] == 112
-        assert x.shape[2] == 112
-        assert x.shape[3] == 112
-
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
-                      x[:, :, 0:-1:2, 1:-1:2],
-                      x[:, :, 0:-1:2, 2::2],
-                      x[:, :, 1:-1:2, 0:-1:2],
-                      x[:, :, 1:-1:2, 1:-1:2],
-                      x[:, :, 1:-1:2, 2::2],
-                      x[:, :, 2::2, 0:-1:2],
-                      x[:, :, 2::2, 1:-1:2],
-                      x[:, :, 2::2, 2::2]])
-
-        out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1))
-
-        max_ = x[0]
-        for i in range(1, 9):
-
-            self.dReLU(max_)
-            self.select_share(max_)
-
-
-        return max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        return super(SecureMaxPoolCryptoProvider, self).forward(x)
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):

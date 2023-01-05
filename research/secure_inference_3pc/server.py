@@ -6,7 +6,7 @@ from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.secure_inference_3pc.base import SecureModule, NetworkAssets
 from research.secure_inference_3pc.timer import Timer
-
+from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.pipeline.backbones.secure_resnet import AvgPoolResNet
@@ -313,19 +313,12 @@ class SecureSelectShareServer(SecureModule):
         return z + mu_1
 
 
-class SecureMaxPoolServer(SecureModule):
+class SecureMaxPoolServer(SecureMaxPool):
     def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
-        super(SecureMaxPoolServer, self).__init__(crypto_assets, network_assets)
-        self.dummy_max_pool = dummy_max_pool
-        self.kernel_size = kernel_size
-        self.stride = stride
-        self.padding = padding
+        super(SecureMaxPoolServer, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
         self.select_share = SecureSelectShareServer(crypto_assets, network_assets)
         self.dReLU = SecureDReLUServer(crypto_assets, network_assets)
         self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
-        assert self.kernel_size == 3
-        assert self.stride == 2
-        assert self.padding == 1
 
     def forward(self, x):
         if self.dummy_max_pool:
@@ -333,35 +326,7 @@ class SecureMaxPoolServer(SecureModule):
             x_rec = x_client + x
             return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy().astype(x.dtype)
 
-        assert x.shape[2] == 112
-        assert x.shape[3] == 112
-
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
-                      x[:, :, 0:-1:2, 1:-1:2],
-                      x[:, :, 0:-1:2, 2::2],
-                      x[:, :, 1:-1:2, 0:-1:2],
-                      x[:, :, 1:-1:2, 1:-1:2],
-                      x[:, :, 1:-1:2, 2::2],
-                      x[:, :, 2::2, 0:-1:2],
-                      x[:, :, 2::2, 1:-1:2],
-                      x[:, :, 2::2, 2::2]])
-
-        out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1))
-
-        max_ = x[0]
-        for i in range(1, 9):
-            w = x[i] - max_
-            beta = self.dReLU(w)
-            max_ = self.select_share(beta, max_, x[i])
-            # a = self.mult(beta, x[i])
-            # b = self.mult(-beta, max_)
-            # max_ = a + b
-
-        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
-        # ret_client = self.network_assets.receiver_01.get()
-        # ret_recon = ret + ret_client
+        ret = super(SecureMaxPoolServer, self).forward(x)
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
         ret = ret + mu_1
         return ret
