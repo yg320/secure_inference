@@ -47,7 +47,7 @@ class Params:
 
     IMAGE_SHAPE = (1, 3, 224, 224)
 
-    NUM_IMAGES = 100
+    NUM_IMAGES = 1
     DEVICE = "cuda"
     DUMMY_RELU = False
     DUMMY_MAX_POOL = True

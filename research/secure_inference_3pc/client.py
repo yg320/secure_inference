@@ -2,7 +2,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 import os
-from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch, get_c_party_0_torch
+from research.secure_inference_3pc.base import SecureModule, decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from functools import partial
@@ -106,26 +106,24 @@ class PrivateCompareClient(SecureModule):
             assert False
         # with Timer("PrivateCompareClient - Random"):
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=np.int32)
-        # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_0.shape, dtype=self.crypto_assets.numpy_dtype)
         r[beta] += 1
         bits = decompose(r)
         c_bits_0 = get_c_party_0(x_bits_0, bits, beta, np.int8(0))
         np.multiply(s, c_bits_0, out=s)
         d_bits_0 = module_67(s)
 
-
-        # s = torch.from_numpy(s).to("cuda:0")
         # r = torch.from_numpy(r).to("cuda:0")
+        # s = torch.from_numpy(s).to("cuda:0")
         # beta = torch.from_numpy(beta).to("cuda:0")
         # x_bits_0 = torch.from_numpy(x_bits_0).to("cuda:0")
-        # r[beta.to(torch.bool)] += 1
-        # bits = decompose_torch(r)
+        # r[beta.to(torch.int64)] += 1
+        # bits = decompose_torch_0(r)
         # c_bits_0 = get_c_party_0_torch(x_bits_0, bits, beta)
         # torch.mul(s, c_bits_0, out=s)
-        # d_bits_0 = s % P
-        # d_bits_0 = d_bits_0.cpu().numpy()
+        # d_bits_0 = s % 67
         d_bits_0 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_0, axis=-1)
-        # with Timer("self.network_assets.sender_02.put(d_bits_0)"):
+        # d_bits_0 = d_bits_0.cpu().numpy().astype(np.uint8)
+
         self.network_assets.sender_02.put(d_bits_0)
 
         return

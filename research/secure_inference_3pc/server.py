@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c_party_1, module_67,  get_assets, TypeConverter
+from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c_party_1, module_67,  get_assets, TypeConverter, get_c_party_1_torch, decompose_torch_1
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
@@ -96,6 +96,7 @@ class PrivateCompareServer(SecureModule):
         # with Timer("PrivateCompareServer"):
         return self._forward(x_bits_1, r, beta)
     def _forward(self, x_bits_1, r, beta):
+        # r = r.astype(np.int64)
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=np.int32)
         # u = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=self.crypto_assets.numpy_dtype)
@@ -108,8 +109,19 @@ class PrivateCompareServer(SecureModule):
         np.multiply(s, c_bits_1, out=s)
 
         d_bits_1 = module_67(s)
+        # r = torch.from_numpy(r).to("cuda:1")
+        # s = torch.from_numpy(s).to("cuda:1")
+        # beta = torch.from_numpy(beta).to("cuda:1")
+        # x_bits_1 = torch.from_numpy(x_bits_1).to("cuda:1")
+        #
+        # r[beta.to(torch.int64)] += 1
+        # bits = decompose_torch_1(r)
+        # c_bits_0 = get_c_party_1_torch(x_bits_1, bits, beta)
+        # torch.mul(s, c_bits_0, out=s)
+        # d_bits_1 = s % 67
 
         d_bits_1 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_1, axis=-1)
+        # d_bits_1 = d_bits_1.cpu().numpy().astype(np.uint8)
 
         self.network_assets.sender_12.put(d_bits_1)
 
@@ -135,6 +147,7 @@ class ShareConvertServer(SecureModule):
 
 
         self.network_assets.sender_12.put(a_tild_1)
+        # x_bits_1 = torch.from_numpy(self.network_assets.receiver_12.get().astype(np.int8)).to("cuda:1")
         x_bits_1 = self.network_assets.receiver_12.get().astype(np.int8)
 
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)

@@ -12,6 +12,7 @@ class PRFWrapper:
         self.seed = seed
         self.prf = np.random.default_rng(seed=self.seed)
         self.non_threaded_prf = np.random.default_rng(seed=self.seed)  # TODO: change seed to random.number something
+        self.torch_prf = torch.Generator().manual_seed(self.seed)
         self.queue = queue
         self.fetch = False
 
@@ -31,6 +32,7 @@ class PRFWrapper:
             return self.prf.integers(low=low, high=high, size=size, dtype=dtype)
 
     def permutation(self, data, axis):
+        # return data[:, torch.randperm(data.size()[axis], generator=self.torch_prf)]
         out = self.non_threaded_prf.permutation(x=data, axis=axis)
         return out
 
