@@ -183,7 +183,6 @@ class SecureModule(torch.nn.Module):
 
         self.trunc = TRUNC
 
-
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
         ret[ret.astype(np.uint64, copy=False) < a.astype(np.uint64, copy=False)] += 1
@@ -314,7 +313,7 @@ def get_c_party_1_torch(x_bits, multiplexer_bits, beta):
 
     return w_cumsum
 
-def get_c_party_1(x_bits, multiplexer_bits, beta, j):
+def get_c_party_1(x_bits, multiplexer_bits, beta):
     beta = beta[..., np.newaxis]
     beta = -2 * beta  # Not allowed to change beta inplace
     np.add(beta, 1, out=beta)
