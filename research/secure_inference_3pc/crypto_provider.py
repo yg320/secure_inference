@@ -141,7 +141,7 @@ class SecureMSBCryptoProvider(SecureModule):
         self.private_compare = PrivateCompareCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, size):
-        x = self.prf_handler[CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
 
         x_bits = decompose(x)
 
@@ -149,12 +149,11 @@ class SecureMSBCryptoProvider(SecureModule):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=np.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
-        x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_0 = self.sub_mode_L_minus_one(x, x_1)
 
         x_bit0 = x % 2
-        x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=size,
-                                                                  dtype=self.dtype)
+        x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
         x_bit_0_1 = x_bit0 - x_bit_0_0
 
         self.network_assets.sender_02.put(x_0)
@@ -168,8 +167,7 @@ class SecureMSBCryptoProvider(SecureModule):
         # beta_p = beta ^ (x > r)
         beta_p = self.private_compare()
 
-        beta_p_0 = self.prf_handler[CRYPTO_PROVIDER].integers(self.min_val, self.max_val + 1, size=size,
-                                                                 dtype=self.dtype)
+        beta_p_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
         beta_p_1 = beta_p - beta_p_0
 
         self.network_assets.sender_02.put(beta_p_0)

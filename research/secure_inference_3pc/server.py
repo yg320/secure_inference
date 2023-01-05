@@ -135,7 +135,7 @@ class ShareConvertServer(SecureModule):
         # with Timer("ShareConvertServer"):
         return self._forward(a_1)
     def _forward(self, a_1):
-        a_1 = a_1.astype(SIGNED_DTYPE)
+
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
@@ -161,7 +161,7 @@ class ShareConvertServer(SecureModule):
         theta_1 = self.add_mode_L_minus_one(beta_1, t00)
         y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
         y_1 = self.add_mode_L_minus_one(y_1, mu_1)
-        return y_1.astype(self.dtype)
+        return y_1
 
 
 class SecureMultiplicationServer(SecureModule):
@@ -198,9 +198,10 @@ class SecureMSBServer(SecureModule):
         self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
 
     def forward(self, a_1):
+        a_1 = a_1.astype(SIGNED_DTYPE)
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
-        x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=a_1.dtype)
+        x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=a_1.dtype)
 
         x_bits_1 = self.network_assets.receiver_12.get()
         x_bit_0_1 = self.network_assets.receiver_12.get()
@@ -213,21 +214,21 @@ class SecureMSBServer(SecureModule):
 
         r = self.add_mode_L_minus_one(r_0, r_1)
         r_mod_2 = r % 2
-        r = r.astype(SIGNED_DTYPE)
+
         self.private_compare(x_bits_1, r, beta)
 
         beta_p_1 = self.network_assets.receiver_12.get()
 
-        beta = beta.astype(self.dtype)
+        beta = beta.astype(SIGNED_DTYPE)
         gamma_1 = beta_p_1 + (1 * beta) - (2 * beta * beta_p_1)
         delta_1 = x_bit_0_1 + r_mod_2 - (2 * r_mod_2 * x_bit_0_1)
 
-        theta_1 = self.mult(gamma_1, delta_1)
+        theta_1 = self.mult(gamma_1.astype(self.dtype), delta_1.astype(self.dtype)).astype(SIGNED_DTYPE)
 
         alpha_1 = gamma_1 + delta_1 - 2 * theta_1
         alpha_1 = alpha_1 + mu_1
 
-        return alpha_1
+        return alpha_1.astype(self.dtype)
 
 
 class SecureDReLUServer(SecureModule):
@@ -241,7 +242,7 @@ class SecureDReLUServer(SecureModule):
         assert X_share.dtype == self.dtype
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=X_share.dtype)
 
-        X1_converted = self.share_convert(self.dtype(2) * X_share)
+        X1_converted = self.share_convert((self.dtype(2) * X_share).astype(SIGNED_DTYPE)).astype(self.dtype)
         MSB_1 = self.msb(X1_converted)
         return 1 - MSB_1 + mu_1
 
