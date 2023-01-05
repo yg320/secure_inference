@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 17851
-        self.port_10 = 17852
-        self.port_02 = 17853
-        self.port_20 = 17854
-        self.port_12 = 17855
-        self.port_21 = 17856
+        self.port_01 = 17871
+        self.port_10 = 17872
+        self.port_02 = 17873
+        self.port_20 = 17874
+        self.port_12 = 17875
+        self.port_21 = 17876
 
 
 class NetworkAssets:
@@ -136,7 +136,7 @@ def decompose(value):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
     end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
-    r_shift = value.astype(np.uint64) >> powers[:,NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
+    r_shift = value.astype(np.uint64) >> powers[:, NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
     value_bits = np.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=np.int8)
     np.bitwise_and(r_shift, np.int8(1), out=value_bits)
     ret = value_bits.reshape(orig_shape + [NUM_OF_COMPARE_BITS])
@@ -183,24 +183,17 @@ class SecureModule(torch.nn.Module):
 
         self.trunc = TRUNC
 
-        self.L_minus_1 = 2 ** NUM_BITS - 1
 
     def add_mode_L_minus_one(self, a, b):
-        orig_type = a.dtype
-        a_u = a.astype(np.uint64)
-        b_u = b.astype(np.uint64)
-        ret = a_u + b_u
-        ret[ret < a_u] += np.uint64(1)
-        ret[ret == self.L_minus_1] = np.uint64(0)
-        return ret.astype(orig_type)
+        ret = a + b
+        ret[ret.astype(np.uint64, copy=False) < a.astype(np.uint64, copy=False)] += 1
+        ret[ret == - 1] = 0   # If ret were uint64, then the condition would be ret == 2**64 - 1
+        return ret
 
     def sub_mode_L_minus_one(self, a, b):
-        orig_type = a.dtype
-        a_u = a.astype(np.uint64)
-        b_u = np.uint64(b)
-        ret = a_u - b_u
-        ret[b_u > a_u] -= np.uint64(1)
-        return ret.astype(orig_type)
+        ret = a - b
+        ret[b.astype(np.uint64, copy=False) > a.astype(np.uint64, copy=False)] -= 1
+        return ret
 
 
 def fuse_conv_bn(conv_module, batch_norm_module):

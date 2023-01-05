@@ -142,7 +142,7 @@ class ShareConvertClient(SecureModule):
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
-
+        # alpha = backend.greater_than(r_0 - r, 0)
         alpha = (0 < r_0 - r).astype(SIGNED_DTYPE)
 
         a_tild_0 = a_0 + r_0
@@ -162,7 +162,7 @@ class ShareConvertClient(SecureModule):
         eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
 
         t0 = self.add_mode_L_minus_one(delta_0, eta_0)
-        t1 = self.sub_mode_L_minus_one(t0, 1)
+        t1 = self.sub_mode_L_minus_one(t0, SIGNED_DTYPE(1))
         t2 = self.sub_mode_L_minus_one(t1, alpha)
         theta_0 = self.add_mode_L_minus_one(beta_0, t2)
 

@@ -50,6 +50,6 @@ class Params:
     NUM_IMAGES = 1
     DEVICE = "cuda"
     DUMMY_RELU = False
-    DUMMY_MAX_POOL = True
+    DUMMY_MAX_POOL = False
     PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second
