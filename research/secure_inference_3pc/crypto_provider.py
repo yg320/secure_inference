@@ -23,8 +23,8 @@ from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 
 class SecureConv2DCryptoProvider(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets, device="cpu"):
-        super(SecureConv2DCryptoProvider, self).__init__(crypto_assets, network_assets)
+    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+        super(SecureConv2DCryptoProvider, self).__init__(**kwargs)
 
         self.W_shape = W_shape
         self.stride = stride
@@ -60,8 +60,8 @@ class SecureConv2DCryptoProvider(SecureModule):
 
 
 class PrivateCompareCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PrivateCompareCryptoProvider, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PrivateCompareCryptoProvider, self).__init__(**kwargs)
 
     def forward(self):
         d_bits_0 = self.network_assets.receiver_02.get()
@@ -74,9 +74,9 @@ class PrivateCompareCryptoProvider(SecureModule):
 
 
 class ShareConvertCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(ShareConvertCryptoProvider, self).__init__(crypto_assets, network_assets)
-        self.private_compare = PrivateCompareCryptoProvider(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(ShareConvertCryptoProvider, self).__init__(**kwargs)
+        self.private_compare = PrivateCompareCryptoProvider(**kwargs)
 
     def forward(self, size):
         a_tild_0 = self.network_assets.receiver_02.get()
@@ -112,8 +112,8 @@ class ShareConvertCryptoProvider(SecureModule):
 
 
 class SecureMultiplicationCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureMultiplicationCryptoProvider, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureMultiplicationCryptoProvider, self).__init__(**kwargs)
 
     def forward(self, shape):
         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
@@ -131,10 +131,10 @@ class SecureMultiplicationCryptoProvider(SecureModule):
 
 
 class SecureMSBCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureMSBCryptoProvider, self).__init__(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
-        self.private_compare = PrivateCompareCryptoProvider(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureMSBCryptoProvider, self).__init__(**kwargs)
+        self.mult = SecureMultiplicationCryptoProvider(**kwargs)
+        self.private_compare = PrivateCompareCryptoProvider(**kwargs)
 
     def forward(self, size):
         x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
@@ -174,11 +174,11 @@ class SecureMSBCryptoProvider(SecureModule):
 
 
 class SecureDReLUCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureDReLUCryptoProvider, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureDReLUCryptoProvider, self).__init__(**kwargs)
 
-        self.share_convert = ShareConvertCryptoProvider(crypto_assets, network_assets)
-        self.msb = SecureMSBCryptoProvider(crypto_assets, network_assets)
+        self.share_convert = ShareConvertCryptoProvider(**kwargs)
+        self.msb = SecureMSBCryptoProvider(**kwargs)
 
     def forward(self, X_share):
 
@@ -188,11 +188,11 @@ class SecureDReLUCryptoProvider(SecureModule):
 
 
 class SecureReLUCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
-        super(SecureReLUCryptoProvider, self).__init__(crypto_assets, network_assets)
+    def __init__(self, dummy_relu=False, **kwargs):
+        super(SecureReLUCryptoProvider, self).__init__(**kwargs)
 
-        self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUCryptoProvider(**kwargs)
+        self.mult = SecureMultiplicationCryptoProvider(**kwargs)
         self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
@@ -205,11 +205,11 @@ class SecureReLUCryptoProvider(SecureModule):
             return X_share
 
 class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU):
-    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
-        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+    def __init__(self, block_sizes, dummy_relu=False, **kwargs):
+        SecureModule.__init__(self, **kwargs)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.DReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
-        self.secure_mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUCryptoProvider(**kwargs)
+        self.secure_mult = SecureMultiplicationCryptoProvider(**kwargs)
 
     def mult(self, x, y):
         self.secure_mult(x.shape)
@@ -218,9 +218,9 @@ class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU)
 
 
 class SecureSelectShareCryptoProvider(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureSelectShareCryptoProvider, self).__init__(crypto_assets, network_assets)
-        self.secure_multiplication = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureSelectShareCryptoProvider, self).__init__(**kwargs)
+        self.secure_multiplication = SecureMultiplicationCryptoProvider(**kwargs)
 
     def forward(self, share, dummy0=None, dummy1=None):
 
@@ -228,11 +228,11 @@ class SecureSelectShareCryptoProvider(SecureModule):
         return share
 
 class SecureMaxPoolCryptoProvider(SecureMaxPool):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
-        super(SecureMaxPoolCryptoProvider, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
-        self.select_share = SecureSelectShareCryptoProvider(crypto_assets, network_assets)
-        self.dReLU = SecureDReLUCryptoProvider(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationCryptoProvider(crypto_assets, network_assets)
+    def __init__(self, kernel_size, stride, padding, dummy_max_pool, **kwargs):
+        super(SecureMaxPoolCryptoProvider, self).__init__(kernel_size, stride, padding, dummy_max_pool, **kwargs)
+        self.select_share = SecureSelectShareCryptoProvider(**kwargs)
+        self.dReLU = SecureDReLUCryptoProvider(**kwargs)
+        self.mult = SecureMultiplicationCryptoProvider(**kwargs)
 
     def forward(self, x):
         if self.dummy_max_pool:
@@ -268,15 +268,15 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
+def build_secure_relu(is_prf_fetcher=False, dummy_relu=False, **kwargs):
     relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUCryptoProvider
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    return relu_class(dummy_relu=dummy_relu, **kwargs)
 
 
 
 class SecureModelSegmentation(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModelSegmentation, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model,  **kwargs):
+        super(SecureModelSegmentation, self).__init__( **kwargs)
         self.model = model
 
     def forward(self, image_shape):
@@ -289,8 +289,8 @@ class SecureModelSegmentation(SecureModule):
 
 
 class SecureModelClassification(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModelClassification, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model,  **kwargs):
+        super(SecureModelClassification, self).__init__( **kwargs)
         self.model = model
 
     def forward(self, image_shape):

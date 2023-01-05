@@ -30,8 +30,8 @@ from research.utils import build_data
 
 class SecureConv2DClient(SecureModule):
 
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
-        super(SecureConv2DClient, self).__init__(crypto_assets, network_assets)
+    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+        super(SecureConv2DClient, self).__init__(**kwargs)
 
         self.W_shape = W_shape
         self.stride = stride
@@ -85,8 +85,8 @@ class SecureConv2DClient(SecureModule):
         return self.forward_(X_share)
 
 class PrivateCompareClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PrivateCompareClient, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PrivateCompareClient, self).__init__(**kwargs)
 
     def forward(self, x_bits_0, r, beta):
         # with Timer("PrivateCompareClient"):
@@ -122,9 +122,9 @@ class PrivateCompareClient(SecureModule):
 
 
 class ShareConvertClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(ShareConvertClient, self).__init__(crypto_assets, network_assets)
-        self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(ShareConvertClient, self).__init__(**kwargs)
+        self.private_compare = PrivateCompareClient(**kwargs)
 
     def forward(self, a_0):
         return self.forward_(a_0)
@@ -165,8 +165,8 @@ class ShareConvertClient(SecureModule):
 
 
 class SecureMultiplicationClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureMultiplicationClient, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureMultiplicationClient, self).__init__(**kwargs)
 
     def forward(self, X_share, Y_share):
         return self.forward_(X_share, Y_share)
@@ -195,9 +195,9 @@ class SecureMultiplicationClient(SecureModule):
 
 
 class SecureSelectShareClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureSelectShareClient, self).__init__(crypto_assets, network_assets)
-        self.secure_multiplication = SecureMultiplicationClient(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureSelectShareClient, self).__init__(**kwargs)
+        self.secure_multiplication = SecureMultiplicationClient(**kwargs)
 
     def forward(self, alpha, x, y):
         # if alpha == 0: return x else return 1
@@ -212,10 +212,10 @@ class SecureSelectShareClient(SecureModule):
 
 
 class SecureMSBClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureMSBClient, self).__init__(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
-        self.private_compare = PrivateCompareClient(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureMSBClient, self).__init__(**kwargs)
+        self.mult = SecureMultiplicationClient(**kwargs)
+        self.private_compare = PrivateCompareClient(**kwargs)
 
     def forward(self, a_0):
         return self.forward_(a_0)
@@ -254,11 +254,11 @@ class SecureMSBClient(SecureModule):
 
 
 class SecureDReLUClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureDReLUClient, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureDReLUClient, self).__init__(**kwargs)
 
-        self.share_convert = ShareConvertClient(crypto_assets, network_assets)
-        self.msb = SecureMSBClient(crypto_assets, network_assets)
+        self.share_convert = ShareConvertClient(**kwargs)
+        self.msb = SecureMSBClient(**kwargs)
 
     def forward(self, X_share):
 
@@ -271,11 +271,11 @@ class SecureDReLUClient(SecureModule):
 
 
 class SecureReLUClient(SecureModule):
-    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
-        super(SecureReLUClient, self).__init__(crypto_assets, network_assets)
+    def __init__(self, dummy_relu=False, **kwargs, ):
+        super(SecureReLUClient, self).__init__(**kwargs)
 
-        self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUClient(**kwargs)
+        self.mult = SecureMultiplicationClient(**kwargs)
         self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
@@ -298,11 +298,11 @@ class SecureReLUClient(SecureModule):
 
 
 class SecureMaxPoolClient(SecureMaxPool):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
-        super(SecureMaxPoolClient, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
-        self.select_share = SecureSelectShareClient(crypto_assets, network_assets)
-        self.dReLU = SecureDReLUClient(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
+    def __init__(self, kernel_size, stride, padding, dummy_max_pool, **kwargs):
+        super(SecureMaxPoolClient, self).__init__(kernel_size, stride, padding, dummy_max_pool, **kwargs)
+        self.select_share = SecureSelectShareClient(**kwargs)
+        self.dReLU = SecureDReLUClient(**kwargs)
+        self.mult = SecureMultiplicationClient(**kwargs)
 
     def forward(self, x):
         if self.dummy_max_pool:
@@ -316,11 +316,11 @@ class SecureMaxPoolClient(SecureMaxPool):
 
 
 class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
-    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
-        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+    def __init__(self, block_sizes, dummy_relu=False, **kwargs):
+        SecureModule.__init__(self, **kwargs)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.DReLU = SecureDReLUClient(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationClient(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUClient(**kwargs)
+        self.mult = SecureMultiplicationClient(**kwargs)
 
 
 def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
@@ -366,8 +366,8 @@ def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy
 
 
 class SecureModelClassification(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModelClassification, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model,  **kwargs):
+        super(SecureModelClassification, self).__init__(**kwargs)
         self.model = model
     def forward(self, img):
         I = TypeConverter.f2i(img)
@@ -384,8 +384,8 @@ class SecureModelClassification(SecureModule):
         return out
 
 class SecureModelSegmentation(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModelSegmentation, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model, **kwargs):
+        super(SecureModelSegmentation, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, img, img_meta):

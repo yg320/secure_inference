@@ -40,9 +40,10 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         dilation=conv_module.dilation,
         padding=conv_module.padding,
         groups=conv_module.groups,
+        device=device,
         crypto_assets=crypto_assets,
         network_assets=network_assets,
-        device=device
+        is_prf_fetcher=is_prf_fetcher
     )
 
 def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
@@ -71,13 +72,13 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
 
 def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
     relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUServer
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=is_prf_fetcher)
 
 
 
 class SecureModelSegmentation(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModelSegmentation, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model, **kwargs):
+        super(SecureModelSegmentation, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, image_shape):
@@ -90,8 +91,8 @@ class SecureModelSegmentation(SecureModule):
         self.network_assets.sender_01.put(out)
 
 class SecureModelClassification(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(SecureModelClassification, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model, **kwargs):
+        super(SecureModelClassification, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, image_shape):

@@ -169,12 +169,13 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
 
 def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool):
 
-    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets)
-    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
-    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
-    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool)
-    secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
-    prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
+    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True)
+
+    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool, is_prf_fetcher=True)
+    secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True)
+    prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
 
     prf_fetcher_model = get_model(
         config=Params.SECURE_CONFIG_PATH,
@@ -185,9 +186,9 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
     securify_resnet_cifar(
         model=prf_fetcher_model,
         max_pool=max_pool,
-        build_secure_conv=partial(build_secure_conv, is_prf_fetcher=True),
-        build_secure_relu=partial(build_secure_relu, is_prf_fetcher=True),
-        build_secure_fully_connected=partial(build_secure_fully_connected, is_prf_fetcher=True),
+        build_secure_conv=build_secure_conv,
+        build_secure_relu=build_secure_relu,
+        build_secure_fully_connected=build_secure_fully_connected,
         secure_model_class=prf_fetcher_secure_model,
         crypto_assets=crypto_assets,
         network_assets=network_assets,

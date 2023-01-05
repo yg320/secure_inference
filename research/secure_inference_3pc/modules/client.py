@@ -8,8 +8,8 @@ from research.secure_inference_3pc.timer import Timer
 from research.bReLU import NumpySecureOptimizedBlockReLU
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
-        super(PRFFetcherConv2D, self).__init__(crypto_assets, network_assets)
+    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+        super(PRFFetcherConv2D, self).__init__(**kwargs)
 
         self.W_shape = W_shape
         self.stride = stride
@@ -28,17 +28,17 @@ class PRFFetcherConv2D(PRFFetcherModule):
 
 
 class PRFFetcherPrivateCompare(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherPrivateCompare, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwars):
+        super(PRFFetcherPrivateCompare, self).__init__(**kwars)
 
     def forward(self, x_bits_0):
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=np.int32)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherShareConvert, self).__init__(crypto_assets, network_assets)
-        self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
+    def __init__(self, **kwars):
+        super(PRFFetcherShareConvert, self).__init__(**kwars)
+        self.private_compare = PRFFetcherPrivateCompare(**kwars)
 
     def forward(self, dummy_tensor):
         self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
@@ -55,8 +55,8 @@ class PRFFetcherShareConvert(PRFFetcherModule):
 
 
 class PRFFetcherMultiplication(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherMultiplication, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwars):
+        super(PRFFetcherMultiplication, self).__init__(**kwars)
 
 
     def forward(self, dummy_tensor):
@@ -69,9 +69,9 @@ class PRFFetcherMultiplication(PRFFetcherModule):
 
 
 class PRFFetcherSelectShare(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherSelectShare, self).__init__(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+    def __init__(self, **kwars):
+        super(PRFFetcherSelectShare, self).__init__(**kwars)
+        self.mult = PRFFetcherMultiplication(**kwars)
 
 
     def forward(self, dummy_tensor):
@@ -85,10 +85,10 @@ class PRFFetcherSelectShare(PRFFetcherModule):
 
 
 class PRFFetcherMSB(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherMSB, self).__init__(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
-        self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
+    def __init__(self, **kwars):
+        super(PRFFetcherMSB, self).__init__(**kwars)
+        self.mult = PRFFetcherMultiplication(**kwars)
+        self.private_compare = PRFFetcherPrivateCompare(**kwars)
 
     def forward(self, dummy_tensor):
 
@@ -103,11 +103,11 @@ class PRFFetcherMSB(PRFFetcherModule):
 
 
 class PRFFetcherDReLU(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherDReLU, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PRFFetcherDReLU, self).__init__(**kwargs)
 
-        self.share_convert = PRFFetcherShareConvert(crypto_assets, network_assets)
-        self.msb = PRFFetcherMSB(crypto_assets, network_assets)
+        self.share_convert = PRFFetcherShareConvert(**kwargs)
+        self.msb = PRFFetcherMSB(**kwargs)
 
     def forward(self, dummy_tensor):
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=dummy_tensor.dtype)
@@ -119,11 +119,11 @@ class PRFFetcherDReLU(PRFFetcherModule):
 
 
 class PRFFetcherReLU(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
-        super(PRFFetcherReLU, self).__init__(crypto_assets, network_assets)
+    def __init__(self, dummy_relu=False, **kwargs):
+        super(PRFFetcherReLU, self).__init__(**kwargs)
 
-        self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.DReLU = PRFFetcherDReLU(**kwargs)
+        self.mult = PRFFetcherMultiplication(**kwargs)
         self.dummy_relu = dummy_relu
 
     def forward(self, dummy_tensor):
@@ -144,12 +144,12 @@ class PRFFetcherReLU(PRFFetcherModule):
 
 
 class PRFFetcherMaxPool(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets, kernel_size=3, stride=2, padding=1, dummy_max_pool=False):
-        super(PRFFetcherMaxPool, self).__init__(crypto_assets, network_assets)
+    def __init__(self, kernel_size=3, stride=2, padding=1, dummy_max_pool=False, **kwargs):
+        super(PRFFetcherMaxPool, self).__init__(**kwargs)
         self.dummy_max_pool = dummy_max_pool
-        self.select_share = PRFFetcherSelectShare(crypto_assets, network_assets)
-        self.dReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.select_share = PRFFetcherSelectShare(**kwargs)
+        self.dReLU = PRFFetcherDReLU(**kwargs)
+        self.mult = PRFFetcherMultiplication(**kwargs)
 
     def forward(self, x):
         if self.dummy_max_pool:
@@ -183,11 +183,11 @@ class PRFFetcherMaxPool(PRFFetcherModule):
 
 
 class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
-    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
-        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+    def __init__(self, block_sizes, dummy_relu=False, **kwargs):
+        SecureModule.__init__(self, **kwargs)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.secure_DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.secure_mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.secure_DReLU = PRFFetcherDReLU(**kwargs)
+        self.secure_mult = PRFFetcherMultiplication(**kwargs)
 
         self.dummy_relu = dummy_relu
 
@@ -207,8 +207,8 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
         return activation
 
 class PRFFetcherSecureModelSegmentation(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(PRFFetcherSecureModelSegmentation, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model,  **kwargs):
+        super(PRFFetcherSecureModelSegmentation, self).__init__( **kwargs)
         self.model = model
 
     def forward(self, img):
@@ -218,8 +218,8 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
 
 
 class PRFFetcherSecureModelClassification(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(PRFFetcherSecureModelClassification, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model, **kwargs):
+        super(PRFFetcherSecureModelClassification, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, img):

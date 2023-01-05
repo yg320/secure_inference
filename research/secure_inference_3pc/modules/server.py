@@ -16,8 +16,8 @@ from research.bReLU import NumpySecureOptimizedBlockReLU
 
 
 class SecureConv2DServer(SecureModule):
-    def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
-        super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
+    def __init__(self, W, bias, stride, dilation, padding, groups, device="cpu", **kwargs):
+        super(SecureConv2DServer, self).__init__(**kwargs)
 
         self.W_plaintext = W
         self.bias = bias
@@ -79,8 +79,8 @@ class SecureConv2DServer(SecureModule):
 
 
 class PrivateCompareServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PrivateCompareServer, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PrivateCompareServer, self).__init__(**kwargs)
 
     def forward(self, x_bits_1, r, beta):
 
@@ -102,9 +102,9 @@ class PrivateCompareServer(SecureModule):
 
 
 class ShareConvertServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(ShareConvertServer, self).__init__(crypto_assets, network_assets)
-        self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(ShareConvertServer, self).__init__(**kwargs)
+        self.private_compare = PrivateCompareServer(**kwargs)
 
     def forward(self, a_1):
 
@@ -140,8 +140,8 @@ class ShareConvertServer(SecureModule):
 
 
 class SecureMultiplicationServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureMultiplicationServer, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureMultiplicationServer, self).__init__(**kwargs)
 
     def forward(self, X_share, Y_share):
 
@@ -168,10 +168,10 @@ class SecureMultiplicationServer(SecureModule):
 
 
 class SecureMSBServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureMSBServer, self).__init__(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
-        self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureMSBServer, self).__init__(**kwargs)
+        self.mult = SecureMultiplicationServer(**kwargs)
+        self.private_compare = PrivateCompareServer(**kwargs)
 
     def forward(self, a_1):
 
@@ -208,11 +208,11 @@ class SecureMSBServer(SecureModule):
 
 
 class SecureDReLUServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureDReLUServer, self).__init__(crypto_assets, network_assets)
+    def __init__(self,  **kwargs):
+        super(SecureDReLUServer, self).__init__( **kwargs)
 
-        self.share_convert = ShareConvertServer(crypto_assets, network_assets)
-        self.msb = SecureMSBServer(crypto_assets, network_assets)
+        self.share_convert = ShareConvertServer( **kwargs)
+        self.msb = SecureMSBServer(**kwargs)
 
     def forward(self, X_share):
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
@@ -228,11 +228,11 @@ class SecureDReLUServer(SecureModule):
 
 
 class SecureReLUServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
-        super(SecureReLUServer, self).__init__(crypto_assets, network_assets)
+    def __init__(self, dummy_relu=False,  **kwargs):
+        super(SecureReLUServer, self).__init__( **kwargs)
 
-        self.DReLU = SecureDReLUServer(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUServer( **kwargs)
+        self.mult = SecureMultiplicationServer( **kwargs)
         self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
@@ -256,17 +256,17 @@ class SecureReLUServer(SecureModule):
 
 
 class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
-    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
-        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+    def __init__(self, block_sizes,  dummy_relu=False, **kwargs):
+        SecureModule.__init__(self, **kwargs)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.DReLU = SecureDReLUServer(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
+        self.DReLU = SecureDReLUServer(**kwargs)
+        self.mult = SecureMultiplicationServer(**kwargs)
 
 
 class SecureSelectShareServer(SecureModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(SecureSelectShareServer, self).__init__(crypto_assets, network_assets)
-        self.secure_multiplication = SecureMultiplicationServer(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(SecureSelectShareServer, self).__init__(**kwargs)
+        self.secure_multiplication = SecureMultiplicationServer(**kwargs)
 
     def forward(self, alpha, x, y):
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=alpha.shape, dtype=SIGNED_DTYPE)
@@ -280,11 +280,11 @@ class SecureSelectShareServer(SecureModule):
 
 
 class SecureMaxPoolServer(SecureMaxPool):
-    def __init__(self, kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool):
-        super(SecureMaxPoolServer, self).__init__(kernel_size, stride, padding, crypto_assets, network_assets, dummy_max_pool)
-        self.select_share = SecureSelectShareServer(crypto_assets, network_assets)
-        self.dReLU = SecureDReLUServer(crypto_assets, network_assets)
-        self.mult = SecureMultiplicationServer(crypto_assets, network_assets)
+    def __init__(self, kernel_size, stride, padding, dummy_max_pool,  **kwargs):
+        super(SecureMaxPoolServer, self).__init__(kernel_size, stride, padding, dummy_max_pool,  **kwargs)
+        self.select_share = SecureSelectShareServer( **kwargs)
+        self.dReLU = SecureDReLUServer( **kwargs)
+        self.mult = SecureMultiplicationServer( **kwargs)
 
     def forward(self, x):
         if self.dummy_max_pool:
@@ -302,8 +302,8 @@ class SecureMaxPoolServer(SecureMaxPool):
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class PRFFetcherConv2D(PRFFetcherModule):
-    def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets, device="cpu"):
-        super(PRFFetcherConv2D, self).__init__(crypto_assets, network_assets)
+    def __init__(self, W, bias, stride, dilation, padding, groups, device="cpu", **kwargs):
+        super(PRFFetcherConv2D, self).__init__(**kwargs)
 
         self.W_shape = W.shape
         self.stride = stride
@@ -324,17 +324,17 @@ class PRFFetcherConv2D(PRFFetcherModule):
 
 
 class PRFFetcherPrivateCompare(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherPrivateCompare, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PRFFetcherPrivateCompare, self).__init__(**kwargs)
 
     def forward(self, x_bits_0):
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=np.int32)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherShareConvert, self).__init__(crypto_assets, network_assets)
-        self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PRFFetcherShareConvert, self).__init__(**kwargs)
+        self.private_compare = PRFFetcherPrivateCompare(**kwargs)
 
     def forward(self, dummy_tensor):
         self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
@@ -349,8 +349,8 @@ class PRFFetcherShareConvert(PRFFetcherModule):
 
 
 class PRFFetcherMultiplication(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherMultiplication, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PRFFetcherMultiplication, self).__init__(**kwargs)
 
     def forward(self, dummy_tensor):
 
@@ -362,9 +362,9 @@ class PRFFetcherMultiplication(PRFFetcherModule):
         return dummy_tensor
 
 class PRFFetcherSelectShare(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherSelectShare, self).__init__(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+    def __init__(self,  **kwargs):
+        super(PRFFetcherSelectShare, self).__init__( **kwargs)
+        self.mult = PRFFetcherMultiplication( **kwargs)
 
 
     def forward(self, dummy_tensor):
@@ -377,10 +377,10 @@ class PRFFetcherSelectShare(PRFFetcherModule):
 
 
 class PRFFetcherMSB(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherMSB, self).__init__(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
-        self.private_compare = PRFFetcherPrivateCompare(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PRFFetcherMSB, self).__init__(**kwargs)
+        self.mult = PRFFetcherMultiplication(**kwargs)
+        self.private_compare = PRFFetcherPrivateCompare(**kwargs)
 
     def forward(self, dummy_tensor):
 
@@ -395,11 +395,11 @@ class PRFFetcherMSB(PRFFetcherModule):
 
 
 class PRFFetcherDReLU(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets):
-        super(PRFFetcherDReLU, self).__init__(crypto_assets, network_assets)
+    def __init__(self, **kwargs):
+        super(PRFFetcherDReLU, self).__init__(**kwargs)
 
-        self.share_convert = PRFFetcherShareConvert(crypto_assets, network_assets)
-        self.msb = PRFFetcherMSB(crypto_assets, network_assets)
+        self.share_convert = PRFFetcherShareConvert(**kwargs)
+        self.msb = PRFFetcherMSB(**kwargs)
 
     def forward(self, dummy_tensor):
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=dummy_tensor.dtype)
@@ -411,11 +411,10 @@ class PRFFetcherDReLU(PRFFetcherModule):
 
 
 class PRFFetcherReLU(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets, dummy_relu=False):
-        super(PRFFetcherReLU, self).__init__(crypto_assets, network_assets)
-
-        self.DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+    def __init__(self, dummy_relu=False, **kwargs):
+        super(PRFFetcherReLU, self).__init__(**kwargs)
+        self.DReLU = PRFFetcherDReLU(**kwargs)
+        self.mult = PRFFetcherMultiplication(**kwargs)
         self.dummy_relu = dummy_relu
 
     def forward(self, dummy_tensor):
@@ -434,13 +433,13 @@ class PRFFetcherReLU(PRFFetcherModule):
             return dummy_tensor
 
 class PRFFetcherMaxPool(PRFFetcherModule):
-    def __init__(self, crypto_assets, network_assets, kernel_size=3, stride=2, padding=1, dummy_max_pool=False):
-        super(PRFFetcherMaxPool, self).__init__(crypto_assets, network_assets)
+    def __init__(self, kernel_size=3, stride=2, padding=1, dummy_max_pool=False, **kwargs):
+        super(PRFFetcherMaxPool, self).__init__( **kwargs)
 
         self.dummy_max_pool = dummy_max_pool
-        self.select_share = PRFFetcherSelectShare(crypto_assets, network_assets)
-        self.dReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.select_share = PRFFetcherSelectShare( **kwargs)
+        self.dReLU = PRFFetcherDReLU( **kwargs)
+        self.mult = PRFFetcherMultiplication( **kwargs)
 
     def forward(self, x):
         if self.dummy_max_pool:
@@ -473,11 +472,11 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         return ret
 
 class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
-    def __init__(self, block_sizes, crypto_assets, network_assets, dummy_relu=False):
-        SecureModule.__init__(self, crypto_assets=crypto_assets, network_assets=network_assets)
+    def __init__(self, block_sizes, dummy_relu=False,  **kwargs):
+        SecureModule.__init__(self,  **kwargs)
         NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.secure_DReLU = PRFFetcherDReLU(crypto_assets, network_assets)
-        self.secure_mult = PRFFetcherMultiplication(crypto_assets, network_assets)
+        self.secure_DReLU = PRFFetcherDReLU( **kwargs)
+        self.secure_mult = PRFFetcherMultiplication( **kwargs)
 
         self.dummy_relu = dummy_relu
 
@@ -497,8 +496,8 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
         return activation
 
 class PRFFetcherSecureModelSegmentation(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(PRFFetcherSecureModelSegmentation, self).__init__(crypto_assets, network_assets)
+    def __init__(self, model,   **kwargs):
+        super(PRFFetcherSecureModelSegmentation, self).__init__( **kwargs)
         self.model = model
 
     def forward(self, img):
@@ -508,8 +507,8 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
 
 
 class PRFFetcherSecureModelClassification(SecureModule):
-    def __init__(self, model,  crypto_assets, network_assets):
-        super(PRFFetcherSecureModelClassification, self).__init__( crypto_assets, network_assets)
+    def __init__(self, model,   **kwargs):
+        super(PRFFetcherSecureModelClassification, self).__init__(  **kwargs)
         self.model = model
 
     def forward(self, img):
