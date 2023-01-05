@@ -67,7 +67,7 @@ class PrivateCompareCryptoProvider(SecureModule):
         d_bits_1 = self.network_assets.receiver_12.get()
 
         d = (d_bits_0 + d_bits_1) % P
-        beta_p = (d == 0).any(axis=-1).astype(d.dtype)
+        beta_p = (d == 0).any(axis=-1).astype(SIGNED_DTYPE)
 
         return beta_p
 
@@ -100,7 +100,7 @@ class ShareConvertCryptoProvider(SecureModule):
         # eta_p = self.network_assets.receiver_12.get()
         # eta_p = eta_p ^ (x > r)
 
-        eta_p = self.private_compare().astype(SIGNED_DTYPE)
+        eta_p = self.private_compare()
 
         eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         eta_p_1 = self.sub_mode_L_minus_one(eta_p, eta_p_0)

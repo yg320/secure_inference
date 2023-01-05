@@ -198,7 +198,7 @@ class SecureMSBServer(SecureModule):
         self.private_compare = PrivateCompareServer(crypto_assets, network_assets)
 
     def forward(self, a_1):
-        a_1 = a_1.astype(SIGNED_DTYPE)
+
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=a_1.dtype)
@@ -228,7 +228,7 @@ class SecureMSBServer(SecureModule):
         alpha_1 = gamma_1 + delta_1 - 2 * theta_1
         alpha_1 = alpha_1 + mu_1
 
-        return alpha_1.astype(self.dtype)
+        return alpha_1
 
 
 class SecureDReLUServer(SecureModule):
@@ -242,8 +242,8 @@ class SecureDReLUServer(SecureModule):
         assert X_share.dtype == self.dtype
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=X_share.dtype)
 
-        X1_converted = self.share_convert((self.dtype(2) * X_share).astype(SIGNED_DTYPE)).astype(self.dtype)
-        MSB_1 = self.msb(X1_converted)
+        X1_converted = self.share_convert((self.dtype(2) * X_share).astype(SIGNED_DTYPE))
+        MSB_1 = self.msb(X1_converted).astype(self.dtype)
         return 1 - MSB_1 + mu_1
 
 

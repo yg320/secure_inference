@@ -234,7 +234,7 @@ class SecureMSBClient(SecureModule):
         return self.forward_(a_0)
 
     def forward_(self, a_0):
-        a_0 = a_0.astype(SIGNED_DTYPE)
+
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
@@ -263,7 +263,7 @@ class SecureMSBClient(SecureModule):
         alpha_0 = gamma_0 + delta_0 - 2 * theta_0
         alpha_0 = alpha_0 + mu_0
 
-        return alpha_0.astype(self.dtype)
+        return alpha_0
 
 
 class SecureDReLUClient(SecureModule):
@@ -277,8 +277,8 @@ class SecureDReLUClient(SecureModule):
         assert X_share.dtype == self.dtype
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=X_share.shape, dtype=X_share.dtype)
 
-        X0_converted = self.share_convert((self.dtype(2) * X_share).astype(SIGNED_DTYPE)).astype(self.dtype)
-        MSB_0 = self.msb(X0_converted)
+        X0_converted = self.share_convert((self.dtype(2) * X_share).astype(SIGNED_DTYPE))
+        MSB_0 = self.msb(X0_converted).astype(self.dtype)
 
         return -MSB_0+mu_0
 
