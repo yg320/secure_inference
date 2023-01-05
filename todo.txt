@@ -1,13 +1,31 @@
 - Leetcode, Algo1, tabs
 
+============================================= Following days =============================================
+- !!!!!!!!!!!!!!!!!!!!!! Ask about Thesis course !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+- Options!
+- Agnostic backend (Transfer everything to Pytorch with GPU (Careful with small tensors)
+- Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
+- Agnostic prf prefetch
+- Further optimize Convs (Don't send back to cpu before second conv)
+- Consider adding Numba implementation in case CUDA isn't available. (Maybe stick to Pytorch instead of Numpy?!)
+- Replace mult in ReLU with select share
+- Build conv handler
+- Find optimal stochastic ReLU params
+- Send Image Size
+- Download ImageNet
+- MaxPool statistics
+- Final Seg/Clss results
+- Method & Intro (freestyle talk on our research. vision oriented), use FALCON.
+- CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
+
 ============================================= Research Major =============================================
-- Stochastic DReLU - I don't think we convert it properly, try ignoring first/second bits and see what happens1
+- Benchmark ops
 - Should FC and GAP be part of distortion?
 - Classification - 32bits
 - Use blocksize [1,0] or discard!
 - Float16? uint8?
 - Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
-- Start analysis (Analysis with noise to KnapSack matrix)
+
 - ImageNet classification - compare with Porthos
 - Explore 32bits, use trunc and understand when things go wrong
 - Consider what is best, torch or numpy - avoid converting between them.
@@ -15,6 +33,7 @@
 - How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
 - Replace Max Pool with Avg Pool with correction
 - Allow for softmax via maxpool derivative (Or FALCON implementation)
+- Unfairness!
 
 ============================================= Implementation Major =============================================
 - Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
@@ -28,19 +47,27 @@
 - Consider transfering to CUDA also ReLU stuff
 - If all ReLUs are [0,1] - fuse with next layer
 - MaxPool/ReLU flip
-
+- Verify +1 in integer_random
+- Go over protocol again. Verify implementation
 ============================================= Reading =============================================
 - FALCON, 2pc, 3pc, OT, HE
 - ABY3
 - How can 3PC be converted to 2PC? (Using OT)
 - Understand our Security level
-- Understand Porthos float2int and int2float methods
-- Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
+
 - Go over protocols again
 - Understand the math behind the protocols
 - Understand detection and propose protocols for special layers
 
 ============================================= Paper notes =============================================
+- Table: ours (Knapsack) vs. Naive
+- Table: benchmark Conv2d on Cuda
+- Figure - Layer reduction histogram
+- Figure - Method explaination
+- Figure - graph - (Non secure!) - Performance degredation as function of number of comparisons
+- Analysis - Maybe will help in KnapSack separation (due to proper additivity)
+- A paragraph on information leakage
+- Paper should be written as a generic tool!
 - Mention that most of our contributions are not related directly to the protocol, and are relevant to many other protocols. (E.g. FALCON)
 - Float implementation
 - Stochastic ReLU
@@ -52,6 +79,12 @@
 - Added CUDA implementation
 - People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
 - We chose not to decompose to offline/online, but this can be done.
+- We propose suite of ops, and show that they can be used in a variety of tasks. We show PoC on 3PC. (Paper is written as Generic tool)
+
+======================================== Reading Minor =============================================
+
+- Understand Porthos float2int and int2float methods
+- Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
 
 ============================================= Research Minor =============================================
 - Add quantization noise (to allow for 32bit inference) - QAT
@@ -61,6 +94,10 @@
 - Why first image is slow
 - Soft training?
 - CRF
+- Start analysis (Analysis with noise to KnapSack matrix)
+- Detection
+- Further datasets/architectures/models/tasks
+- QAT
 
 ============================================= Implementation Minor =============================================
 - Can we add more LUTs?
@@ -82,32 +119,5 @@
 - Verify fetchers are not slowing us down. Also verify that they are really needed
 - Can some ReLU ops be fetched?
 - Implement get_c in Numba! (And maybe even other ops)
-
-
-== SHAI ==
-
-Improvements:
-    - Block ReLU + KnapSack
-    - Stochastic DReLU
-    - CUDA implementation - general
-    - CUDA implementation - conv2d (int64 => float)
-    - MaxPool?
-    - 32Bits?
-
-- Implementation (Probably 50-80%)
-- HP etc. (How many)
-- Detection?
-- Analysis
-
-
-Movie
-3PC
-Security
-A bunch of reading and intro. work (Convert to 2PC), relevant to other protocols
-
-- Comparison to Porthos
-- Finetuning not fair
-- No online
-- Go over paper achievements and discuss with Shai
-- Show table and say that in 10 Working days effort we can reduce by x2 or x3
-- Say about classification and detection
+- 2 GPUs 3 parties
+- benchmark on AWS

@@ -158,11 +158,6 @@ class SecureOptimizedBlockReLU(Module):
         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
-
-
-    # def mult(self, a, b):
-    #     return a * b
-
     def forward(self, activation):
         # TODO: fuse with next layer
         if np.all(self.block_sizes == [0, 1]):
@@ -215,10 +210,11 @@ class NumpySecureOptimizedBlockReLU(SecureOptimizedBlockReLU):
         self.depth_to_space_class = DepthToSpaceNumpy
         self.space_to_depth_class = SpaceToDepthNumpy
         self.pad_handler_class = NumpyPadHandler
+    #
+    # def DReLU(self, activation):
+    #     return activation >= 0
 
-    def DReLU(self, activation):
-        return activation >= 0
-        # return activation.sign().add(1).div(2).to(activation.dtype)
+
 class TorchSecureOptimizedBlockReLU(SecureOptimizedBlockReLU):
     def __init__(self, block_sizes):
         super().__init__(block_sizes)
