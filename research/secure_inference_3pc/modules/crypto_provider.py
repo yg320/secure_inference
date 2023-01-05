@@ -45,10 +45,11 @@ class PRFFetcherShareConvert(PRFFetcherModule):
 
     def forward(self, dummy_tensor):
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=dummy_tensor.shape, dtype=self.dtype)
+        # self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
 
         self.private_compare(dummy_tensor)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=dummy_tensor.shape, dtype=self.dtype)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
 
         return
 
@@ -59,11 +60,11 @@ class PRFFetcherMultiplication(PRFFetcherModule):
 
     def forward(self, dummy_tensor):
 
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=dummy_tensor.shape, dtype=self.dtype)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         return dummy_tensor
 
 class PRFFetcherSelectShare(PRFFetcherModule):
@@ -86,12 +87,12 @@ class PRFFetcherMSB(PRFFetcherModule):
     def forward(self, dummy_tensor):
         size = dummy_tensor.shape
         
-        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val, size=size, dtype=self.dtype)
-        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=size,dtype=self.dtype)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
+        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=size,dtype=SIGNED_DTYPE)
         self.private_compare(dummy_tensor)
-        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(self.min_val, self.max_val + 1, size=size, dtype=self.dtype)
+        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
         self.mult(dummy_tensor)
 
         return dummy_tensor
@@ -124,7 +125,7 @@ class PRFFetcherReLU(PRFFetcherModule):
         if self.dummy_relu:
             return dummy_tensor
         else:
-            dummy_arr = dummy_tensor.astype(self.dtype).flatten()
+            dummy_arr = dummy_tensor.astype(SIGNED_DTYPE).flatten()
             self.DReLU(dummy_arr)
             self.mult(dummy_arr)
             return dummy_tensor
@@ -157,7 +158,7 @@ class PRFFetcherMaxPool(PRFFetcherModule):
                       x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1)).astype(self.dtype)
+        x = x.reshape((x.shape[0], -1)).astype(SIGNED_DTYPE)
 
         max_ = x[0]
         for i in range(1, 9):
@@ -179,10 +180,10 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
         self.dummy_relu = dummy_relu
 
     def mult(self, x, y):
-        return self.secure_mult(x.astype(self.dtype))
+        return self.secure_mult(x.astype(SIGNED_DTYPE))
 
     def DReLU(self, activation):
-        return self.secure_DReLU(activation.astype(self.dtype))
+        return self.secure_DReLU(activation.astype(SIGNED_DTYPE))
 
     def forward(self, activation):
         if self.dummy_relu:

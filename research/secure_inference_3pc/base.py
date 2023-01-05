@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 17591
-        self.port_10 = 17592
-        self.port_02 = 17593
-        self.port_20 = 17594
-        self.port_12 = 17595
-        self.port_21 = 17596
+        self.port_01 = 17851
+        self.port_10 = 17852
+        self.port_02 = 17853
+        self.port_20 = 17854
+        self.port_12 = 17855
+        self.port_21 = 17856
 
 
 class NetworkAssets:
@@ -183,23 +183,24 @@ class SecureModule(torch.nn.Module):
 
         self.trunc = TRUNC
 
-        self.dtype = UNSIGNED_DTYPE
-
-        self.min_val = np.iinfo(self.dtype).min
-        self.max_val = np.iinfo(self.dtype).max
         self.L_minus_1 = 2 ** NUM_BITS - 1
 
     def add_mode_L_minus_one(self, a, b):
-        ret = a + b
-        ret[ret < a] += self.dtype(1)
-        ret[ret == self.L_minus_1] = self.dtype(0)
-        return ret
+        orig_type = a.dtype
+        a_u = a.astype(np.uint64)
+        b_u = b.astype(np.uint64)
+        ret = a_u + b_u
+        ret[ret < a_u] += np.uint64(1)
+        ret[ret == self.L_minus_1] = np.uint64(0)
+        return ret.astype(orig_type)
 
     def sub_mode_L_minus_one(self, a, b):
-        ret = a - b
-        ret[b > a] -= self.dtype(1)
-        return ret
-
+        orig_type = a.dtype
+        a_u = a.astype(np.uint64)
+        b_u = np.uint64(b)
+        ret = a_u - b_u
+        ret[b_u > a_u] -= np.uint64(1)
+        return ret.astype(orig_type)
 
 
 def fuse_conv_bn(conv_module, batch_norm_module):
