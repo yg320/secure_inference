@@ -153,15 +153,15 @@ class ShareConvertServer(SecureModule):
         self.private_compare(x_bits_1, r - 1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
 
-        eta_pp = eta_pp.astype(self.dtype)
+        eta_pp = eta_pp.astype(SIGNED_DTYPE)
         t00 = eta_pp * eta_p_1
         t11 = self.add_mode_L_minus_one(t00, t00)
         eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
-        t00 = self.add_mode_L_minus_one(delta_1.astype(self.dtype), eta_1)
-        theta_1 = self.add_mode_L_minus_one(beta_1.astype(self.dtype), t00)
-        y_1 = self.sub_mode_L_minus_one(a_1.astype(self.dtype), theta_1)
-        y_1 = self.add_mode_L_minus_one(y_1, mu_1.astype(self.dtype))
-        return y_1
+        t00 = self.add_mode_L_minus_one(delta_1, eta_1)
+        theta_1 = self.add_mode_L_minus_one(beta_1, t00)
+        y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
+        y_1 = self.add_mode_L_minus_one(y_1, mu_1)
+        return y_1.astype(self.dtype)
 
 
 class SecureMultiplicationServer(SecureModule):

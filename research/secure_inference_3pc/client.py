@@ -156,22 +156,22 @@ class ShareConvertClient(SecureModule):
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
 
-        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_0.shape, dtype=self.dtype)
-        eta_pp = eta_pp.astype(self.dtype)
+        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
+        eta_pp = eta_pp.astype(SIGNED_DTYPE)
         t0 = eta_pp * eta_p_0
         t1 = self.add_mode_L_minus_one(t0, t0)
         t2 = self.sub_mode_L_minus_one(eta_pp, t1)
         eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
 
-        t0 = self.add_mode_L_minus_one(delta_0.astype(self.dtype), eta_0)
+        t0 = self.add_mode_L_minus_one(delta_0, eta_0)
         t1 = self.sub_mode_L_minus_one(t0, self.dtype(1))
-        t2 = self.sub_mode_L_minus_one(t1, alpha.astype(self.dtype))
-        theta_0 = self.add_mode_L_minus_one(beta_0.astype(self.dtype), t2)
+        t2 = self.sub_mode_L_minus_one(t1, alpha)
+        theta_0 = self.add_mode_L_minus_one(beta_0, t2)
 
-        y_0 = self.sub_mode_L_minus_one(a_0.astype(self.dtype), theta_0)
-        y_0 = self.add_mode_L_minus_one(y_0, mu_0.astype(self.dtype))
+        y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
+        y_0 = self.add_mode_L_minus_one(y_0, mu_0)
 
-        return y_0
+        return y_0.astype(self.dtype)
 
 
 class SecureMultiplicationClient(SecureModule):

@@ -100,9 +100,9 @@ class ShareConvertCryptoProvider(SecureModule):
         # eta_p = self.network_assets.receiver_12.get()
         # eta_p = eta_p ^ (x > r)
 
-        eta_p = self.private_compare()
+        eta_p = self.private_compare().astype(SIGNED_DTYPE)
 
-        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=size, dtype=self.dtype)
+        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         eta_p_1 = self.sub_mode_L_minus_one(eta_p, eta_p_0)
 
         self.network_assets.sender_12.put(eta_p_1)
