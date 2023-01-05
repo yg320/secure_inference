@@ -138,16 +138,17 @@ class ShareConvertClient(SecureModule):
         return self.forward_(a_0)
 
     def forward_(self, a_0):
+        a_0 = a_0.astype(SIGNED_DTYPE)
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
 
-        r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
-        r_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_0.shape, dtype=self.dtype)
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val, size=a_0.shape, dtype=self.dtype)
+        r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
+        r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
 
-        alpha = (r < r_0).astype(self.dtype)
+        alpha = (r.astype(self.dtype) < r_0.astype(self.dtype)).astype(SIGNED_DTYPE)
 
         a_tild_0 = a_0 + r_0
-        beta_0 = (a_tild_0 < a_0).astype(self.dtype)
+        beta_0 = (a_tild_0.astype(self.dtype) < a_0.astype(self.dtype)).astype(SIGNED_DTYPE)
         self.network_assets.sender_02.put(a_tild_0)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
@@ -162,13 +163,13 @@ class ShareConvertClient(SecureModule):
         t2 = self.sub_mode_L_minus_one(eta_pp, t1)
         eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
 
-        t0 = self.add_mode_L_minus_one(delta_0, eta_0)
+        t0 = self.add_mode_L_minus_one(delta_0.astype(self.dtype), eta_0)
         t1 = self.sub_mode_L_minus_one(t0, self.dtype(1))
-        t2 = self.sub_mode_L_minus_one(t1, alpha)
-        theta_0 = self.add_mode_L_minus_one(beta_0, t2)
+        t2 = self.sub_mode_L_minus_one(t1, alpha.astype(self.dtype))
+        theta_0 = self.add_mode_L_minus_one(beta_0.astype(self.dtype), t2)
 
-        y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
-        y_0 = self.add_mode_L_minus_one(y_0, mu_0)
+        y_0 = self.sub_mode_L_minus_one(a_0.astype(self.dtype), theta_0)
+        y_0 = self.add_mode_L_minus_one(y_0, mu_0.astype(self.dtype))
 
         return y_0
 
@@ -250,6 +251,7 @@ class SecureMSBClient(SecureModule):
         r = self.add_mode_L_minus_one(r_0, r_1)
 
         r_mode_2 = r % 2
+        r = r.astype(SIGNED_DTYPE)
         self.private_compare(x_bits_0, r, beta)
 
         beta = beta.astype(self.dtype)

@@ -135,22 +135,20 @@ class ShareConvertServer(SecureModule):
         # with Timer("ShareConvertServer"):
         return self._forward(a_1)
     def _forward(self, a_1):
-
+        a_1 = a_1.astype(SIGNED_DTYPE)
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
-        r = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
-        r_0 = self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val + 1, size=a_1.shape, dtype=self.dtype)
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
-
+        r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
+        r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
+        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
         r_1 = r - r_0
         a_tild_1 = a_1 + r_1
-        beta_1 = (a_tild_1 < a_1).astype(self.dtype)
-
+        beta_1 = (a_tild_1.astype(self.dtype) < a_1.astype(self.dtype)).astype(SIGNED_DTYPE)
 
         self.network_assets.sender_12.put(a_tild_1)
         # x_bits_1 = torch.from_numpy(self.network_assets.receiver_12.get().astype(np.int8)).to("cuda:1")
         x_bits_1 = self.network_assets.receiver_12.get().astype(np.int8)
 
-        delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(self.min_val, self.max_val, size=a_1.shape, dtype=self.dtype)
+        delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
 
         self.private_compare(x_bits_1, r - 1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
@@ -159,10 +157,10 @@ class ShareConvertServer(SecureModule):
         t00 = eta_pp * eta_p_1
         t11 = self.add_mode_L_minus_one(t00, t00)
         eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
-        t00 = self.add_mode_L_minus_one(delta_1, eta_1)
-        theta_1 = self.add_mode_L_minus_one(beta_1, t00)
-        y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-        y_1 = self.add_mode_L_minus_one(y_1, mu_1)
+        t00 = self.add_mode_L_minus_one(delta_1.astype(self.dtype), eta_1)
+        theta_1 = self.add_mode_L_minus_one(beta_1.astype(self.dtype), t00)
+        y_1 = self.sub_mode_L_minus_one(a_1.astype(self.dtype), theta_1)
+        y_1 = self.add_mode_L_minus_one(y_1, mu_1.astype(self.dtype))
         return y_1
 
 
@@ -215,6 +213,7 @@ class SecureMSBServer(SecureModule):
 
         r = self.add_mode_L_minus_one(r_0, r_1)
         r_mod_2 = r % 2
+        r = r.astype(SIGNED_DTYPE)
         self.private_compare(x_bits_1, r, beta)
 
         beta_p_1 = self.network_assets.receiver_12.get()
