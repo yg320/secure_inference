@@ -237,12 +237,12 @@ class SecureDReLUServer(SecureModule):
         self.msb = SecureMSBServer(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share = X_share.astype(SIGNED_DTYPE)
+
         mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
 
         X1_converted = self.share_convert(X_share)
         MSB_1 = self.msb(X1_converted)
-        return (1 - MSB_1 + mu_1).astype(self.dtype)
+        return 1 - MSB_1 + mu_1
 
 
 class SecureReLUServer(SecureModule):
@@ -262,12 +262,11 @@ class SecureReLUServer(SecureModule):
         else:
 
             shape = X_share.shape
-            dtype = X_share.dtype
-            mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+            mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
-            X_share = X_share.astype(self.dtype).flatten()
+            X_share = X_share.flatten()
             MSB_0 = self.DReLU(X_share)
-            relu_0 = self.mult(X_share.astype(SIGNED_DTYPE), MSB_0.astype(SIGNED_DTYPE)).reshape(shape).astype(self.dtype)
+            relu_0 = self.mult(X_share, MSB_0).reshape(shape)
             ret = relu_0.astype(SIGNED_DTYPE)
             return ret + mu_1
 
@@ -285,7 +284,7 @@ class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
         return self.secure_mult(x.astype(SIGNED_DTYPE), y.astype(SIGNED_DTYPE)).astype(x.dtype)
 
     def DReLU(self, activation):
-        return self.secure_DReLU(activation.astype(self.dtype))
+        return self.secure_DReLU(activation)
 
     def forward(self, activation):
         if self.dummy_relu:
@@ -349,7 +348,7 @@ class SecureMaxPoolServer(SecureModule):
                       x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1)).astype(self.dtype)
+        x = x.reshape((x.shape[0], -1))
 
         max_ = x[0]
         for i in range(1, 9):

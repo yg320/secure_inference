@@ -45,7 +45,7 @@ class SecureConv2DClient(SecureModule):
                                                               high=MAX_VAL,
                                                               size=self.W_shape,
                                                               dtype=SIGNED_DTYPE)
-        assert X_share.dtype == SIGNED_DTYPE
+        assert X_share.dtype == SIGNED_DTYPE, X_share.dtype
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
 
@@ -270,13 +270,14 @@ class SecureDReLUClient(SecureModule):
         self.msb = SecureMSBClient(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        X_share = X_share.astype(SIGNED_DTYPE)
+
+
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
 
         X0_converted = self.share_convert(X_share)
         MSB_0 = self.msb(X0_converted)
 
-        return (-MSB_0+mu_0).astype(self.dtype)
+        return -MSB_0+mu_0
 
 
 class SecureReLUClient(SecureModule):
@@ -297,13 +298,11 @@ class SecureReLUClient(SecureModule):
         else:
 
             shape = X_share.shape
-            dtype = X_share.dtype
-            mu_0 = self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
-            X_share = X_share.astype(self.dtype).flatten()
+            X_share = X_share.flatten()
             MSB_0 = self.DReLU(X_share)
-            relu_0 = self.mult(X_share.astype(SIGNED_DTYPE), MSB_0.astype(SIGNED_DTYPE)).reshape(shape).astype(self.dtype)
-            ret = relu_0.astype(SIGNED_DTYPE)
+            ret = self.mult(X_share, MSB_0).reshape(shape)
 
             return ret + mu_0
 
@@ -344,7 +343,7 @@ class SecureMaxPoolClient(SecureModule):
                       x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1)).astype(self.dtype)
+        x = x.reshape((x.shape[0], -1))
 
         max_ = x[0]
         for i in range(1, 9):
@@ -376,7 +375,7 @@ class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
         return self.secure_mult(x.astype(SIGNED_DTYPE), y.astype(SIGNED_DTYPE)).astype(x.dtype)
 
     def DReLU(self, activation):
-        return self.secure_DReLU(activation.astype(self.dtype))
+        return self.secure_DReLU(activation)
 
     def forward(self, activation):
         if self.dummy_relu:

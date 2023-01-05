@@ -180,7 +180,7 @@ class SecureDReLUCryptoProvider(SecureModule):
         self.msb = SecureMSBCryptoProvider(crypto_assets, network_assets)
 
     def forward(self, X_share):
-        assert X_share.dtype == self.dtype
+
         self.share_convert(X_share.shape)
         self.msb(X_share.shape)
         return X_share
@@ -198,8 +198,7 @@ class SecureReLUCryptoProvider(SecureModule):
         if self.dummy_relu:
             return X_share
         else:
-            shape = X_share.shape
-            X_share_np = X_share.astype(self.dtype).flatten()
+            X_share_np = X_share.flatten()
             X_share_np = self.DReLU(X_share_np)
             self.mult(X_share_np.shape)
             return X_share
@@ -216,8 +215,9 @@ class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU)
     def mult(self, x, y):
         self.secure_mult(x.shape)
         return x
+
     def DReLU(self, activation):
-        return self.secure_DReLU(activation.astype(self.dtype))
+        return self.secure_DReLU(activation)
 
     def forward(self, activation):
         if self.dummy_relu:
@@ -273,7 +273,7 @@ class SecureMaxPoolCryptoProvider(SecureModule):
                       x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1)).astype(self.dtype)
+        x = x.reshape((x.shape[0], -1))
 
         max_ = x[0]
         for i in range(1, 9):
