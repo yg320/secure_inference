@@ -20,6 +20,7 @@ import mmcv
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 
+import numpy as backend
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, crypto_assets, network_assets: NetworkAssets, device="cpu"):
         super(SecureConv2DServer, self).__init__(crypto_assets, network_assets)
@@ -199,7 +200,8 @@ class SecureMSBServer(SecureModule):
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=np.int8)
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=a_1.dtype)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=a_1.dtype)
+        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
 
         x_bits_1 = self.network_assets.receiver_12.get()
         x_bit_0_1 = self.network_assets.receiver_12.get()
@@ -237,12 +239,16 @@ class SecureDReLUServer(SecureModule):
         self.msb = SecureMSBServer(crypto_assets, network_assets)
 
     def forward(self, X_share):
-
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
+        backend.multiply(mu_1, -1, out=mu_1)
 
         X1_converted = self.share_convert(X_share)
         MSB_1 = self.msb(X1_converted)
-        return 1 - MSB_1 + mu_1
+
+        ret = backend.multiply(MSB_1, -1, out=MSB_1)
+        ret = backend.add(ret, mu_1, out=ret)
+        ret = backend.add(ret, 1, out=ret)
+        return ret
 
 
 class SecureReLUServer(SecureModule):
@@ -255,6 +261,7 @@ class SecureReLUServer(SecureModule):
 
     def forward(self, X_share):
         if self.dummy_relu:
+            assert False
             share_client = self.network_assets.receiver_01.get()
             value = share_client + X_share
             value = value * ((value > 0).astype(value.dtype))
@@ -262,13 +269,14 @@ class SecureReLUServer(SecureModule):
         else:
 
             shape = X_share.shape
-            mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+            mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+            backend.multiply(mu_1, -1, out=mu_1)
 
-            X_share = X_share.flatten()
+            X_share = X_share.reshape(-1)
             MSB_0 = self.DReLU(X_share)
-            relu_0 = self.mult(X_share, MSB_0).reshape(shape)
-            ret = relu_0.astype(SIGNED_DTYPE)
-            return ret + mu_1
+            ret = self.mult(X_share, MSB_0).reshape(shape)
+            backend.add(ret, mu_1, out=ret)
+            return ret
 
 
 class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
@@ -285,14 +293,14 @@ class SecureSelectShareServer(SecureModule):
         self.secure_multiplication = SecureMultiplicationServer(crypto_assets, network_assets)
 
     def forward(self, alpha, x, y):
-        dtype = alpha.dtype
-        shape = alpha.shape
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=alpha.shape, dtype=SIGNED_DTYPE)
+        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
+        backend.subtract(y, x, out=y)
 
-        w = y - x
-        c = self.secure_multiplication(alpha, w)
-        z = x + c
-        return z + mu_1
+        c = self.secure_multiplication(alpha, y)
+        backend.add(x, c, out=x)
+        backend.add(x, mu_1, out=x)
+        return x
 
 
 class SecureMaxPoolServer(SecureMaxPool):
@@ -309,8 +317,9 @@ class SecureMaxPoolServer(SecureMaxPool):
             return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy().astype(x.dtype)
 
         ret = super(SecureMaxPoolServer, self).forward(x)
-        mu_1 = -self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
-        ret = ret + mu_1
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
+        backend.multiply(mu_1, -1, out=mu_1)
+        backend.add(ret, mu_1, out=ret)
         return ret
 
 
