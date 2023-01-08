@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as backend
 from research.secure_inference_3pc.modules.base import SecureModule
 
 
@@ -19,8 +19,8 @@ class SecureMaxPool(SecureModule):
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+        x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
                       x[:, :, 0:-1:2, 1:-1:2],
                       x[:, :, 0:-1:2, 2::2],
                       x[:, :, 1:-1:2, 0:-1:2],

@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as backend
 from tqdm import tqdm
 
 from research.secure_inference_3pc.modules.base import SecureModule
@@ -128,9 +128,9 @@ def full_inference_classification(cfg, model, num_images):
     model.eval()
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher,
-                                            image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
+                                            image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
     for sample_id in tqdm(range(num_images)):
-        img = dataset[sample_id]['img'].data[np.newaxis]
+        img = dataset[sample_id]['img'].data[backend.newaxis]
         gt = dataset.get_gt_labels()[sample_id]
 
         with Timer("Inference"):
@@ -138,7 +138,7 @@ def full_inference_classification(cfg, model, num_images):
     #     # gt = dataset.gt_labels[sample_id]
         results_gt.append(gt)
         results_pred.append(out)
-    print((np.array(results_gt) == np.array(results_pred)).mean())
+    print((backend.array(results_gt) == backend.array(results_pred)).mean())
 
 
 def full_inference(cfg, model, num_images):

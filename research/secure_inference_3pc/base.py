@@ -1,5 +1,5 @@
 import torch
-import numpy as np
+import numpy as backend
 
 from research.secure_inference_3pc.communication.utils import Sender, Receiver
 import time
@@ -116,29 +116,29 @@ def get_assets(party, repeat, simulated_bandwidth=None):
     return crypto_assets, network_assets
 
 
-powers = np.arange(NUM_BITS, dtype=UNSIGNED_DTYPE)[np.newaxis][:, ::-1]
-powers_torch_cuda_0 = torch.from_numpy(powers.astype(np.int64)).to("cuda:0")
-powers_torch_cuda_1 = torch.from_numpy(powers.astype(np.int64)).to("cuda:1")
+powers = backend.arange(NUM_BITS, dtype=UNSIGNED_DTYPE)[backend.newaxis][:, ::-1]
+powers_torch_cuda_0 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:0")
+powers_torch_cuda_1 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:1")
 
 
 min_org_shit = -283206
 max_org_shit = 287469
-org_shit = (np.arange(min_org_shit, max_org_shit + 1) % P).astype(np.uint8)
+org_shit = (backend.arange(min_org_shit, max_org_shit + 1) % P).astype(backend.uint8)
 
 
 def module_67(xxx):
     orig_shape = xxx.shape
     xxx = xxx.reshape(-1)
-    np.subtract(xxx, min_org_shit, out=xxx)
+    backend.subtract(xxx, min_org_shit, out=xxx)
     return org_shit[xxx].reshape(orig_shape)
 
 def decompose(value):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
     end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
-    r_shift = value.astype(np.uint64) >> powers[:, NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
-    value_bits = np.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=np.int8)
-    np.bitwise_and(r_shift, np.int8(1), out=value_bits)
+    r_shift = value.astype(backend.uint64) >> powers[:, NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
+    value_bits = backend.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=backend.int8)
+    backend.bitwise_and(r_shift, backend.int8(1), out=value_bits)
     ret = value_bits.reshape(orig_shape + [NUM_OF_COMPARE_BITS])
     return ret
 
@@ -236,18 +236,18 @@ def fuse_conv_bn(conv_module, batch_norm_module):
 
 
 def get_c_party_0(x_bits, multiplexer_bits, beta):
-    beta = beta[..., np.newaxis]
+    beta = beta[..., backend.newaxis]
     beta = 2 * beta  # Not allowed to change beta inplace
-    np.subtract(beta, 1, out=beta)
-    np.multiply(multiplexer_bits, x_bits, out=multiplexer_bits)
-    np.multiply(multiplexer_bits, -2, out=multiplexer_bits)
-    np.add(multiplexer_bits, x_bits, out=multiplexer_bits)
+    backend.subtract(beta, 1, out=beta)
+    backend.multiply(multiplexer_bits, x_bits, out=multiplexer_bits)
+    backend.multiply(multiplexer_bits, -2, out=multiplexer_bits)
+    backend.add(multiplexer_bits, x_bits, out=multiplexer_bits)
 
-    w_cumsum = multiplexer_bits.astype(np.int32)
-    np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-    np.subtract(w_cumsum, multiplexer_bits, out=w_cumsum)
-    np.multiply(x_bits, beta, out=x_bits)
-    np.add(w_cumsum, x_bits, out=w_cumsum)
+    w_cumsum = multiplexer_bits.astype(backend.int32)
+    backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+    backend.subtract(w_cumsum, multiplexer_bits, out=w_cumsum)
+    backend.multiply(x_bits, beta, out=x_bits)
+    backend.add(w_cumsum, x_bits, out=w_cumsum)
 
     return w_cumsum
 
@@ -291,36 +291,36 @@ def get_c_party_1_torch(x_bits, multiplexer_bits, beta):
     return w_cumsum
 
 def get_c_party_1(x_bits, multiplexer_bits, beta):
-    beta = beta[..., np.newaxis]
+    beta = beta[..., backend.newaxis]
     beta = -2 * beta  # Not allowed to change beta inplace
-    np.add(beta, 1, out=beta)
+    backend.add(beta, 1, out=beta)
 
     w = multiplexer_bits * x_bits
-    np.multiply(w, -2, out=w)
-    np.add(w, x_bits, out=w)
-    np.add(w, multiplexer_bits, out=w)
+    backend.multiply(w, -2, out=w)
+    backend.add(w, x_bits, out=w)
+    backend.add(w, multiplexer_bits, out=w)
 
-    w_cumsum = w.astype(np.int32)
-    np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-    np.subtract(w_cumsum, w, out=w_cumsum)
+    w_cumsum = w.astype(backend.int32)
+    backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+    backend.subtract(w_cumsum, w, out=w_cumsum)
 
-    np.subtract(multiplexer_bits, x_bits, out=multiplexer_bits)
-    np.multiply(multiplexer_bits, beta, out=multiplexer_bits)
-    np.add(multiplexer_bits, 1, out=multiplexer_bits)
-    np.add(w_cumsum, multiplexer_bits, out=w_cumsum)
+    backend.subtract(multiplexer_bits, x_bits, out=multiplexer_bits)
+    backend.multiply(multiplexer_bits, beta, out=multiplexer_bits)
+    backend.add(multiplexer_bits, 1, out=multiplexer_bits)
+    backend.add(w_cumsum, multiplexer_bits, out=w_cumsum)
 
     return w_cumsum
 
 
 def get_c(x_bits, multiplexer_bits, beta, j):
-    beta = beta[..., np.newaxis]
+    beta = beta[..., backend.newaxis]
     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
-    w_cumsum = w.astype(np.int32)
-    np.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-    np.subtract(w_cumsum, w, out=w_cumsum)
+    w_cumsum = w.astype(backend.int32)
+    backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+    backend.subtract(w_cumsum, w, out=w_cumsum)
     rrr = w_cumsum
     zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
-    ret = rrr + zzz.astype(np.int32)
+    ret = rrr + zzz.astype(backend.int32)
 
     return ret
 

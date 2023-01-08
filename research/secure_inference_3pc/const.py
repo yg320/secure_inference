@@ -20,6 +20,4 @@ TORCH_DTYPE = {32: torch.int32, 64: torch.int64}[NUM_BITS]
 MIN_VAL = np.iinfo(SIGNED_DTYPE).min
 MAX_VAL = np.iinfo(SIGNED_DTYPE).max
 
-# MIN_VAL = -1000 #np.iinfo(SIGNED_DTYPE).min
-# MAX_VAL = 1000 #np.iinfo(SIGNED_DTYPE).max
 

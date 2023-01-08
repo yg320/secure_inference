@@ -205,4 +205,3 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
         arch_utils.set_bReLU_layers(prf_fetcher_model, layer_name_to_block_sizes, block_relu_class=secure_block_relu)
     prf_fetcher_model = prf_fetcher_secure_model(prf_fetcher_model)
     return prf_fetcher_model
-    # prf_fetcher_model.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=prf_fetcher_model, image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))

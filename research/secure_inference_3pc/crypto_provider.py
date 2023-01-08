@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as backend
 
 from research.secure_inference_3pc.base import get_assets
 from research.secure_inference_3pc.modules.base import SecureModule
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     )
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=model.prf_fetcher,
-                                            image=np.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
+                                            image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
 
     for _ in range(Params.NUM_IMAGES):
         out = model(Params.IMAGE_SHAPE)

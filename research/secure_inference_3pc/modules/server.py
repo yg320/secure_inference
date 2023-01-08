@@ -1,4 +1,3 @@
-import numpy as np
 import numpy as backend
 import torch
 
@@ -321,7 +320,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=X_share.dtype)
 
-        return np.zeros(shape=out_shape, dtype=X_share.dtype)
+        return backend.zeros(shape=out_shape, dtype=X_share.dtype)
 
 
 class PRFFetcherPrivateCompare(PRFFetcherModule):
@@ -329,7 +328,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(**kwargs)
 
     def forward(self, x_bits_0):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=np.int32)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=backend.int32)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
@@ -338,7 +337,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.private_compare = PRFFetcherPrivateCompare(**kwargs)
 
     def forward(self, dummy_tensor):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=backend.int8)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
@@ -385,7 +384,7 @@ class PRFFetcherMSB(PRFFetcherModule):
 
     def forward(self, dummy_tensor):
 
-        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=backend.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=dummy_tensor.dtype)
 
@@ -448,8 +447,8 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+        x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
                       x[:, :, 0:-1:2, 1:-1:2],
                       x[:, :, 0:-1:2, 2::2],
                       x[:, :, 1:-1:2, 0:-1:2],
@@ -504,7 +503,7 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
     def forward(self, img):
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=img.shape, dtype=SIGNED_DTYPE)
-        out_0 = self.model.decode_head(self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
+        out_0 = self.model.decode_head(self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
 
 
 class PRFFetcherSecureModelClassification(SecureModule):
@@ -515,6 +514,6 @@ class PRFFetcherSecureModelClassification(SecureModule):
     def forward(self, img):
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
-        out = self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
+        out = self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
         out = self.model.neck(out)
         out_0 = self.model.head.fc(out)
