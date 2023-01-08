@@ -1,4 +1,5 @@
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
+
 
 from research.secure_inference_3pc.base import get_assets
 from research.secure_inference_3pc.modules.base import SecureModule

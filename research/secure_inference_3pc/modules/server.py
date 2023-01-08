@@ -1,4 +1,5 @@
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
+
 import torch
 
 

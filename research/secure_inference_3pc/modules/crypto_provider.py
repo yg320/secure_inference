@@ -2,7 +2,8 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule
 from research.secure_inference_3pc.const import  NUM_OF_COMPARE_BITS
 
 import torch
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
+
 
 from research.secure_inference_3pc.base import P, sub_mode_p, decompose
 from research.secure_inference_3pc.conv2d import conv_2d

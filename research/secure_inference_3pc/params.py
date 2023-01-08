@@ -51,5 +51,5 @@ class Params:
     DEVICE = "cuda"
     DUMMY_RELU = False
     DUMMY_MAX_POOL = False
-    PRF_PREFETCH = True
+    PRF_PREFETCH = False
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

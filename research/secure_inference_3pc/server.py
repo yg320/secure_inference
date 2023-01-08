@@ -1,6 +1,7 @@
 import torch
 import mmcv
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
+
 
 from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c_party_1, module_67,  get_assets, TypeConverter, NetworkAssets, get_c_party_1_torch, decompose_torch_1
 from research.secure_inference_3pc.modules.base import SecureModule

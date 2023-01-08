@@ -1,8 +1,7 @@
 from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureModule
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
-import torch
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.base import decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
 from research.secure_inference_3pc.conv2d import conv_2d
@@ -81,9 +80,10 @@ class PrivateCompareClient(SecureModule):
         return self.forward_(x_bits_0, r, beta)
 
     def forward_(self, x_bits_0, r, beta):
-
-        if backend.any(r == backend.iinfo(r.dtype).max):  # HERE
-            assert False
+        # TODO: what about this piece of code??!
+        # print(r.dtype)
+        # if backend.any(r == backend.iinfo(r.dtype).max):  # HERE
+        #     assert False
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
         r[beta] += 1
         bits = decompose(r)
@@ -491,7 +491,7 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
 
     def forward(self, activation):
         if self.dummy_relu:
-            return torch.zeros_like(activation)
+            return backend.zeros_like(activation)
 
         activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
         activation = activation.astype(SIGNED_DTYPE)
