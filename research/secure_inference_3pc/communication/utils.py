@@ -9,6 +9,9 @@ import numpy as np
 
 NUMPY_ARR_QUEUE_SIZE = 10
 
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
+
+
 class Receiver(Thread):
     def __init__(self, port):
         super(Receiver, self).__init__()
@@ -34,7 +37,10 @@ class Receiver(Thread):
 
     def get(self):
         arr = self.numpy_arr_queue.get()
-        return arr
+        if IS_TORCH_BACKEND:
+            return torch.from_numpy(arr)
+        else:
+            return arr
 
 
 class Sender(Thread):
@@ -89,6 +95,9 @@ class Sender(Thread):
     def put(self, arr):
         # TODO: why is this copy needed (related to the monster threading bug)
         if arr is not None:
-            arr = arr.copy()
+            if IS_TORCH_BACKEND:
+                arr = arr.cpu().numpy()
+            else:
+                arr = arr.copy()
         self.numpy_arr_queue.put(arr)
 

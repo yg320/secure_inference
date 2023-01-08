@@ -33,7 +33,6 @@ class SecureConv2DClient(SecureModule):
                                                               high=MAX_VAL,
                                                               size=self.W_shape,
                                                               dtype=SIGNED_DTYPE)
-        assert X_share.dtype == SIGNED_DTYPE, X_share.dtype
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
 
@@ -46,7 +45,7 @@ class SecureConv2DClient(SecureModule):
 
         share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(backend.concatenate([E_share.flatten(), F_share.flatten()]))
-        E_share_server, F_share_server = share_server[:E_share.size].reshape(E_share.shape), share_server[E_share.size:].reshape(F_share.shape)
+        E_share_server, F_share_server = share_server[:backend.size(E_share)].reshape(E_share.shape), share_server[backend.size(E_share):].reshape(F_share.shape)
 
         E = E_share_server + E_share
         F = F_share_server + F_share
@@ -63,7 +62,7 @@ class SecureConv2DClient(SecureModule):
         # TODO: This is the proper way, but it's slower and takes more time
         #  t = out_numpy.dtype
         #  out = (out_numpy / self.trunc).round().astype(t)
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=out.dtype)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         return out + mu_0
 
@@ -112,10 +111,10 @@ class ShareConvertClient(SecureModule):
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
         # alpha = backend.greater_than(r_0 - r, 0)
-        alpha = (0 < r_0 - r).astype(SIGNED_DTYPE)
+        alpha = backend.astype(0 < r_0 - r, SIGNED_DTYPE)
 
         a_tild_0 = a_0 + r_0
-        beta_0 = (0 < a_0 - a_tild_0).astype(SIGNED_DTYPE)
+        beta_0 = backend.astype(0 < a_0 - a_tild_0, SIGNED_DTYPE)
         self.network_assets.sender_02.put(a_tild_0)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
@@ -124,7 +123,7 @@ class ShareConvertClient(SecureModule):
         self.private_compare(x_bits_0, r - 1, eta_pp)
 
         eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
-        eta_pp = eta_pp.astype(SIGNED_DTYPE)
+        eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
         t0 = eta_pp * eta_p_0
         t1 = self.add_mode_L_minus_one(t0, t0)
         t2 = self.sub_mode_L_minus_one(eta_pp, t1)
@@ -216,7 +215,7 @@ class SecureMSBClient(SecureModule):
 
         self.private_compare(x_bits_0, r, beta)
 
-        beta = beta.astype(SIGNED_DTYPE)
+        beta = backend.astype(beta, SIGNED_DTYPE)
         beta_p_0 = self.network_assets.receiver_02.get()
 
         gamma_0 = beta_p_0 + (0 * beta) - (2 * beta * beta_p_0)
@@ -238,7 +237,7 @@ class SecureDReLUClient(SecureModule):
 
     def forward(self, X_share):
 
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
 
         X0_converted = self.share_convert(X_share)
         MSB_0 = self.msb(X0_converted)
@@ -468,7 +467,7 @@ class PRFFetcherMaxPool(PRFFetcherModule):
             self.dReLU(max_)
             self.select_share(max_)
 
-        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        ret = backend.astype(max_.reshape(out_shape), SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
 
         return ret
@@ -494,7 +493,7 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
             return backend.zeros_like(activation)
 
         activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
-        activation = activation.astype(SIGNED_DTYPE)
+        activation = backend.astype(activation, SIGNED_DTYPE)
 
         return activation
 

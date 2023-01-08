@@ -1,5 +1,5 @@
 import torch
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
 
 from research.secure_inference_3pc.communication.utils import Sender, Receiver
 import time
@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 18161
-        self.port_10 = 18162
-        self.port_02 = 18163
-        self.port_20 = 18164
-        self.port_12 = 18165
-        self.port_21 = 18166
+        self.port_01 = 18741
+        self.port_10 = 18742
+        self.port_02 = 18743
+        self.port_20 = 18744
+        self.port_12 = 18745
+        self.port_21 = 18746
 
 
 class NetworkAssets:
@@ -115,15 +115,16 @@ def get_assets(party, repeat, simulated_bandwidth=None):
 
     return crypto_assets, network_assets
 
+powers = backend.flip(backend.unsqueeze(backend.arange(NUM_BITS, dtype=SIGNED_DTYPE), 0), axis=-1)
 
-powers = backend.arange(NUM_BITS, dtype=UNSIGNED_DTYPE)[backend.newaxis][:, ::-1]
-powers_torch_cuda_0 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:0")
-powers_torch_cuda_1 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:1")
+
+# powers_torch_cuda_0 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:0")
+# powers_torch_cuda_1 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:1")
 
 
 min_org_shit = -283206
 max_org_shit = 287469
-org_shit = (backend.arange(min_org_shit, max_org_shit + 1) % P).astype(backend.uint8)
+org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, backend.int8)
 
 
 def module_67(xxx):
@@ -136,9 +137,9 @@ def decompose(value):
     orig_shape = list(value.shape)
     value = value.reshape(-1, 1)
     end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
-    r_shift = value.astype(backend.uint64) >> powers[:, NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
+    r_shift = value >> powers[:, NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
     value_bits = backend.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=backend.int8)
-    backend.bitwise_and(r_shift, backend.int8(1), out=value_bits)
+    value_bits = backend.bitwise_and(r_shift, 1, out=value_bits)  # TODO: backend.int8(1) instead of 1
     ret = value_bits.reshape(orig_shape + [NUM_OF_COMPARE_BITS])
     return ret
 
@@ -236,7 +237,7 @@ def fuse_conv_bn(conv_module, batch_norm_module):
 
 
 def get_c_party_0(x_bits, multiplexer_bits, beta):
-    beta = beta[..., backend.newaxis]
+    beta = backend.unsqueeze(beta, -1)
     beta = 2 * beta  # Not allowed to change beta inplace
     backend.subtract(beta, 1, out=beta)
     backend.multiply(multiplexer_bits, x_bits, out=multiplexer_bits)
@@ -291,7 +292,7 @@ def get_c_party_1_torch(x_bits, multiplexer_bits, beta):
     return w_cumsum
 
 def get_c_party_1(x_bits, multiplexer_bits, beta):
-    beta = beta[..., backend.newaxis]
+    beta = backend.unsqueeze(beta, -1)
     beta = -2 * beta  # Not allowed to change beta inplace
     backend.add(beta, 1, out=beta)
 
@@ -331,7 +332,7 @@ def get_c_case_2(u, j):
     return c % P
 
 
-
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 class TypeConverter:
     trunc = TRUNC
     int_dtype = TORCH_DTYPE
@@ -340,9 +341,16 @@ class TypeConverter:
     @staticmethod
     def f2i(data):
         if type(data) in [torch.Tensor, torch.nn.Parameter]:
-            return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
+            if IS_TORCH_BACKEND:
+                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype))
+            else:
+                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
+
         else:
-            return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
+            if IS_TORCH_BACKEND:
+                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype))
+            else:
+                return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
     @staticmethod
     def i2f(data):
         return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc

@@ -50,8 +50,8 @@ class SecureConv2DServer(SecureModule):
         self.network_assets.sender_01.put(backend.concatenate([E_share.reshape(-1), F_share.reshape(-1)]))
         share_client = self.network_assets.receiver_01.get()
 
-        E_share_client, F_share_client = share_client[:E_share.size].reshape(E_share.shape), \
-                share_client[E_share.size:].reshape(F_share.shape)
+        E_share_client, F_share_client = share_client[:backend.size(E_share)].reshape(E_share.shape), \
+                share_client[backend.size(E_share):].reshape(F_share.shape)
 
         E = backend.add(E_share_client, E_share, out=E_share)
         F = backend.add(F_share_client, F_share, out=F_share)
@@ -74,7 +74,7 @@ class SecureConv2DServer(SecureModule):
         if self.bias is not None:
             out = backend.add(out, self.bias, out=out)
 
-        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=out.dtype)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
         mu_1 = backend.multiply(mu_1, -1, out=mu_1)
         return out + mu_1
 
@@ -117,7 +117,7 @@ class ShareConvertServer(SecureModule):
 
         r_1 = backend.subtract(r, r_0, out=r_0)
         a_tild_1 = backend.add(a_1, r_1, out=r_1)
-        beta_1 = (0 < a_1 - a_tild_1).astype(SIGNED_DTYPE)  # TODO: Optimize this
+        beta_1 = backend.astype(0 < a_1 - a_tild_1, SIGNED_DTYPE)  # TODO: Optimize this
 
         self.network_assets.sender_12.put(a_tild_1)
 
@@ -129,7 +129,7 @@ class ShareConvertServer(SecureModule):
         self.private_compare(x_bits_1, r_minus_1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
 
-        eta_pp = eta_pp.astype(SIGNED_DTYPE)  # TODO: Optimize this
+        eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)  # TODO: Optimize this
         t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
         t11 = self.add_mode_L_minus_one(t00, t00)  # TODO: Optimize this
         eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)  # TODO: Optimize this
@@ -196,7 +196,7 @@ class SecureMSBServer(SecureModule):
         self.private_compare(x_bits_1, r, beta)
         beta_p_1 = self.network_assets.receiver_12.get()
 
-        beta = beta.astype(SIGNED_DTYPE)  # TODO: Optimize this
+        beta = backend.astype(beta, SIGNED_DTYPE)  # TODO: Optimize this
         gamma_1 = beta_p_1 + beta - 2 * beta * beta_p_1  # TODO: Optimize this
         delta_1 = x_bit_0_1 + r_mod_2 - (2 * r_mod_2 * x_bit_0_1)  # TODO: Optimize this
 
@@ -216,7 +216,7 @@ class SecureDReLUServer(SecureModule):
         self.msb = SecureMSBServer(**kwargs)
 
     def forward(self, X_share):
-        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=X_share.dtype)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         backend.multiply(mu_1, -1, out=mu_1)
 
         X1_converted = self.share_convert(X_share)
@@ -241,7 +241,7 @@ class SecureReLUServer(SecureModule):
             assert False
             share_client = self.network_assets.receiver_01.get()
             value = share_client + X_share
-            value = value * ((value > 0).astype(value.dtype))
+            value = value * (backend.astype(value > 0, value.dtype))
             return value
         else:
 
@@ -467,7 +467,7 @@ class PRFFetcherMaxPool(PRFFetcherModule):
             self.dReLU(max_)
             self.select_share(max_)
 
-        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        ret = backend.astype(max_.reshape(out_shape), SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
 
         return ret
@@ -492,7 +492,7 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
             return torch.zeros_like(activation)
 
         activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
-        activation = activation.astype(SIGNED_DTYPE)
+        activation = backend.astype(activation, SIGNED_DTYPE)
 
         return activation
 

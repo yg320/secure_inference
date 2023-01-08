@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 class Conv2DHandler:
     def __init__(self, device):
@@ -37,8 +37,11 @@ class Conv2DHandler:
 
     def conv2d_torch_4_type_1(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
         kwargs = dict(stride=stride, padding=padding, dilation=dilation)
-        a = torch.from_numpy(a).to(self.device)
-        b = torch.from_numpy(b).to(self.device)
+        if not IS_TORCH_BACKEND:
+            a = torch.from_numpy(a)
+            b = torch.from_numpy(b)
+        a = a.to(self.device)
+        b = b.to(self.device)
 
         x = (a & self.mask4_x) >> self.shift_x
         y = (b.unsqueeze(0) & self.mask4_y) >> self.shift_y
@@ -70,8 +73,11 @@ class Conv2DHandler:
         
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
         
-        a = torch.from_numpy(a).to(self.device)
-        b = torch.from_numpy(b).to(self.device)
+        if not IS_TORCH_BACKEND:
+            a = torch.from_numpy(a)
+            b = torch.from_numpy(b)
+        a = a.to(self.device)
+        b = b.to(self.device)
 
         x0 = ((a & self.mask0_4) >> 0).to(dtype)
         x1 = ((a & self.mask1_4) >> 4).to(dtype)
@@ -267,8 +273,12 @@ class Conv2DHandler:
 
     def conv2d_torch_8(self, a, b, stride, padding, dilation, groups, dtype):
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
-        a = torch.from_numpy(a).to(self.device)
-        b = torch.from_numpy(b).to(self.device)
+
+        if not IS_TORCH_BACKEND:
+            a = torch.from_numpy(a)
+            b = torch.from_numpy(b)
+        a = a.to(self.device)
+        b = b.to(self.device)
 
         x0 = ((a & self.mask0_8) >> 0).to(dtype)
         x1 = ((a & self.mask1_8) >> 8).to(dtype)
@@ -345,13 +355,18 @@ class Conv2DHandler:
         # print(a.shape, b.shape, stride, padding, dilation, groups)
         # TODO: clean up
         if groups > 1:
-            return self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
-        if num_mult >= 4096:
-            return self.conv2d_torch_4(a, b, stride, padding, dilation, groups, dtype=torch.float32)
-        if num_mult >= 256:
-            return self.conv2d_torch_4_type_1(a, b, stride, padding, dilation, groups, dtype=torch.float32)
-        return self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
+            out = self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
+        elif num_mult >= 4096:
+            out = self.conv2d_torch_4(a, b, stride, padding, dilation, groups, dtype=torch.float32)
+        elif num_mult >= 256:
+            out = self.conv2d_torch_4_type_1(a, b, stride, padding, dilation, groups, dtype=torch.float32)
+        else:
+            out = self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
 
+        if IS_TORCH_BACKEND:
+            return torch.from_numpy(out)
+        else:
+            return out
     # def conv2d(self, a, b, stride, padding, dilation, groups):
     #     num_mult = b.shape[1] * b.shape[2] * b.shape[3]
     #

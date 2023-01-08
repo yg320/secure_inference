@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from research.secure_inference_3pc.const import SIGNED_DTYPE
 import pickle
 from research.distortion.arch_utils.factory import arch_utils_factory

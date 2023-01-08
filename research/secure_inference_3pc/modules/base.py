@@ -2,6 +2,7 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS
 import torch
 import numpy as np
 
+
 class SecureModule(torch.nn.Module):
     def __init__(self, crypto_assets, network_assets, is_prf_fetcher=False):
         torch.nn.Module.__init__(self)

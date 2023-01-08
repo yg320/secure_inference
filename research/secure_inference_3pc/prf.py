@@ -3,10 +3,20 @@ import torch
 from research.secure_inference_3pc.timer import Timer
 from threading import Thread
 import queue
-
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 # TODO: https://towardsdatascience.com/six-levels-of-python-decorators-1f12c9067b23
+dtype_converted = {
+    np.int8: np.int8,
+    torch.int8: np.int8,
 
+
+    np.int32: np.int32,
+    torch.int32: np.int32,
+
+    np.int64: np.int64,
+    torch.int64: np.int64
+}
 class PRFWrapper:
     def __init__(self, seed, queue):
         self.seed = seed
@@ -29,7 +39,13 @@ class PRFWrapper:
             assert ret.dtype == dtype, f"{ret.dtype} , {dtype}"
             return ret
         else:
-            return self.prf.integers(low=low, high=high, size=size, dtype=dtype)
+            if IS_TORCH_BACKEND:
+                dtype = dtype_converted[dtype]
+                out = self.prf.integers(low=low, high=high, size=size, dtype=dtype)
+                out = torch.from_numpy(out)
+                return out
+            else:
+                return self.prf.integers(low=low, high=high, size=size, dtype=dtype)
 
     def permutation(self, data, axis):
         # return data[:, torch.randperm(data.size()[axis], generator=self.torch_prf)]

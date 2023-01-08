@@ -31,7 +31,6 @@ class SecureConv2DCryptoProvider(SecureModule):
 
     def forward(self, X_share):
 
-        assert X_share.dtype == SIGNED_DTYPE
         # TODO: intergers should be called without all of these arguments
         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
@@ -61,7 +60,7 @@ class PrivateCompareCryptoProvider(SecureModule):
         d_bits_1 = self.network_assets.receiver_12.get()
 
         d = (d_bits_0 + d_bits_1) % P
-        beta_p = (d == 0).any(axis=-1).astype(SIGNED_DTYPE)
+        beta_p = backend.astype((d == 0).any(axis=-1), SIGNED_DTYPE)
 
         return beta_p
 
@@ -82,13 +81,13 @@ class ShareConvertCryptoProvider(SecureModule):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
-        delta = (0 < a_tild_0 - x).astype(SIGNED_DTYPE)
+        delta = backend.astype((0 < a_tild_0 - x), SIGNED_DTYPE)
 
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         delta_0 = self.sub_mode_L_minus_one(delta, delta_1)
 
         self.network_assets.sender_02.put(delta_0)
-        self.network_assets.sender_12.put(x_bits_1.astype(backend.int8))
+        self.network_assets.sender_12.put(backend.astype(x_bits_1, backend.int8))
 
         # r = self.network_assets.receiver_12.get()
         # eta_p = self.network_assets.receiver_12.get()
@@ -147,7 +146,7 @@ class SecureMSBCryptoProvider(SecureModule):
         self.network_assets.sender_02.put(x_0)
         self.network_assets.sender_02.put(x_bit_0_0)
 
-        self.network_assets.sender_12.put(x_bits_1.astype(backend.int8))
+        self.network_assets.sender_12.put(backend.astype(x_bits_1, backend.int8))
         self.network_assets.sender_12.put(x_bit_0_1)
 
         # r = self.network_assets.receiver_12.get()
@@ -191,10 +190,11 @@ class SecureReLUCryptoProvider(SecureModule):
         if self.dummy_relu:
             return X_share
         else:
+            orig_shape = X_share.shape
             X_share = X_share.flatten()
             X_share = self.DReLU(X_share)
             self.mult(X_share.shape)
-            return X_share
+            return X_share.reshape(orig_shape)
 
 class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU):
     def __init__(self, block_sizes, dummy_relu=False, **kwargs):
@@ -349,7 +349,7 @@ class PRFFetcherReLU(PRFFetcherModule):
         if self.dummy_relu:
             return dummy_tensor
         else:
-            dummy_arr = dummy_tensor.astype(SIGNED_DTYPE).flatten()
+            dummy_arr = backend.astype(dummy_tensor, SIGNED_DTYPE).flatten()
             self.DReLU(dummy_arr)
             self.mult(dummy_arr)
             return dummy_tensor
@@ -382,14 +382,14 @@ class PRFFetcherMaxPool(PRFFetcherModule):
                       x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1)).astype(SIGNED_DTYPE)
+        x = backend.astype(x.reshape((x.shape[0], -1)), SIGNED_DTYPE)
 
         max_ = x[0]
         for i in range(1, 9):
             self.dReLU(max_)
             self.select_share(max_)
 
-        ret = max_.reshape(out_shape).astype(SIGNED_DTYPE)
+        ret = backend.astype(max_.reshape(out_shape), SIGNED_DTYPE)
 
         return ret
 
@@ -404,17 +404,17 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
         self.dummy_relu = dummy_relu
 
     def mult(self, x, y):
-        return self.secure_mult(x.astype(SIGNED_DTYPE))
+        return self.secure_mult(backend.astype(x, SIGNED_DTYPE))
 
     def DReLU(self, activation):
-        return self.secure_DReLU(activation.astype(SIGNED_DTYPE))
+        return self.secure_DReLU(backend.astype(activation, SIGNED_DTYPE))
 
     def forward(self, activation):
         if self.dummy_relu:
             return torch.zeros_like(activation)
 
         activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
-        activation = activation.astype(SIGNED_DTYPE)
+        activation = backend.astype(activation, SIGNED_DTYPE)
 
         return activation
 class PRFFetcherSecureModelSegmentation(SecureModule):

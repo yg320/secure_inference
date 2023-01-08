@@ -16,8 +16,8 @@ class SecureMaxPool(SecureModule):
 
     def forward(self, x):
 
-        assert x.shape[2] == 112
-        assert x.shape[3] == 112
+        assert x.shape[2] == 112, x.shape
+        assert x.shape[3] == 112, x.shape
 
         x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
         x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
