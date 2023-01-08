@@ -37,14 +37,15 @@ class SecureConv2DCryptoProvider(SecureModule):
         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
 
-        A = A_share_0 + A_share_1
-        B = B_share_0 + B_share_1
+        A = backend.add(A_share_0, A_share_1, out=A_share_0)
+        B = backend.add(B_share_0, B_share_1, out=B_share_0)
+
         if self.device == "cpu":
             C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
         else:
             C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
-        C_share_0 = C - C_share_1
+        C_share_0 = backend.subtract(C, C_share_1, out=C)
 
         self.network_assets.sender_02.put(C_share_0)
 

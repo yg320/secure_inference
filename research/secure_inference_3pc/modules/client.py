@@ -40,31 +40,32 @@ class SecureConv2DClient(SecureModule):
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
         C_share = self.network_assets.receiver_02.get()
 
-        E_share = X_share - A_share
-        F_share = self.W_share - B_share
+        E_share = backend.subtract(X_share, A_share, out=A_share)
+        F_share = backend.subtract(self.W_share, B_share, out=B_share)
 
         share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(backend.concatenate([E_share.flatten(), F_share.flatten()]))
         E_share_server, F_share_server = share_server[:backend.size(E_share)].reshape(E_share.shape), share_server[backend.size(E_share):].reshape(F_share.shape)
 
-        E = E_share_server + E_share
-        F = F_share_server + F_share
+        E = backend.add(E_share_server, E_share, out=E_share)
+        F = backend.add(F_share_server, F_share, out=F_share)
 
         if self.device == "cpu":
-            out_numpy = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
+            out = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
         else:
-            out_numpy = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-            out_numpy += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+            out = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+            out += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
 
-        out_numpy = out_numpy + C_share
-
-        out = out_numpy // self.trunc
+        out = backend.add(out, C_share, out=out)
+        out = out // self.trunc
         # TODO: This is the proper way, but it's slower and takes more time
         #  t = out_numpy.dtype
         #  out = (out_numpy / self.trunc).round().astype(t)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
-        return out + mu_0
+        out = backend.add(out, mu_0, out=out)
+
+        return out
 
     def forward(self, X_share):
         # with Timer("SecureConv2DClient"):

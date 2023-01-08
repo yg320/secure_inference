@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import time
 from numba import njit, prange, int64, int32
 from research.secure_inference_3pc.const import SIGNED_DTYPE, NUM_BITS
@@ -436,25 +437,41 @@ def single_conv_2d_mat_mul(A, B, padding, stride, dilation):
 
 
 def conv_2d(A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1, method=NUMBA_CONV):
+    if type(A) is not np.ndarray:
+        is_torch = True
+    else:
+        is_torch = False
+
+    if is_torch:
+        A = A.numpy()
+        B = B.numpy()
+        if C is not None:
+            C = C.numpy()
+            D = D.numpy()
+
     if groups == 1:
         if method == NUMBA_CONV:
             if C is None:
-                return single_conv_2d(A, B, padding, stride, dilation)
+                out = single_conv_2d(A, B, padding, stride, dilation)
             else:
-                return double_conv_2d(A, B, C, D, padding, stride, dilation)
+                out =  double_conv_2d(A, B, C, D, padding, stride, dilation)
         else:
             if C is None:
-                return single_conv_2d_mat_mul(A, B, padding, stride, dilation)
+                out =  single_conv_2d_mat_mul(A, B, padding, stride, dilation)
             else:
-                return double_conv_2d_mat_mul(A, B, C, D, padding, stride, dilation)
+                out =  double_conv_2d_mat_mul(A, B, C, D, padding, stride, dilation)
     else:
         assert method == NUMBA_CONV
         assert groups == B.shape[0]
         if C is None:
-            return single_conv_2d(A, B, padding, stride, dilation, groups=groups)
+            out =  single_conv_2d(A, B, padding, stride, dilation, groups=groups)
         else:
-            return double_conv_2d(A, B, C, D, padding, stride, dilation, groups=groups)
+            out =  double_conv_2d(A, B, C, D, padding, stride, dilation, groups=groups)
 
+    if is_torch:
+        out = torch.from_numpy(out)
+
+    return out
 
 # TODO: put in init
 def compile_numba_funcs():

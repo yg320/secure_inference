@@ -1,8 +1,8 @@
 import torch
 import numpy as np
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
-dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8, torch.bool:torch.bool, torch.int32:torch.int32}
-
+dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8, torch.bool:torch.bool, torch.int32:torch.int32, torch.int64:torch.int64}
+torch_dtype_converted = {torch.int32: np.int32, torch.int64: np.int64, torch.int8:np.int8, torch.bool:np.bool, np.int32:np.int32, np.int64:np.int64, np.int8:np.int8, np.bool:np.bool, None:None}
 class NumpyBackend:
     def __init__(self):
         self.int8 = np.int8
@@ -40,7 +40,7 @@ class NumpyBackend:
         if end is None:
             end = start
             start = 0
-        return np.arange(start, end, dtype=dtype)
+        return np.arange(start, end, dtype=torch_dtype_converted[dtype])
 
     def unsqueeze(self, data, axis):
         if axis == 0:
@@ -77,21 +77,28 @@ class NumpyBackend:
 
     def ones_like(self, data):
         return np.ones_like(data)
-
+    def zeros_like(self, data):
+        return np.zeros_like(data)
 class TorchBackend:
     def __init__(self):
         self.int8 = torch.int8
         self.int32 = torch.int32
         self.bool = torch.bool
-        
+        self.numpy_backend = NumpyBackend()
+
     def zeros(self, shape, dtype):
-        return torch.zeros(size=shape, dtype=dtype_converted[dtype])
+        out = torch.zeros(size=shape, dtype=dtype_converted[dtype])
+        assert (self.numpy_backend.zeros(shape, torch_dtype_converted[dtype]) == out.numpy()).all()
+        return out
 
     def concatenate(self, tensors):
-        return torch.cat(tensors)
+        out = torch.cat(tensors)
+        assert (self.numpy_backend.concatenate([tensor.numpy() for tensor in tensors]) == out.numpy()).all()
+        return out
 
     def add(self, a, b, out):
-        return torch.add(a, b, out=out)
+        out = torch.add(a, b, out=out)
+        return out
 
     def multiply(self, a, b, out):
         return torch.mul(a, b, out=out)
@@ -103,13 +110,19 @@ class TorchBackend:
         return np.array(data)
 
     def reshape(self, data, shape):
-        return torch.reshape(data, shape)
+        out = torch.reshape(data, shape)
+        assert (self.numpy_backend.reshape(data.numpy(), shape) == out.numpy()).all()
+        return out
 
     def size(self, data):
-        return torch.numel(data)
+        out = torch.numel(data)
+        assert (self.numpy_backend.size(data.numpy()) == out)
+        return out
 
     def astype(self, data, dtype):
-        return data.to(dtype_converted[dtype])
+        out = data.to(dtype_converted[dtype])
+        assert (self.numpy_backend.astype(data.numpy(), torch_dtype_converted[dtype]) == out.numpy()).all()
+        return out
 
     def arange(self, start, end=None, dtype=None):
         if end is None:
@@ -117,43 +130,69 @@ class TorchBackend:
             start = 0
         if dtype is not None:
             dtype = dtype_converted[dtype]
-        return torch.arange(start, end, dtype=dtype)
+        out = torch.arange(start, end, dtype=dtype)
+        assert (self.numpy_backend.arange(start, end, dtype) == out.numpy()).all()
+        return out
 
     def unsqueeze(self, data, axis):
-        return torch.unsqueeze(data, dim=axis)
+        out = torch.unsqueeze(data, dim=axis)
+        assert (self.numpy_backend.unsqueeze(data.numpy(), axis) == out.numpy()).all()
+        return out
 
     def cumsum(self, data, axis, out=None):
-        return torch.cumsum(data, dim=axis, out=data)
+        out = torch.cumsum(data, dim=axis, out=out)
+        assert (self.numpy_backend.cumsum(data.numpy(), axis, out) == out.numpy()).all()
+        return out
 
 
     def flip(self, data, axis):
-        return torch.flip(data, dims=(axis,))
+
+        out = torch.flip(data, dims=(axis,))
+        assert (self.numpy_backend.flip(data.numpy(), axis) == out.numpy()).all()
+        return out
 
     def bitwise_and(self, x, y, out=None):
         # TODO: make inplace!
-        return x & y
+        out = x & y
+        assert (self.numpy_backend.bitwise_and(x.numpy(), y, None) == out.numpy()).all()
+        return out
 
     def unsigned_gt(self, a, b):
         out = a > b
         out[(a < 0) & (b >= 0)] = True
         out[(a >= 0) & (b < 0)] = False
+
+        assert (self.numpy_backend.unsigned_gt(a.numpy(), b.numpy()) == out.numpy()).all()
+
         return out
 
     def pad(self, data, pad, mode='constant', value=0):
         assert pad[0][0] == 0 and pad[0][1] == 0
         assert pad[1][0] == 0 and pad[1][1] == 0
-        pad = [pad[2][0], pad[2][1], pad[3][0], pad[3][1]]
-        return torch.nn.functional.pad(data, pad, mode=mode, value=value)
+        out = torch.nn.functional.pad(data, [pad[2][0], pad[2][1], pad[3][0], pad[3][1]], mode=mode, value=value)
+        assert (self.numpy_backend.pad(data.numpy(), pad, mode=mode) == out.numpy()).all()
+        return out
 
     def stack(self, data, axis=0):
-        return torch.stack(data, dim=axis)
+        out = torch.stack(data, dim=axis)
+        assert (self.numpy_backend.stack([tensor.numpy() for tensor in data], axis=axis) == out.numpy()).all()
+        return out
 
     def mean(self, data, axis, keepdims=False):
         size = sum(data.shape[i] for i in axis)
-        return torch.sum(data, dim=axis, keepdim=keepdims) // size
+        out = torch.sum(data, dim=axis, keepdim=keepdims) // size
+        assert np.abs(self.numpy_backend.mean(data.numpy(), axis, keepdims) - out.numpy()).max() <= 1
+        return out
 
     def ones_like(self, data):
-        return torch.ones_like(data)
+        out = torch.ones_like(data)
+        assert (self.numpy_backend.ones_like(data.numpy()) == out.numpy()).all()
+        return out
+
+    def zeros_like(self, data):
+        out = torch.zeros_like(data)
+        assert (self.numpy_backend.zeros_like(data.numpy()) == out.numpy()).all()
+        return out
 
 if IS_TORCH_BACKEND:
     backend = TorchBackend()

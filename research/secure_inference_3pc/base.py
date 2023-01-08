@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 19001
-        self.port_10 = 19002
-        self.port_02 = 19003
-        self.port_20 = 19004
-        self.port_12 = 19005
-        self.port_21 = 19006
+        self.port_01 = 19201
+        self.port_10 = 19202
+        self.port_02 = 19203
+        self.port_20 = 19204
+        self.port_12 = 19205
+        self.port_21 = 19206
 
 
 class NetworkAssets:
@@ -128,6 +128,7 @@ org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, ba
 
 
 def module_67(xxx):
+    return xxx % 67
     orig_shape = xxx.shape
     xxx = xxx.reshape(-1)
     backend.subtract(xxx, min_org_shit, out=xxx)

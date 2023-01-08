@@ -43,9 +43,12 @@ class SecureConv2DServer(SecureModule):
 
         A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
-
+        # print('===========')
+        # print(int(X_share.sum()))
+        # print(int(A_share.sum()))
         E_share = backend.subtract(X_share, A_share, out=A_share)
         F_share = backend.subtract(self.W_share, B_share, out=B_share)
+        # print(int(E_share.sum()))
 
         self.network_assets.sender_01.put(backend.concatenate([E_share.reshape(-1), F_share.reshape(-1)]))
         share_client = self.network_assets.receiver_01.get()
@@ -76,7 +79,8 @@ class SecureConv2DServer(SecureModule):
 
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
         mu_1 = backend.multiply(mu_1, -1, out=mu_1)
-        return out + mu_1
+        out = backend.add(out, mu_1, out=out)
+        return out
 
 
 class PrivateCompareServer(SecureModule):
@@ -238,7 +242,6 @@ class SecureReLUServer(SecureModule):
 
     def forward(self, X_share):
         if self.dummy_relu:
-            assert False
             share_client = self.network_assets.receiver_01.get()
             value = share_client + X_share
             value = value * (backend.astype(value > 0, value.dtype))
@@ -291,8 +294,10 @@ class SecureMaxPoolServer(SecureMaxPool):
         if self.dummy_max_pool:
             x_client = self.network_assets.receiver_01.get()
             x_rec = x_client + x
-            return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy().astype(x.dtype)
-
+            if type(x) is torch.Tensor:
+                return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(x_rec.to(torch.float64)).to(x.dtype)
+            else:
+                return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy().astype(x.dtype)
         ret = super(SecureMaxPoolServer, self).forward(x)
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
         mu_1 = backend.multiply(mu_1, -1, out=mu_1)
