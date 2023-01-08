@@ -84,7 +84,7 @@ class PrivateCompareClient(SecureModule):
         # if backend.any(r == backend.iinfo(r.dtype).max):  # HERE
         #     assert False
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
-        r[beta] += 1
+        r[backend.astype(beta, backend.bool)] += 1
         bits = decompose(r)
         c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
         backend.multiply(s, c_bits_0, out=s)
@@ -130,7 +130,7 @@ class ShareConvertClient(SecureModule):
         eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
 
         t0 = self.add_mode_L_minus_one(delta_0, eta_0)
-        t1 = self.sub_mode_L_minus_one(t0, SIGNED_DTYPE(1))
+        t1 = self.sub_mode_L_minus_one(t0, backend.ones_like(t0))
         t2 = self.sub_mode_L_minus_one(t1, alpha)
         theta_0 = self.add_mode_L_minus_one(beta_0, t2)
 

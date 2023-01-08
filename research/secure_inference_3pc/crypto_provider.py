@@ -29,7 +29,7 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         device=device
     )
 
-def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False):
+def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DCryptoProvider
 
     return conv_class(
@@ -39,7 +39,8 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
         padding=(0, 0),
         groups=1,
         crypto_assets=crypto_assets,
-        network_assets=network_assets
+        network_assets=network_assets,
+        device=device
     )
 
 

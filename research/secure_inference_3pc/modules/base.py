@@ -1,6 +1,7 @@
 from research.secure_inference_3pc.const import TRUNC, NUM_BITS
 import torch
 import numpy as np
+from research.secure_inference_3pc.backend import backend
 
 
 class SecureModule(torch.nn.Module):
@@ -15,13 +16,14 @@ class SecureModule(torch.nn.Module):
 
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
-        ret[ret.astype(np.uint64, copy=False) < a.astype(np.uint64, copy=False)] += 1
+        ret[backend.unsigned_gt(a, ret)] += 1
         ret[ret == - 1] = 0   # If ret were uint64, then the condition would be ret == 2**64 - 1
         return ret
 
     def sub_mode_L_minus_one(self, a, b):
         ret = a - b
-        ret[b.astype(np.uint64, copy=False) > a.astype(np.uint64, copy=False)] -= 1
+        ret[backend.unsigned_gt(b, a)] -= 1
+        # a.numpy().astype(np.uint64, copy=False) > b.numpy().astype(np.uint64, copy=False)
         return ret
 
     # def forward(self):

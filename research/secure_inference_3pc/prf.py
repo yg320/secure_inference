@@ -48,9 +48,11 @@ class PRFWrapper:
                 return self.prf.integers(low=low, high=high, size=size, dtype=dtype)
 
     def permutation(self, data, axis):
-        # return data[:, torch.randperm(data.size()[axis], generator=self.torch_prf)]
-        out = self.non_threaded_prf.permutation(x=data, axis=axis)
-        return out
+        if IS_TORCH_BACKEND:
+            return data[:, torch.randperm(data.size()[axis], generator=self.torch_prf)]
+        else:
+            out = self.non_threaded_prf.permutation(x=data, axis=axis)
+            return out
 
 
 

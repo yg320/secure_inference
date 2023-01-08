@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 18741
-        self.port_10 = 18742
-        self.port_02 = 18743
-        self.port_20 = 18744
-        self.port_12 = 18745
-        self.port_21 = 18746
+        self.port_01 = 19001
+        self.port_10 = 19002
+        self.port_02 = 19003
+        self.port_20 = 19004
+        self.port_12 = 19005
+        self.port_21 = 19006
 
 
 class NetworkAssets:
@@ -131,7 +131,7 @@ def module_67(xxx):
     orig_shape = xxx.shape
     xxx = xxx.reshape(-1)
     backend.subtract(xxx, min_org_shit, out=xxx)
-    return org_shit[xxx].reshape(orig_shape)
+    return org_shit[backend.astype(xxx, SIGNED_DTYPE)].reshape(orig_shape)
 
 def decompose(value):
     orig_shape = list(value.shape)
@@ -244,7 +244,7 @@ def get_c_party_0(x_bits, multiplexer_bits, beta):
     backend.multiply(multiplexer_bits, -2, out=multiplexer_bits)
     backend.add(multiplexer_bits, x_bits, out=multiplexer_bits)
 
-    w_cumsum = multiplexer_bits.astype(backend.int32)
+    w_cumsum = backend.astype(multiplexer_bits, backend.int32)
     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
     backend.subtract(w_cumsum, multiplexer_bits, out=w_cumsum)
     backend.multiply(x_bits, beta, out=x_bits)
@@ -301,7 +301,7 @@ def get_c_party_1(x_bits, multiplexer_bits, beta):
     backend.add(w, x_bits, out=w)
     backend.add(w, multiplexer_bits, out=w)
 
-    w_cumsum = w.astype(backend.int32)
+    w_cumsum = backend.astype(w, backend.int32)
     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
     backend.subtract(w_cumsum, w, out=w_cumsum)
 
@@ -353,4 +353,7 @@ class TypeConverter:
                 return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
     @staticmethod
     def i2f(data):
-        return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc
+        if IS_TORCH_BACKEND:
+            return (data.to(TypeConverter.float_dtype) / TypeConverter.trunc)
+        else:
+            return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc

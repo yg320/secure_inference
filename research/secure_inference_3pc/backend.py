@@ -1,12 +1,13 @@
 import torch
 import numpy as np
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
-dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8}
+dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8, torch.bool:torch.bool, torch.int32:torch.int32}
 
 class NumpyBackend:
     def __init__(self):
         self.int8 = np.int8
         self.int32 = np.int32
+        self.bool = np.bool
 
     def zeros(self, shape, dtype):
         return np.zeros(shape=shape, dtype=dtype)
@@ -61,11 +62,28 @@ class NumpyBackend:
     def flip(self, data, axis):
         return np.flip(data, axis=axis)
 
+    def unsigned_gt(self, a, b):
+        return a.astype(np.uint64, copy=False) > b.astype(np.uint64, copy=False)
+
+    def pad(self, data, pad_width, mode):
+        return np.pad(data, pad_width, mode=mode, constant_values=0)
+
+    def stack(self, data, axis=0):
+        return np.stack(data, axis=axis)
+
+    def mean(self, data, axis, keepdims=False):
+        size = sum(data.shape[i] for i in axis)
+        return np.sum(data, axis=axis, keepdims=keepdims) // size
+
+    def ones_like(self, data):
+        return np.ones_like(data)
+
 class TorchBackend:
     def __init__(self):
         self.int8 = torch.int8
         self.int32 = torch.int32
-
+        self.bool = torch.bool
+        
     def zeros(self, shape, dtype):
         return torch.zeros(size=shape, dtype=dtype_converted[dtype])
 
@@ -104,12 +122,38 @@ class TorchBackend:
     def unsqueeze(self, data, axis):
         return torch.unsqueeze(data, dim=axis)
 
+    def cumsum(self, data, axis, out=None):
+        return torch.cumsum(data, dim=axis, out=data)
+
+
     def flip(self, data, axis):
         return torch.flip(data, dims=(axis,))
 
     def bitwise_and(self, x, y, out=None):
         # TODO: make inplace!
         return x & y
+
+    def unsigned_gt(self, a, b):
+        out = a > b
+        out[(a < 0) & (b >= 0)] = True
+        out[(a >= 0) & (b < 0)] = False
+        return out
+
+    def pad(self, data, pad, mode='constant', value=0):
+        assert pad[0][0] == 0 and pad[0][1] == 0
+        assert pad[1][0] == 0 and pad[1][1] == 0
+        pad = [pad[2][0], pad[2][1], pad[3][0], pad[3][1]]
+        return torch.nn.functional.pad(data, pad, mode=mode, value=value)
+
+    def stack(self, data, axis=0):
+        return torch.stack(data, dim=axis)
+
+    def mean(self, data, axis, keepdims=False):
+        size = sum(data.shape[i] for i in axis)
+        return torch.sum(data, dim=axis, keepdim=keepdims) // size
+
+    def ones_like(self, data):
+        return torch.ones_like(data)
 
 if IS_TORCH_BACKEND:
     backend = TorchBackend()

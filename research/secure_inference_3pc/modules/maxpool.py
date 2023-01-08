@@ -1,4 +1,4 @@
-import numpy as backend
+from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
 
 
@@ -21,14 +21,14 @@ class SecureMaxPool(SecureModule):
 
         x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
         x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
-                      x[:, :, 0:-1:2, 1:-1:2],
-                      x[:, :, 0:-1:2, 2::2],
-                      x[:, :, 1:-1:2, 0:-1:2],
-                      x[:, :, 1:-1:2, 1:-1:2],
-                      x[:, :, 1:-1:2, 2::2],
-                      x[:, :, 2::2, 0:-1:2],
-                      x[:, :, 2::2, 1:-1:2],
-                      x[:, :, 2::2, 2::2]])
+                           x[:, :, 0:-1:2, 1:-1:2],
+                           x[:, :, 0:-1:2, 2::2],
+                           x[:, :, 1:-1:2, 0:-1:2],
+                           x[:, :, 1:-1:2, 1:-1:2],
+                           x[:, :, 1:-1:2, 2::2],
+                           x[:, :, 2::2, 0:-1:2],
+                           x[:, :, 2::2, 1:-1:2],
+                           x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
         x = x.reshape((x.shape[0], -1))

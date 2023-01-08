@@ -87,7 +87,7 @@ class PrivateCompareServer(SecureModule):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=backend.int32)
 
-        r[beta] += 1
+        r[backend.astype(beta, backend.bool)] += 1
 
         bits = decompose(r)
 

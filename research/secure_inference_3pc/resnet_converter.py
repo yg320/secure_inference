@@ -4,6 +4,7 @@ import pickle
 from research.distortion.arch_utils.factory import arch_utils_factory
 from functools import partial
 from research.distortion.utils import get_model
+from research.secure_inference_3pc.backend import backend
 
 def securify_resnet18_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=None, relu_spec_file=None):
     model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
@@ -97,7 +98,7 @@ class SecureGlobalAveragePooling2d(nn.Module):
 
     # TODO: is this the best way to do this?)
     def forward(self, x):
-        return ((x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])).astype(x.dtype))
+        return backend.mean(x, axis=(2, 3), keepdims=True)
 
 def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
@@ -132,7 +133,7 @@ def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu,
 def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, max_pool, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, dummy_max_pool=False, prf_fetcher=None, device="cpu"):
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
-    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets)
+    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
     max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool)
     block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
@@ -167,7 +168,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
 
 
 def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool):
-
+    assert device == "cpu"
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True)
