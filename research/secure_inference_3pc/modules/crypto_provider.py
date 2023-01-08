@@ -2,7 +2,7 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule
 from research.secure_inference_3pc.const import  NUM_OF_COMPARE_BITS
 
 import torch
-import numpy as np
+import numpy as backend
 
 from research.secure_inference_3pc.base import P, sub_mode_p, decompose
 from research.secure_inference_3pc.conv2d import conv_2d
@@ -29,7 +29,6 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.device = device
 
     def forward(self, X_share):
-        # return np.zeros(get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride), dtype=X_share.dtype)
 
         assert X_share.dtype == SIGNED_DTYPE
         # TODO: intergers should be called without all of these arguments
@@ -79,7 +78,7 @@ class ShareConvertCryptoProvider(SecureModule):
 
         x_bits = decompose(x)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=np.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
         delta = (0 < a_tild_0 - x).astype(SIGNED_DTYPE)
@@ -88,7 +87,7 @@ class ShareConvertCryptoProvider(SecureModule):
         delta_0 = self.sub_mode_L_minus_one(delta, delta_1)
 
         self.network_assets.sender_02.put(delta_0)
-        self.network_assets.sender_12.put(x_bits_1.astype(np.int8))
+        self.network_assets.sender_12.put(x_bits_1.astype(backend.int8))
 
         # r = self.network_assets.receiver_12.get()
         # eta_p = self.network_assets.receiver_12.get()
@@ -134,8 +133,7 @@ class SecureMSBCryptoProvider(SecureModule):
 
         x_bits = decompose(x)
 
-        # x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=np.int32)
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=np.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
 
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
@@ -148,7 +146,7 @@ class SecureMSBCryptoProvider(SecureModule):
         self.network_assets.sender_02.put(x_0)
         self.network_assets.sender_02.put(x_bit_0_0)
 
-        self.network_assets.sender_12.put(x_bits_1.astype(np.int8))
+        self.network_assets.sender_12.put(x_bits_1.astype(backend.int8))
         self.network_assets.sender_12.put(x_bit_0_1)
 
         # r = self.network_assets.receiver_12.get()
@@ -192,9 +190,9 @@ class SecureReLUCryptoProvider(SecureModule):
         if self.dummy_relu:
             return X_share
         else:
-            X_share_np = X_share.flatten()
-            X_share_np = self.DReLU(X_share_np)
-            self.mult(X_share_np.shape)
+            X_share = X_share.flatten()
+            X_share = self.DReLU(X_share)
+            self.mult(X_share.shape)
             return X_share
 
 class SecureBlockReLUCryptoProvider(SecureModule, NumpySecureOptimizedBlockReLU):
@@ -252,7 +250,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=SIGNED_DTYPE)
 
-        return np.zeros(shape=out_shape, dtype=X_share.dtype)
+        return backend.zeros(shape=out_shape, dtype=X_share.dtype)
 
 
 class PRFFetcherPrivateCompare(PRFFetcherModule):
@@ -269,7 +267,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.private_compare = PRFFetcherPrivateCompare(**kwargs)
 
     def forward(self, dummy_tensor):
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
         # self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
 
@@ -313,7 +311,7 @@ class PRFFetcherMSB(PRFFetcherModule):
         size = dummy_tensor.shape
         
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=size,dtype=SIGNED_DTYPE)
         self.private_compare(dummy_tensor)
@@ -371,8 +369,8 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+        x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
                       x[:, :, 0:-1:2, 1:-1:2],
                       x[:, :, 0:-1:2, 2::2],
                       x[:, :, 1:-1:2, 0:-1:2],
@@ -425,7 +423,7 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
 
     def forward(self, img):
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=img.shape, dtype=SIGNED_DTYPE)
-        out_0 = self.model.decode_head(self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
+        out_0 = self.model.decode_head(self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
 
 
 class PRFFetcherSecureModelClassification(SecureModule):
@@ -435,7 +433,7 @@ class PRFFetcherSecureModelClassification(SecureModule):
 
     def forward(self, img):
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=img.shape, dtype=SIGNED_DTYPE)
-        out = self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
+        out = self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
         out = self.model.neck(out)
         out_0 = self.model.head.fc(out)
 

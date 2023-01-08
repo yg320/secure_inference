@@ -235,7 +235,7 @@ def fuse_conv_bn(conv_module, batch_norm_module):
     return W, B
 
 
-def get_c_party_0(x_bits, multiplexer_bits, beta, j):
+def get_c_party_0(x_bits, multiplexer_bits, beta):
     beta = beta[..., np.newaxis]
     beta = 2 * beta  # Not allowed to change beta inplace
     np.subtract(beta, 1, out=beta)

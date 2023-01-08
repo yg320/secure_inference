@@ -2,8 +2,7 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 import torch
-import numpy as np
-
+import numpy as backend
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.base import decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
 from research.secure_inference_3pc.conv2d import conv_2d
@@ -47,7 +46,7 @@ class SecureConv2DClient(SecureModule):
         F_share = self.W_share - B_share
 
         share_server = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(np.concatenate([E_share.flatten(), F_share.flatten()]))
+        self.network_assets.sender_01.put(backend.concatenate([E_share.flatten(), F_share.flatten()]))
         E_share_server, F_share_server = share_server[:E_share.size].reshape(E_share.shape), share_server[E_share.size:].reshape(F_share.shape)
 
         E = E_share_server + E_share
@@ -83,27 +82,16 @@ class PrivateCompareClient(SecureModule):
 
     def forward_(self, x_bits_0, r, beta):
 
-        if np.any(r == np.iinfo(r.dtype).max):  # HERE
+        if backend.any(r == backend.iinfo(r.dtype).max):  # HERE
             assert False
-        # with Timer("PrivateCompareClient - Random"):
-        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=np.int32)
+        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
         r[beta] += 1
         bits = decompose(r)
-        c_bits_0 = get_c_party_0(x_bits_0, bits, beta, np.int8(0))
-        np.multiply(s, c_bits_0, out=s)
+        c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
+        backend.multiply(s, c_bits_0, out=s)
         d_bits_0 = module_67(s)
 
-        # r = torch.from_numpy(r).to("cuda:0")
-        # s = torch.from_numpy(s).to("cuda:0")
-        # beta = torch.from_numpy(beta).to("cuda:0")
-        # x_bits_0 = torch.from_numpy(x_bits_0).to("cuda:0")
-        # r[beta.to(torch.int64)] += 1
-        # bits = decompose_torch_0(r)
-        # c_bits_0 = get_c_party_0_torch(x_bits_0, bits, beta)
-        # torch.mul(s, c_bits_0, out=s)
-        # d_bits_0 = s % 67
         d_bits_0 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_0, axis=-1)
-        # d_bits_0 = d_bits_0.cpu().numpy().astype(np.uint8)
 
         self.network_assets.sender_02.put(d_bits_0)
 
@@ -119,7 +107,7 @@ class ShareConvertClient(SecureModule):
         return self.forward_(a_0)
 
     def forward_(self, a_0):
-        eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
+        eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
@@ -130,7 +118,7 @@ class ShareConvertClient(SecureModule):
         beta_0 = (0 < a_0 - a_tild_0).astype(SIGNED_DTYPE)
         self.network_assets.sender_02.put(a_tild_0)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
@@ -190,9 +178,8 @@ class SecureSelectShareClient(SecureModule):
 
     def forward(self, alpha, x, y):
         # if alpha == 0: return x else return 1
-        dtype = alpha.dtype
         shape = alpha.shape
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(np.iinfo(dtype).min, np.iinfo(dtype).max + 1, size=shape, dtype=dtype)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
         w = y - x
         c = self.secure_multiplication(alpha, w)
@@ -211,9 +198,9 @@ class SecureMSBClient(SecureModule):
 
     def forward_(self, a_0):
 
-        beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=np.int8)
+        beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=a_0.dtype)
 
         x_0 = self.network_assets.receiver_02.get()
@@ -273,7 +260,7 @@ class SecureReLUClient(SecureModule):
     def forward_(self, X_share):
         if self.dummy_relu:
             self.network_assets.sender_01.put(X_share)
-            return np.zeros_like(X_share)
+            return backend.zeros_like(X_share)
         else:
 
             shape = X_share.shape
@@ -296,7 +283,7 @@ class SecureMaxPoolClient(SecureMaxPool):
     def forward(self, x):
         if self.dummy_max_pool:
             self.network_assets.sender_01.put(x)
-            return np.zeros_like(x[:, :, ::2, ::2])
+            return backend.zeros_like(x[:, :, ::2, ::2])
 
         ret = super(SecureMaxPoolClient, self).forward(x)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
@@ -329,7 +316,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=X_share.dtype)
 
-        return np.zeros(shape=out_shape, dtype=X_share.dtype)
+        return backend.zeros(shape=out_shape, dtype=X_share.dtype)
 
 
 class PRFFetcherPrivateCompare(PRFFetcherModule):
@@ -337,7 +324,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(**kwars)
 
     def forward(self, x_bits_0):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=np.int32)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[x_bits_0.shape[0]] + [NUM_OF_COMPARE_BITS], dtype=backend.int32)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
@@ -346,11 +333,11 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.private_compare = PRFFetcherPrivateCompare(**kwars)
 
     def forward(self, dummy_tensor):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=backend.int8)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
 
         self.private_compare(dummy_tensor)
 
@@ -397,8 +384,8 @@ class PRFFetcherMSB(PRFFetcherModule):
 
     def forward(self, dummy_tensor):
 
-        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=np.int8)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=np.int8)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=dummy_tensor.shape, dtype=backend.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=dummy_tensor.shape, dtype=dummy_tensor.dtype)
 
         self.private_compare(dummy_tensor)
@@ -462,8 +449,8 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         assert x.shape[2] == 112
         assert x.shape[3] == 112
 
-        x = np.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = np.stack([x[:, :, 0:-1:2, 0:-1:2],
+        x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
+        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
                       x[:, :, 0:-1:2, 1:-1:2],
                       x[:, :, 0:-1:2, 2::2],
                       x[:, :, 1:-1:2, 0:-1:2],
@@ -519,7 +506,7 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
     def forward(self, img):
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
-        out_0 = self.model.decode_head(self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
+        out_0 = self.model.decode_head(self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
 
 
 class PRFFetcherSecureModelClassification(SecureModule):
@@ -530,6 +517,6 @@ class PRFFetcherSecureModelClassification(SecureModule):
     def forward(self, img):
         # print(f"PRFFetcherSecureModelClassification - {img.shape}")
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
-        out = self.model.backbone(np.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
+        out = self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))[0]
         out = self.model.neck(out)
         out_0 = self.model.head.fc(out)
