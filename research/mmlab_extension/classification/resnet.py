@@ -39,7 +39,7 @@ class MyBottleneck(Bottleneck):
 
             out = self.drop_path(out)
 
-            out += identity
+            out = out + identity
 
             return out
 
