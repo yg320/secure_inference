@@ -11,7 +11,7 @@ from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER,
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
-from research.bReLU import NumpySecureOptimizedBlockReLU
+from research.bReLU import SecureOptimizedBlockReLU
 
 
 
@@ -294,10 +294,10 @@ class SecureMaxPoolClient(SecureMaxPool):
         return ret + mu_0
 
 
-class SecureBlockReLUClient(SecureModule, NumpySecureOptimizedBlockReLU):
+class SecureBlockReLUClient(SecureModule, SecureOptimizedBlockReLU):
     def __init__(self, block_sizes, dummy_relu=False, **kwargs):
         SecureModule.__init__(self, **kwargs)
-        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.DReLU = SecureDReLUClient(**kwargs)
         self.mult = SecureMultiplicationClient(**kwargs)
 
@@ -477,10 +477,10 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         return ret
 
 
-class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
+class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
     def __init__(self, block_sizes, dummy_relu=False, **kwargs):
         SecureModule.__init__(self, **kwargs)
-        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.secure_DReLU = PRFFetcherDReLU(**kwargs)
         self.secure_mult = PRFFetcherMultiplication(**kwargs)
 
@@ -496,7 +496,7 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
         if self.dummy_relu:
             return backend.zeros_like(activation)
 
-        activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
+        activation = SecureOptimizedBlockReLU.forward(self, activation)
         activation = backend.astype(activation, SIGNED_DTYPE)
 
         return activation

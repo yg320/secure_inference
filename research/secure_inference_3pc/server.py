@@ -13,7 +13,7 @@ from research.secure_inference_3pc.resnet_converter import get_secure_model, ini
 from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.server import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
 
-from research.bReLU import NumpySecureOptimizedBlockReLU
+from research.bReLU import SecureOptimizedBlockReLU
 
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet

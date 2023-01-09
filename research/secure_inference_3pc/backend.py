@@ -3,6 +3,9 @@ import numpy as np
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8, torch.bool:torch.bool, torch.int32:torch.int32, torch.int64:torch.int64}
 torch_dtype_converted = {torch.int32: np.int32, torch.int64: np.int64, torch.int8:np.int8, torch.bool:np.bool, np.int32:np.int32, np.int64:np.int64, np.int8:np.int8, np.bool:np.bool, None:None}
+
+# TODO: make repeat a more generic function
+
 class NumpyBackend:
     def __init__(self):
         self.int8 = np.int8
@@ -75,10 +78,23 @@ class NumpyBackend:
         size = sum(data.shape[i] for i in axis)
         return np.sum(data, axis=axis, keepdims=keepdims) // size
 
+    def sum(self, data, axis, keepdims=False):
+        out = np.sum(data, axis=axis, keepdims=keepdims)
+        return out
+
     def ones_like(self, data):
         return np.ones_like(data)
+
     def zeros_like(self, data):
         return np.zeros_like(data)
+
+    def repeat(self, data, repeats):
+        # TODO: add axis
+        return data.repeat(repeats, axis=-1)
+
+    def permute(self, data, order):
+        return data.transpose(order)
+
 class TorchBackend:
     def __init__(self):
         self.int8 = torch.int8
@@ -144,13 +160,13 @@ class TorchBackend:
         assert (self.numpy_backend.cumsum(data.numpy(), axis, out) == out.numpy()).all()
         return out
 
-
     def right_shift(self, data, shift):
         if type(shift) is int:
 
             return torch.from_numpy(data.numpy() >> shift)
         else:
             return torch.from_numpy(data.numpy() >> shift.numpy())
+
     def flip(self, data, axis):
 
         out = torch.flip(data, dims=(axis,))
@@ -175,7 +191,7 @@ class TorchBackend:
     def pad(self, data, pad, mode='constant', value=0):
         assert pad[0][0] == 0 and pad[0][1] == 0
         assert pad[1][0] == 0 and pad[1][1] == 0
-        out = torch.nn.functional.pad(data, [pad[2][0], pad[2][1], pad[3][0], pad[3][1]], mode=mode, value=value)
+        out = torch.nn.functional.pad(data, [pad[3][0], pad[3][1], pad[2][0], pad[2][1]], mode=mode, value=value)
         assert (self.numpy_backend.pad(data.numpy(), pad, mode=mode) == out.numpy()).all()
         return out
 
@@ -190,6 +206,10 @@ class TorchBackend:
         assert np.abs(self.numpy_backend.mean(data.numpy(), axis, keepdims) - out.numpy()).max() <= 1
         return out
 
+    def sum(self, data, axis, keepdims=False):
+        out = torch.sum(data, dim=axis, keepdim=keepdims)
+        return out
+
     def ones_like(self, data):
         out = torch.ones_like(data)
         assert (self.numpy_backend.ones_like(data.numpy()) == out.numpy()).all()
@@ -200,6 +220,11 @@ class TorchBackend:
         assert (self.numpy_backend.zeros_like(data.numpy()) == out.numpy()).all()
         return out
 
+    def repeat(self, data, repeats):
+        return data.repeat((1, 1, 1, 1, repeats))
+
+    def permute(self, data, order):
+        return data.permute(order)
 if IS_TORCH_BACKEND:
     backend = TorchBackend()
 else:

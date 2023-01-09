@@ -10,7 +10,7 @@ from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
-from research.bReLU import NumpySecureOptimizedBlockReLU
+from research.bReLU import SecureOptimizedBlockReLU
 
 
 class SecureConv2DServer(SecureModule):
@@ -252,10 +252,10 @@ class SecureReLUServer(SecureModule):
             return ret
 
 
-class SecureBlockReLUServer(SecureModule, NumpySecureOptimizedBlockReLU):
+class SecureBlockReLUServer(SecureModule, SecureOptimizedBlockReLU):
     def __init__(self, block_sizes,  dummy_relu=False, **kwargs):
         SecureModule.__init__(self, **kwargs)
-        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.DReLU = SecureDReLUServer(**kwargs)
         self.mult = SecureMultiplicationServer(**kwargs)
 
@@ -470,10 +470,10 @@ class PRFFetcherMaxPool(PRFFetcherModule):
 
         return ret
 
-class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
+class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
     def __init__(self, block_sizes, dummy_relu=False,  **kwargs):
         SecureModule.__init__(self,  **kwargs)
-        NumpySecureOptimizedBlockReLU.__init__(self, block_sizes)
+        SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.secure_DReLU = PRFFetcherDReLU( **kwargs)
         self.secure_mult = PRFFetcherMultiplication( **kwargs)
 
@@ -489,7 +489,7 @@ class PRFFetcherBlockReLU(SecureModule, NumpySecureOptimizedBlockReLU):
         if self.dummy_relu:
             return torch.zeros_like(activation)
 
-        activation = NumpySecureOptimizedBlockReLU.forward(self, activation)
+        activation = SecureOptimizedBlockReLU.forward(self, activation)
         activation = backend.astype(activation, SIGNED_DTYPE)
 
         return activation
