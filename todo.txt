@@ -1,7 +1,12 @@
 - Leetcode, Algo1, tabs
 
 ============================================= Following days =============================================
+- Alpha maxpool 1 - alpha avg pool
+- itertaive sub channels (with multiple training)
 - !!!!!!!!!!!!!!!!!!!!!! Ask about Thesis course !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+- Make forward_fetch and forward_regular
+- Try https://github.com/tensorly/tensorly
+- make dummy in base class
 - Options!
 - Agnostic backend (Transfer everything to Pytorch with GPU (Careful with small tensors)
 - Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
@@ -17,7 +22,8 @@
 - Final Seg/Clss results
 - Method & Intro (freestyle talk on our research. vision oriented), use FALCON.
 - CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
-
+- efficient CUDA r_shift
+- Mod %67
 ============================================= Research Major =============================================
 - Benchmark ops
 - Should FC and GAP be part of distortion?
@@ -25,7 +31,10 @@
 - Use blocksize [1,0] or discard!
 - Float16? uint8?
 - Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
-
+- ablation finetuning
+- Don't put back on CPU
+- Dmei Avt
+- Use eagerpy
 - ImageNet classification - compare with Porthos
 - Explore 32bits, use trunc and understand when things go wrong
 - Consider what is best, torch or numpy - avoid converting between them.
@@ -36,6 +45,9 @@
 - Unfairness!
 
 ============================================= Implementation Major =============================================
+- CUDA is able to perform integer operations, conv2d is not available due to cudnn. Maybe we can use matrix multiplication instead? Or any other solution.
+- Modulo 67
+- out = out // self.trunc? or just shift? (out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE))
 - Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
 - Use newer torch version with inplace << and bit_wise and
 - Instead of TRUNC, consider less <<
@@ -100,6 +112,7 @@
 - QAT
 
 ============================================= Implementation Minor =============================================
+- what about this piece of code??! - assert not backend.any(r == backend.iinfo(r.dtype).max):  # HERE (In PrivateCompareClient)
 - Can we add more LUTs?
 - Can we convert more ops into inplace ones?
 - Understand the += issue
