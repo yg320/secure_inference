@@ -57,12 +57,15 @@ class PrivateCompareCryptoProvider(SecureModule):
     def forward(self):
         d_bits_0 = self.network_assets.receiver_02.get()
         d_bits_1 = self.network_assets.receiver_12.get()
-
-        d = (d_bits_0 + d_bits_1) % P
-
-        # d = module_67(backend.add(d_bits_0, d_bits_1, out=d_bits_0))
+        d = backend.add(d_bits_0, d_bits_1, out=d_bits_0)
+        d = d % P
         beta_p = backend.astype((d == 0).any(axis=-1), SIGNED_DTYPE)
 
+        # is_zero = backend.equal(d, 0, out=d)
+        # beta_p = backend.astype(is_zero.any(axis=-1), SIGNED_DTYPE)
+        #
+        # # beta_p = backend.any(is_zero, axis=-1, out=is_zero[..., 0])
+        # # assert False
         return beta_p
 
 
@@ -75,21 +78,20 @@ class ShareConvertCryptoProvider(SecureModule):
     def forward(self, size):
         a_tild_0 = self.network_assets.receiver_02.get()
         a_tild_1 = self.network_assets.receiver_12.get()
-
         x = backend.add(a_tild_0, a_tild_1, out=a_tild_1)
 
         x_bits = self.decompose(x)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS,), dtype=backend.int8)
         x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
+        self.network_assets.sender_12.put(backend.astype(x_bits_1, backend.int8))
 
-        delta = backend.astype((0 < a_tild_0 - x), SIGNED_DTYPE)
+        diff = backend.subtract(a_tild_0, x, out=a_tild_0)
+        delta = backend.greater(diff, 0, out=diff)
 
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         delta_0 = self.sub_mode_L_minus_one(delta, delta_1)
-
         self.network_assets.sender_02.put(delta_0)
-        self.network_assets.sender_12.put(backend.astype(x_bits_1, backend.int8))
 
         eta_p = self.private_compare()
 

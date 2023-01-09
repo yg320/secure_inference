@@ -104,6 +104,14 @@ class NumpyBackend:
         ret[ret < 0] += P
         return ret
 
+    def greater(self, x, y, out=None):
+        return np.greater(x, y, out=out)
+
+    def equal(self, x, y, out=None):
+        return np.equal(x, y, out=out)
+
+    def any(self, x, axis=None, out=None):
+        return np.any(x, axis=axis, out=out)
 
 class TorchBackend:
     def __init__(self):
@@ -237,6 +245,17 @@ class TorchBackend:
         ret = self.subtract(x, y, out=x)
         ret[ret < 0] += P
         return ret
+
+    def greater(self, x, y, out=None):
+        return torch.gt(x, y, out=out)
+
+    def equal(self, x, y, out=None):
+        return torch.eq(x, y, out=out)
+
+    def any(self, x, axis=None, out=None):
+        r = x.to(torch.bool)
+        out[:] = torch.any(r, dim=axis, out=r)
+        return out
 
 if IS_TORCH_BACKEND:
     backend = TorchBackend()

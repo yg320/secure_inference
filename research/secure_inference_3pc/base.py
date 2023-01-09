@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 19931
-        self.port_10 = 19932
-        self.port_02 = 19933
-        self.port_20 = 19934
-        self.port_12 = 19935
-        self.port_21 = 19936
+        self.port_01 = 19961
+        self.port_10 = 19962
+        self.port_02 = 19963
+        self.port_20 = 19964
+        self.port_12 = 19965
+        self.port_21 = 19966
 
 
 class NetworkAssets:

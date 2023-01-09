@@ -2,6 +2,7 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS
 import torch
 import numpy as np
 from research.secure_inference_3pc.backend import backend
+from research.secure_inference_3pc.timer import timer
 
 
 class SecureModule(torch.nn.Module):
@@ -47,6 +48,7 @@ class Decompose(SecureModule):
         end = None if self.ignore_msb_bits == 0 else -self.ignore_msb_bits
         self.powers = backend.put_on_device(backend.flip(self.powers, axis=-1)[:, NUM_BITS - self.num_of_compare_bits:end], self.device)
 
+    @timer("decompose")
     def forward(self, value):
         orig_shape = list(value.shape)
         value = value.reshape(-1, 1)
