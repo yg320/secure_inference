@@ -1,8 +1,5 @@
 from research.secure_inference_3pc.backend import backend
 
-import torch
-
-
 from research.secure_inference_3pc.modules.base import PRFFetcherModule
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS
@@ -43,12 +40,9 @@ class SecureConv2DServer(SecureModule):
 
         A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
-        # print('===========')
-        # print(int(X_share.sum()))
-        # print(int(A_share.sum()))
+
         E_share = backend.subtract(X_share, A_share, out=A_share)
         F_share = backend.subtract(self.W_share, B_share, out=B_share)
-        # print(int(E_share.sum()))
 
         self.network_assets.sender_01.put(backend.concatenate([E_share.reshape(-1), F_share.reshape(-1)]))
         share_client = self.network_assets.receiver_01.get()
@@ -70,10 +64,8 @@ class SecureConv2DServer(SecureModule):
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         out = backend.add(out, C_share, out=out)
-        out = out // self.trunc  # TODO:
-        # This is the proper way, but it's slower and takes more time
-        # t = out.dtype
-        # out = (out / self.trunc).round().astype(t)
+        out = backend.right_shift(out, 16)
+
         if self.bias is not None:
             out = backend.add(out, self.bias, out=out)
 
@@ -233,6 +225,7 @@ class SecureDReLUServer(SecureModule):
 
 
 class SecureReLUServer(SecureModule):
+    # index = 0
     def __init__(self, dummy_relu=False,  **kwargs):
         super(SecureReLUServer, self).__init__( **kwargs)
 
@@ -243,8 +236,8 @@ class SecureReLUServer(SecureModule):
     def forward(self, X_share):
         if self.dummy_relu:
             share_client = self.network_assets.receiver_01.get()
-            value = share_client + X_share
-            value = value * (backend.astype(value > 0, value.dtype))
+            recon = share_client + X_share
+            value = recon * (backend.astype(recon > 0, recon.dtype))
             return value
         else:
 

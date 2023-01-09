@@ -145,6 +145,12 @@ class TorchBackend:
         return out
 
 
+    def right_shift(self, data, shift):
+        if type(shift) is int:
+
+            return torch.from_numpy(data.numpy() >> shift)
+        else:
+            return torch.from_numpy(data.numpy() >> shift.numpy())
     def flip(self, data, axis):
 
         out = torch.flip(data, dims=(axis,))

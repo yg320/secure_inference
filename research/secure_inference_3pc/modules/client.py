@@ -57,7 +57,10 @@ class SecureConv2DClient(SecureModule):
             out += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
 
         out = backend.add(out, C_share, out=out)
-        out = out // self.trunc
+        # out = out // self.trunc
+        out = backend.right_shift(out, 16)
+
+        # out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE)
         # TODO: This is the proper way, but it's slower and takes more time
         #  t = out_numpy.dtype
         #  out = (out_numpy / self.trunc).round().astype(t)
