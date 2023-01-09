@@ -5,7 +5,7 @@ import torch
 from research.secure_inference_3pc.backend import backend
 
 
-from research.secure_inference_3pc.base import P, sub_mode_p
+from research.secure_inference_3pc.base import P
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -81,7 +81,7 @@ class ShareConvertCryptoProvider(SecureModule):
         x_bits = self.decompose(x)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
-        x_bits_1 = sub_mode_p(x_bits, x_bits_0)
+        x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
 
         delta = backend.astype((0 < a_tild_0 - x), SIGNED_DTYPE)
 
@@ -137,7 +137,7 @@ class SecureMSBCryptoProvider(SecureModule):
         x_bits = self.decompose(x)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
-        x_bits_1 = sub_mode_p(x_bits, x_bits_0)
+        x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
 
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_0 = self.sub_mode_L_minus_one(x, x_1)

@@ -122,18 +122,12 @@ org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, ba
 
 def module_67(xxx):
     # TODO: fix this
-    return xxx % 67
+    # return xxx % 67
+
     orig_shape = xxx.shape
     xxx = xxx.reshape(-1)
     backend.subtract(xxx, min_org_shit, out=xxx)
     return org_shit[backend.astype(xxx, SIGNED_DTYPE)].reshape(orig_shape)
-
-def sub_mode_p(x, y):
-    mask = y > x
-    ret = x - y
-    ret_2 = x + (P - y)
-    ret[mask] = ret_2[mask]
-    return ret
 
 
 def fuse_conv_bn(conv_module, batch_norm_module):
@@ -215,45 +209,6 @@ def get_c_party_0(x_bits, multiplexer_bits, beta):
 
     return w_cumsum
 
-
-def get_c_party_0_torch(x_bits, multiplexer_bits, beta):
-
-    beta = beta.unsqueeze(-1)
-    beta = 2 * beta  # Not allowed to change beta inplace
-    torch.sub(beta, 1, out=beta)
-    torch.mul(multiplexer_bits, x_bits, out=multiplexer_bits)
-    torch.mul(multiplexer_bits, -2, out=multiplexer_bits)
-    torch.add(multiplexer_bits, x_bits, out=multiplexer_bits)
-
-    w_cumsum = multiplexer_bits.to(torch.int32)
-    torch.cumsum(w_cumsum, dim=-1, out=w_cumsum)
-    torch.sub(w_cumsum, multiplexer_bits, out=w_cumsum)
-    torch.mul(x_bits, beta, out=x_bits)
-    torch.add(w_cumsum, x_bits, out=w_cumsum)
-
-    return w_cumsum
-
-def get_c_party_1_torch(x_bits, multiplexer_bits, beta):
-    beta = beta.unsqueeze(-1)
-    beta = -2 * beta  # Not allowed to change beta inplace
-    torch.add(beta, 1, out=beta)
-
-    w = multiplexer_bits * x_bits
-    torch.mul(w, -2, out=w)
-    torch.add(w, x_bits, out=w)
-    torch.add(w, multiplexer_bits, out=w)
-
-    w_cumsum = w.to(torch.int32)
-    torch.cumsum(w_cumsum, dim=-1, out=w_cumsum)
-    torch.sub(w_cumsum, w, out=w_cumsum)
-
-    torch.sub(multiplexer_bits, x_bits, out=multiplexer_bits)
-    torch.mul(multiplexer_bits, beta, out=multiplexer_bits)
-    torch.add(multiplexer_bits, 1, out=multiplexer_bits)
-    torch.add(w_cumsum, multiplexer_bits, out=w_cumsum)
-
-    return w_cumsum
-
 def get_c_party_1(x_bits, multiplexer_bits, beta):
     beta = backend.unsqueeze(beta, -1)
     beta = -2 * beta  # Not allowed to change beta inplace
@@ -276,23 +231,23 @@ def get_c_party_1(x_bits, multiplexer_bits, beta):
     return w_cumsum
 
 
-def get_c(x_bits, multiplexer_bits, beta, j):
-    beta = beta[..., backend.newaxis]
-    w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
-    w_cumsum = w.astype(backend.int32)
-    backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-    backend.subtract(w_cumsum, w, out=w_cumsum)
-    rrr = w_cumsum
-    zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
-    ret = rrr + zzz.astype(backend.int32)
-
-    return ret
-
-
-def get_c_case_2(u, j):
-    c = (P + 1 - j) * (u + 1) + (P-j) * u
-    c[..., 0] = u[...,0] * (P-1) ** j
-    return c % P
+# def get_c(x_bits, multiplexer_bits, beta, j):
+#     beta = beta[..., backend.newaxis]
+#     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
+#     w_cumsum = w.astype(backend.int32)
+#     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+#     backend.subtract(w_cumsum, w, out=w_cumsum)
+#     rrr = w_cumsum
+#     zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
+#     ret = rrr + zzz.astype(backend.int32)
+#
+#     return ret
+#
+#
+# def get_c_case_2(u, j):
+#     c = (P + 1 - j) * (u + 1) + (P-j) * u
+#     c[..., 0] = u[...,0] * (P-1) ** j
+#     return c % P
 
 
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND

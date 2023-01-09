@@ -98,6 +98,13 @@ class NumpyBackend:
     def put_on_device(self, data, device):
         assert device == "cpu"
         return data
+
+    def subtract_module(self, x, y, P):
+        ret = self.subtract(x, y, out=x)
+        ret[ret < 0] += P
+        return ret
+
+
 class TorchBackend:
     def __init__(self):
         self.int8 = torch.int8
@@ -225,6 +232,12 @@ class TorchBackend:
 
     def put_on_device(self, data, device):
         return data.to(device)
+
+    def subtract_module(self, x, y, P):
+        ret = self.subtract(x, y, out=x)
+        ret[ret < 0] += P
+        return ret
+
 if IS_TORCH_BACKEND:
     backend = TorchBackend()
 else:
