@@ -45,13 +45,13 @@ class Decompose(SecureModule):
         self.num_of_compare_bits = num_of_compare_bits
         self.powers = backend.unsqueeze(backend.arange(NUM_BITS, dtype=dtype), 0)
         end = None if self.ignore_msb_bits == 0 else -self.ignore_msb_bits
-        self.powers = backend.put_on_device(backend.flip(self.powers, axis=-1)[:, NUM_BITS - self.num_of_compare_bits - self.ignore_msb_bits:end], self.device)
+        self.powers = backend.put_on_device(backend.flip(self.powers, axis=-1)[:, NUM_BITS - self.num_of_compare_bits:end], self.device)
 
     def forward(self, value):
         orig_shape = list(value.shape)
         value = value.reshape(-1, 1)
         r_shift = value >> self.powers
-        value_bits = backend.zeros(shape=(value.shape[0], self.num_of_compare_bits), dtype=backend.int8)
+        value_bits = backend.zeros(shape=(value.shape[0], self.num_of_compare_bits - self.ignore_msb_bits), dtype=backend.int8)
         value_bits = backend.bitwise_and(r_shift, 1, out=value_bits)  # TODO: backend.int8(1) instead of 1
-        ret = value_bits.reshape(orig_shape + [self.num_of_compare_bits])
+        ret = value_bits.reshape(orig_shape + [self.num_of_compare_bits - self.ignore_msb_bits])
         return ret

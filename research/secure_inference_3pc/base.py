@@ -6,17 +6,17 @@ import time
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from numba import njit, prange
-from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
+from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE
 
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 19901
-        self.port_10 = 19902
-        self.port_02 = 19903
-        self.port_20 = 19904
-        self.port_12 = 19905
-        self.port_21 = 19906
+        self.port_01 = 19931
+        self.port_10 = 19932
+        self.port_02 = 19933
+        self.port_20 = 19934
+        self.port_12 = 19935
+        self.port_21 = 19936
 
 
 class NetworkAssets:

@@ -80,7 +80,7 @@ class ShareConvertCryptoProvider(SecureModule):
 
         x_bits = self.decompose(x)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS,), dtype=backend.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS,), dtype=backend.int8)
         x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
 
         delta = backend.astype((0 < a_tild_0 - x), SIGNED_DTYPE)
@@ -267,7 +267,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.private_compare = PRFFetcherPrivateCompare(**kwargs)
 
     def forward(self, dummy_tensor):
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(dummy_tensor.shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
         # self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
 
@@ -311,7 +311,7 @@ class PRFFetcherMSB(PRFFetcherModule):
         size = dummy_tensor.shape
         
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_OF_COMPARE_BITS], dtype=backend.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(size) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=size,dtype=SIGNED_DTYPE)
         self.private_compare(dummy_tensor)
