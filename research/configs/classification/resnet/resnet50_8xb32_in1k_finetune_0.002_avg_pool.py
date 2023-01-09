@@ -1,6 +1,6 @@
 _base_ = [
     '../_base_/models/resnet50_avg_pool.py', '../_base_/datasets/imagenet_bs32.py',
-    '../_base_/schedules/imagenet_bs256_finetune.py', '../_base_/default_runtime.py'
+    '../_base_/schedules/imagenet_bs256_finetune_0.002.py', '../_base_/default_runtime.py'
 ]
 
 relu_spec_file = None
