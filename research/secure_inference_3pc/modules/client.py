@@ -3,20 +3,20 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.base import decompose, get_c_party_0, P, module_67, get_assets, TypeConverter, decompose_torch_0, get_c_party_0_torch
+from research.secure_inference_3pc.base import get_c_party_0, P, module_67
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
 
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-
+from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.bReLU import SecureOptimizedBlockReLU
 
 
 class SecureConv2DClient(SecureModule):
 
-    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+    def __init__(self, W_shape, stride, dilation, padding, groups, **kwargs):
         super(SecureConv2DClient, self).__init__(**kwargs)
 
         self.W_shape = W_shape
@@ -24,8 +24,7 @@ class SecureConv2DClient(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
-        self.conv2d_handler = Conv2DHandler("cuda:0")
-        self.device = device
+        self.conv2d_handler = Conv2DHandler(self.device)
 
     def forward(self, X_share):
         self.W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
@@ -68,12 +67,13 @@ class SecureConv2DClient(SecureModule):
 class PrivateCompareClient(SecureModule):
     def __init__(self, **kwargs):
         super(PrivateCompareClient, self).__init__(**kwargs)
+        self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, x_bits_0, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
         r[backend.astype(beta, backend.bool)] += 1
-        bits = decompose(r)
+        bits = self.decompose(r)
         c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
         backend.multiply(s, c_bits_0, out=s)
         d_bits_0 = module_67(s)
@@ -231,7 +231,7 @@ class SecureDReLUClient(SecureModule):
 
 
 class SecureReLUClient(SecureModule):
-    def __init__(self, dummy_relu=False, **kwargs, ):
+    def __init__(self, dummy_relu=False, **kwargs):
         super(SecureReLUClient, self).__init__(**kwargs)
 
         self.DReLU = SecureDReLUClient(**kwargs)
@@ -284,7 +284,7 @@ class SecureBlockReLUClient(SecureModule, SecureOptimizedBlockReLU):
 
 
 class PRFFetcherConv2D(PRFFetcherModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+    def __init__(self, W_shape, stride, dilation, padding, groups, **kwargs):
         super(PRFFetcherConv2D, self).__init__(**kwargs)
 
         self.W_shape = W_shape

@@ -38,10 +38,8 @@ class Conv2DHandler:
     def conv2d_torch_4_type_1(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
         kwargs = dict(stride=stride, padding=padding, dilation=dilation)
         if not IS_TORCH_BACKEND:
-            a = torch.from_numpy(a)
-            b = torch.from_numpy(b)
-        a = a.to(self.device)
-        b = b.to(self.device)
+            a = torch.from_numpy(a).to(self.device)
+            b = torch.from_numpy(b).to(self.device)
 
         x = (a & self.mask4_x) >> self.shift_x
         y = (b.unsqueeze(0) & self.mask4_y) >> self.shift_y
@@ -66,7 +64,7 @@ class Conv2DHandler:
         res_float += (torch.conv2d(x[:, :-13 * a.shape[1]], y[13*b.shape[0]:], **kwargs, groups=3).reshape(  3, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 8
         res_float += (torch.conv2d(x[:, :-14 * a.shape[1]], y[14*b.shape[0]:], **kwargs, groups=2).reshape(  2, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 4
 
-        return res_float.cpu().numpy()
+        return res_float
 
 
     def conv2d_torch_4(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
@@ -74,10 +72,8 @@ class Conv2DHandler:
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
         
         if not IS_TORCH_BACKEND:
-            a = torch.from_numpy(a)
-            b = torch.from_numpy(b)
-        a = a.to(self.device)
-        b = b.to(self.device)
+            a = torch.from_numpy(a).to(self.device)
+            b = torch.from_numpy(b).to(self.device)
 
         x0 = ((a & self.mask0_4) >> 0).to(dtype)
         x1 = ((a & self.mask1_4) >> 4).to(dtype)
@@ -269,16 +265,14 @@ class Conv2DHandler:
         res_float += (torch.conv2d(x14, y1, **kwargs).to(torch.int64) << 60)
         res_float += (torch.conv2d(x15, y0, **kwargs).to(torch.int64) << 60)
 
-        return res_float.cpu().numpy()
+        return res_float
 
     def conv2d_torch_8(self, a, b, stride, padding, dilation, groups, dtype):
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
 
         if not IS_TORCH_BACKEND:
-            a = torch.from_numpy(a)
-            b = torch.from_numpy(b)
-        a = a.to(self.device)
-        b = b.to(self.device)
+            a = torch.from_numpy(a).to(self.device)
+            b = torch.from_numpy(b).to(self.device)
 
         x0 = ((a & self.mask0_8) >> 0).to(dtype)
         x1 = ((a & self.mask1_8) >> 8).to(dtype)
@@ -347,7 +341,7 @@ class Conv2DHandler:
         res_float += (torch.conv2d(x6, y1, **kwargs).to(torch.int64) << 56)
         res_float += (torch.conv2d(x7, y0, **kwargs).to(torch.int64) << 56)
 
-        return res_float.cpu().numpy()
+        return res_float
 
     def conv2d(self, a, b, stride, padding, dilation, groups):
         num_mult = b.shape[1] * b.shape[2] * b.shape[3]
@@ -364,9 +358,9 @@ class Conv2DHandler:
             out = self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
 
         if IS_TORCH_BACKEND:
-            return torch.from_numpy(out)
-        else:
             return out
+        else:
+            return out.cpu().numpy()
     # def conv2d(self, a, b, stride, padding, dilation, groups):
     #     num_mult = b.shape[1] * b.shape[2] * b.shape[3]
     #

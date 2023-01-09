@@ -1,11 +1,11 @@
 from research.secure_inference_3pc.modules.base import PRFFetcherModule
-from research.secure_inference_3pc.const import  NUM_OF_COMPARE_BITS
+from research.secure_inference_3pc.const import  NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
 
 import torch
 from research.secure_inference_3pc.backend import backend
 
 
-from research.secure_inference_3pc.base import P, sub_mode_p, decompose
+from research.secure_inference_3pc.base import P, sub_mode_p
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -13,11 +13,12 @@ from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
+from research.secure_inference_3pc.modules.base import Decompose
 
 
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class SecureConv2DCryptoProvider(SecureModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+    def __init__(self, W_shape, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DCryptoProvider, self).__init__(**kwargs)
 
         self.W_shape = W_shape
@@ -26,8 +27,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.padding = padding
         self.groups = groups
 
-        self.conv2d_handler = Conv2DHandler("cuda:0")
-        self.device = device
+        self.conv2d_handler = Conv2DHandler(self.device)
 
     def forward(self, X_share):
 
@@ -70,6 +70,7 @@ class ShareConvertCryptoProvider(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertCryptoProvider, self).__init__(**kwargs)
         self.private_compare = PrivateCompareCryptoProvider(**kwargs)
+        self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, size):
         a_tild_0 = self.network_assets.receiver_02.get()
@@ -77,7 +78,7 @@ class ShareConvertCryptoProvider(SecureModule):
 
         x = (a_tild_0 + a_tild_1)
 
-        x_bits = decompose(x)
+        x_bits = self.decompose(x)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
@@ -128,11 +129,12 @@ class SecureMSBCryptoProvider(SecureModule):
         super(SecureMSBCryptoProvider, self).__init__(**kwargs)
         self.mult = SecureMultiplicationCryptoProvider(**kwargs)
         self.private_compare = PrivateCompareCryptoProvider(**kwargs)
+        self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, size):
         x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
 
-        x_bits = decompose(x)
+        x_bits = self.decompose(x)
 
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
         x_bits_1 = sub_mode_p(x_bits, x_bits_0)
@@ -234,7 +236,7 @@ class SecureMaxPoolCryptoProvider(SecureMaxPool):
 
 
 class PRFFetcherConv2D(PRFFetcherModule):
-    def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
+    def __init__(self, W_shape, stride, dilation, padding, groups, **kwargs):
         super(PRFFetcherConv2D, self).__init__(**kwargs)
 
         self.W_shape = W_shape

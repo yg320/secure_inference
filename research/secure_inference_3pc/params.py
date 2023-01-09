@@ -48,8 +48,10 @@ class Params:
     IMAGE_SHAPE = (1, 3, 224, 224)
 
     NUM_IMAGES = 1
-    DEVICE = "cuda"
+    CLIENT_DEVICE = "cpu" #"cuda:0"
+    SERVER_DEVICE = "cpu" #"cuda:1"
+    CRYPTO_PROVIDER_DEVICE = "cpu" #"cuda:0"
     DUMMY_RELU = False
     DUMMY_MAX_POOL = False
-    PRF_PREFETCH = False
+    PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

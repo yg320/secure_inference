@@ -2,31 +2,32 @@ from research.secure_inference_3pc.backend import backend
 
 from research.secure_inference_3pc.modules.base import PRFFetcherModule
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS
+from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
 
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.base import decompose, get_c_party_1, module_67, NetworkAssets, get_c_party_1_torch, decompose_torch_1
+from research.secure_inference_3pc.base import get_c_party_1, module_67
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.bReLU import SecureOptimizedBlockReLU
+from research.secure_inference_3pc.modules.base import Decompose
 
 
 class SecureConv2DServer(SecureModule):
-    def __init__(self, W, bias, stride, dilation, padding, groups, device="cpu", **kwargs):
+    def __init__(self, W, bias, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DServer, self).__init__(**kwargs)
 
-        self.W_plaintext = W
+        self.W_plaintext = backend.put_on_device(W, self.device)
         self.bias = bias
         if self.bias is not None:
             self.bias = backend.reshape(self.bias, [1, -1, 1, 1])
+            self.bias = backend.put_on_device(self.bias, self.device)
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
-        self.conv2d_handler = Conv2DHandler("cuda:1")
-        self.device = device
+        self.conv2d_handler = Conv2DHandler(self.device)
 
     def forward(self, X_share):
 
@@ -81,6 +82,7 @@ class SecureConv2DServer(SecureModule):
 class PrivateCompareServer(SecureModule):
     def __init__(self, **kwargs):
         super(PrivateCompareServer, self).__init__(**kwargs)
+        self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, x_bits_1, r, beta):
 
@@ -88,7 +90,7 @@ class PrivateCompareServer(SecureModule):
 
         r[backend.astype(beta, backend.bool)] += 1
 
-        bits = decompose(r)
+        bits = self.decompose(r)
 
         c_bits_1 = get_c_party_1(x_bits_1, bits, beta)
 

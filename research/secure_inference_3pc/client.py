@@ -61,9 +61,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
+def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False, **kwargs):
     relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUClient
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, **kwargs)
 
 
 class SecureModelClassification(SecureModule):
@@ -123,7 +123,7 @@ class SecureModelSegmentation(SecureModule):
         return seg_pred
 
 
-def full_inference_classification(cfg, model, num_images):
+def full_inference_classification(cfg, model, num_images, device):
     dataset = build_data(cfg, train=False)
     results_gt = []
     results_pred = []
@@ -133,7 +133,7 @@ def full_inference_classification(cfg, model, num_images):
                                             image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
     for sample_id in tqdm(range(num_images)):
         img = dataset[sample_id]['img'].data
-        img = img.reshape((1,) + img.shape)
+        img = backend.put_on_device(img.reshape((1,) + img.shape), device)
         gt = dataset.get_gt_labels()[sample_id]
 
         with Timer("Inference"):
@@ -192,7 +192,7 @@ if __name__ == "__main__":
     assert (Params.RELU_SPEC_FILE is None) or (Params.DUMMY_RELU is False)
     cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    crypto_assets, network_assets = get_assets(party, device=Params.CLIENT_DEVICE, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
@@ -209,6 +209,7 @@ if __name__ == "__main__":
             network_assets=network_assets,
             dummy_relu=Params.DUMMY_RELU,
             dummy_max_pool=Params.DUMMY_MAX_POOL,
+            device=Params.CLIENT_DEVICE,
         )
     else:
         prf_fetcher = None
@@ -228,7 +229,7 @@ if __name__ == "__main__":
         dummy_relu=Params.DUMMY_RELU,
         dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher,
-        device=Params.DEVICE
+        device=Params.CLIENT_DEVICE
     )
 
 
@@ -236,7 +237,7 @@ if __name__ == "__main__":
     if cfg.model.type == "EncoderDecoder":
         full_inference(cfg, model, Params.NUM_IMAGES)
     else:
-        full_inference_classification(cfg, model, Params.NUM_IMAGES)
+        full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE)
 
     network_assets.done()
 

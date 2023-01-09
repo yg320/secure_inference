@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 19391
-        self.port_10 = 19392
-        self.port_02 = 19393
-        self.port_20 = 19394
-        self.port_12 = 19395
-        self.port_21 = 19396
+        self.port_01 = 19851
+        self.port_10 = 19852
+        self.port_02 = 19853
+        self.port_20 = 19854
+        self.port_12 = 19855
+        self.port_21 = 19856
 
 
 class NetworkAssets:
@@ -51,13 +51,13 @@ class NetworkAssets:
             self.sender_01.put(None)
 
 
-def get_assets(party, repeat, simulated_bandwidth=None):
+def get_assets(party, device, simulated_bandwidth=None):
 
     addresses = Addresses()
 
     if party == 0:
         crypto_assets = MultiPartyPRFHandler(
-            party=0, seeds={
+            party=0, device=device, seeds={
                 (CLIENT, SERVER): 0,
                 (CLIENT, CRYPTO_PROVIDER): 1,
                 # (SERVER, CRYPTO_PROVIDER): None,
@@ -69,14 +69,14 @@ def get_assets(party, repeat, simulated_bandwidth=None):
             sender_01=Sender(addresses.port_01, simulated_bandwidth=simulated_bandwidth),
             sender_02=Sender(addresses.port_02, simulated_bandwidth=simulated_bandwidth),
             sender_12=None,
-            receiver_01=Receiver(addresses.port_10),
-            receiver_02=Receiver(addresses.port_20),
+            receiver_01=Receiver(addresses.port_10, device=device),
+            receiver_02=Receiver(addresses.port_20, device=device),
             receiver_12=None
         )
 
     if party == 1:
         crypto_assets = MultiPartyPRFHandler(
-            party=1, seeds={
+            party=1, device=device, seeds={
                 (CLIENT, SERVER): 0,
                 # (CLIENT, CRYPTO_PROVIDER): None,
                 (SERVER, CRYPTO_PROVIDER): 2,
@@ -88,14 +88,14 @@ def get_assets(party, repeat, simulated_bandwidth=None):
             sender_01=Sender(addresses.port_10, simulated_bandwidth=simulated_bandwidth),
             sender_02=None,
             sender_12=Sender(addresses.port_12, simulated_bandwidth=simulated_bandwidth),
-            receiver_01=Receiver(addresses.port_01),
+            receiver_01=Receiver(addresses.port_01, device=device),
             receiver_02=None,
-            receiver_12=Receiver(addresses.port_21),
+            receiver_12=Receiver(addresses.port_21, device=device),
         )
 
     if party == 2:
         crypto_assets = MultiPartyPRFHandler(
-            party=2, seeds={
+            party=2, device=device, seeds={
                 # (CLIENT, SERVER): None,
                 (CLIENT, CRYPTO_PROVIDER): 1,
                 (SERVER, CRYPTO_PROVIDER): 2,
@@ -109,18 +109,11 @@ def get_assets(party, repeat, simulated_bandwidth=None):
             sender_02=Sender(addresses.port_20, simulated_bandwidth=simulated_bandwidth),
             sender_12=Sender(addresses.port_21, simulated_bandwidth=simulated_bandwidth),
             receiver_01=None,
-            receiver_02=Receiver(addresses.port_02),
-            receiver_12=Receiver(addresses.port_12),
+            receiver_02=Receiver(addresses.port_02, device=device),
+            receiver_12=Receiver(addresses.port_12, device=device),
         )
 
     return crypto_assets, network_assets
-
-powers = backend.flip(backend.unsqueeze(backend.arange(NUM_BITS, dtype=SIGNED_DTYPE), 0), axis=-1)
-
-
-# powers_torch_cuda_0 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:0")
-# powers_torch_cuda_1 = torch.from_numpy(powers.astype(backend.int64)).to("cuda:1")
-
 
 min_org_shit = -283206
 max_org_shit = 287469
@@ -133,38 +126,6 @@ def module_67(xxx):
     xxx = xxx.reshape(-1)
     backend.subtract(xxx, min_org_shit, out=xxx)
     return org_shit[backend.astype(xxx, SIGNED_DTYPE)].reshape(orig_shape)
-
-def decompose(value):
-    orig_shape = list(value.shape)
-    value = value.reshape(-1, 1)
-    end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
-    r_shift = value >> powers[:, NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
-    value_bits = backend.zeros(shape=(value.shape[0], NUM_OF_COMPARE_BITS), dtype=backend.int8)
-    value_bits = backend.bitwise_and(r_shift, 1, out=value_bits)  # TODO: backend.int8(1) instead of 1
-    ret = value_bits.reshape(orig_shape + [NUM_OF_COMPARE_BITS])
-    return ret
-
-def decompose_torch_0(value):
-    orig_shape = list(value.shape)
-    value = value.reshape(-1, 1)
-    end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
-
-    r_shift = value >> powers_torch_cuda_0[:,NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
-    value_bits = r_shift & 1
-
-    ret = value_bits.to(torch.int8).reshape(orig_shape + [NUM_OF_COMPARE_BITS])
-    return ret
-
-def decompose_torch_1(value):
-    orig_shape = list(value.shape)
-    value = value.reshape(-1, 1)
-    end = None if IGNORE_MSB_BITS == 0 else -IGNORE_MSB_BITS
-
-    r_shift = value >> powers_torch_cuda_1[:,NUM_BITS - NUM_OF_COMPARE_BITS-IGNORE_MSB_BITS:end]
-    value_bits = r_shift & 1
-
-    ret = value_bits.to(torch.int8).reshape(orig_shape + [NUM_OF_COMPARE_BITS])
-    return ret
 
 def sub_mode_p(x, y):
     mask = y > x

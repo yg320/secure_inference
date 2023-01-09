@@ -13,13 +13,14 @@ from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 
 class Receiver(Thread):
-    def __init__(self, port):
+    def __init__(self, port, device):
         super(Receiver, self).__init__()
         self.numpy_arr_queue = queue.Queue(maxsize=NUMPY_ARR_QUEUE_SIZE)
         self.port = port
 
         self.lock = threading.Lock()
         self.stop_running = False
+        self.device = device
 
     def run(self):
 
@@ -38,7 +39,7 @@ class Receiver(Thread):
     def get(self):
         arr = self.numpy_arr_queue.get()
         if IS_TORCH_BACKEND:
-            return torch.from_numpy(arr)
+            return torch.from_numpy(arr).to(self.device)
         else:
             return arr
 

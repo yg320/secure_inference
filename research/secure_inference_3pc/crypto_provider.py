@@ -83,7 +83,7 @@ if __name__ == "__main__":
     party = 2
     cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    crypto_assets, network_assets = get_assets(party, device=Params.CRYPTO_PROVIDER_DEVICE, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
@@ -99,7 +99,9 @@ if __name__ == "__main__":
             crypto_assets=crypto_assets,
             network_assets=network_assets,
             dummy_relu=Params.DUMMY_RELU,
-            dummy_max_pool=Params.DUMMY_MAX_POOL)
+            dummy_max_pool=Params.DUMMY_MAX_POOL,
+            device=Params.CRYPTO_PROVIDER_DEVICE
+        )
     else:
         prf_fetcher = None
 
@@ -118,7 +120,7 @@ if __name__ == "__main__":
         dummy_relu=Params.DUMMY_RELU,
         dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher,
-        device=Params.DEVICE
+        device=Params.CRYPTO_PROVIDER_DEVICE
 
     )
     if model.prf_fetcher:

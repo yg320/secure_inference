@@ -3,7 +3,7 @@ import mmcv
 from research.secure_inference_3pc.backend import backend
 
 
-from research.secure_inference_3pc.base import fuse_conv_bn, decompose, get_c_party_1, module_67,  get_assets, TypeConverter, NetworkAssets, get_c_party_1_torch, decompose_torch_1
+from research.secure_inference_3pc.base import fuse_conv_bn,  get_assets, TypeConverter
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
@@ -73,9 +73,9 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
     )
 
 
-def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False):
+def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy_relu=False, **kwargs):
     relu_class = PRFFetcherReLU if is_prf_fetcher else SecureReLUServer
-    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=is_prf_fetcher)
+    return relu_class(crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=is_prf_fetcher, **kwargs)
 
 
 
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     party = 1
     cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, repeat=Params.NUM_IMAGES, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    crypto_assets, network_assets = get_assets(party, device=Params.SERVER_DEVICE, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
@@ -131,7 +131,9 @@ if __name__ == "__main__":
             crypto_assets=crypto_assets,
             network_assets=network_assets,
             dummy_relu=Params.DUMMY_RELU,
-            dummy_max_pool=Params.DUMMY_MAX_POOL)
+            dummy_max_pool=Params.DUMMY_MAX_POOL,
+            device=Params.SERVER_DEVICE,
+        )
     else:
         prf_fetcher = None
 
@@ -150,7 +152,7 @@ if __name__ == "__main__":
         dummy_relu=Params.DUMMY_RELU,
         dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher,
-        device=Params.DEVICE
+        device=Params.SERVER_DEVICE
 
     )
     if model.prf_fetcher:

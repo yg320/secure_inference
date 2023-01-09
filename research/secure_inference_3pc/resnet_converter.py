@@ -134,11 +134,11 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
-    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
-    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool)
-    block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, device=device)
+    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool, device=device)
+    block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, device=device)
 
-    secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets)
+    secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
 
     model = get_model(
         config=cfg,
@@ -167,15 +167,15 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     return ret
 
 
-def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool):
-    assert device == "cpu"
-    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
-    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
-    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True)
+def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool, device):
 
-    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool, is_prf_fetcher=True)
-    secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True)
-    prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True)
+    build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, device=device)
+    build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, device=device)
+    build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True, device=device)
+
+    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool, is_prf_fetcher=True, device=device)
+    secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True, device=device)
+    prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, device=device)
 
     prf_fetcher_model = get_model(
         config=Params.SECURE_CONFIG_PATH,
@@ -195,7 +195,6 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
         dummy_relu=dummy_relu,
         block_relu=secure_block_relu,
         relu_spec_file=relu_spec_file)
-
 
     if relu_spec_file:
         secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)
