@@ -5,7 +5,7 @@ import torch
 from research.secure_inference_3pc.backend import backend
 
 
-from research.secure_inference_3pc.base import P
+from research.secure_inference_3pc.base import P, module_67
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -16,7 +16,6 @@ from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
 
 
-# TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 class SecureConv2DCryptoProvider(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DCryptoProvider, self).__init__(**kwargs)
@@ -31,7 +30,6 @@ class SecureConv2DCryptoProvider(SecureModule):
 
     def forward(self, X_share):
 
-        # TODO: intergers should be called without all of these arguments
         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -61,6 +59,8 @@ class PrivateCompareCryptoProvider(SecureModule):
         d_bits_1 = self.network_assets.receiver_12.get()
 
         d = (d_bits_0 + d_bits_1) % P
+
+        # d = module_67(backend.add(d_bits_0, d_bits_1, out=d_bits_0))
         beta_p = backend.astype((d == 0).any(axis=-1), SIGNED_DTYPE)
 
         return beta_p
@@ -76,11 +76,11 @@ class ShareConvertCryptoProvider(SecureModule):
         a_tild_0 = self.network_assets.receiver_02.get()
         a_tild_1 = self.network_assets.receiver_12.get()
 
-        x = (a_tild_0 + a_tild_1)
+        x = backend.add(a_tild_0, a_tild_1, out=a_tild_1)
 
         x_bits = self.decompose(x)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=x_bits.shape, dtype=backend.int8)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS,), dtype=backend.int8)
         x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
 
         delta = backend.astype((0 < a_tild_0 - x), SIGNED_DTYPE)
@@ -90,10 +90,6 @@ class ShareConvertCryptoProvider(SecureModule):
 
         self.network_assets.sender_02.put(delta_0)
         self.network_assets.sender_12.put(backend.astype(x_bits_1, backend.int8))
-
-        # r = self.network_assets.receiver_12.get()
-        # eta_p = self.network_assets.receiver_12.get()
-        # eta_p = eta_p ^ (x > r)
 
         eta_p = self.private_compare()
 

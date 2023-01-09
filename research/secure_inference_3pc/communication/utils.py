@@ -1,6 +1,7 @@
 import threading
 
 from research.secure_inference_3pc.communication.numpy_socket.numpysocket.numpysocket import NumpySocket
+from research.secure_inference_3pc.timer import timer
 import time
 from threading import Thread
 import torch
@@ -38,6 +39,7 @@ class Receiver(Thread):
                     frame = torch.from_numpy(frame).to(self.device)  # NUMPY_CONVERSION
                 self.numpy_arr_queue.put(frame)
 
+    @timer("receiver - get")
     def get(self):
         arr = self.numpy_arr_queue.get()
         return arr

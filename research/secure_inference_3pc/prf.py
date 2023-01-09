@@ -1,10 +1,9 @@
 import numpy as np
 import torch
-from research.secure_inference_3pc.timer import Timer
 from threading import Thread
 import queue
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
-from research.secure_inference_3pc.timer import Timer
+from research.secure_inference_3pc.timer import timer
 # TODO: https://towardsdatascience.com/six-levels-of-python-decorators-1f12c9067b23
 # dtype_converted = {
 #     np.int8: torch.int8,
@@ -47,6 +46,7 @@ class PRFWrapper:
             out = torch.from_numpy(out).to(self.device)# NUMPY_CONVERSION
         self.queue.put(out)
 
+    @timer("integers")
     def integers(self, low, high, size, dtype):
         if self.fetch:
             # with Timer("Integers - fetch"):

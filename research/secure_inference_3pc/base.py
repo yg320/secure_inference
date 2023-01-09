@@ -121,13 +121,14 @@ org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, ba
 
 
 def module_67(xxx):
+    if IS_TORCH_BACKEND:
     # TODO: fix this
-    # return xxx % 67
-
-    orig_shape = xxx.shape
-    xxx = xxx.reshape(-1)
-    backend.subtract(xxx, min_org_shit, out=xxx)
-    return org_shit[backend.astype(xxx, SIGNED_DTYPE)].reshape(orig_shape)
+        return xxx % 67
+    else:
+        orig_shape = xxx.shape
+        xxx = xxx.reshape(-1)
+        backend.subtract(xxx, min_org_shit, out=xxx)
+        return org_shit[backend.astype(xxx, SIGNED_DTYPE)].reshape(orig_shape)
 
 
 def fuse_conv_bn(conv_module, batch_norm_module):
