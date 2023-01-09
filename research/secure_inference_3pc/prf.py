@@ -43,7 +43,8 @@ class PRFWrapper:
 
     def integers_fetch(self, low, high, size, dtype):
         out = self.prf.integers(low=low, high=high, size=size, dtype=dtype_converted[dtype])
-        # print("fetch:", low, high, size, dtype)
+        if IS_TORCH_BACKEND:
+            out = torch.from_numpy(out).to(self.device)# NUMPY_CONVERSION
         self.queue.put(out)
 
     def integers(self, low, high, size, dtype):
@@ -52,14 +53,13 @@ class PRFWrapper:
             ret = self.queue.get()
             assert ret.shape == tuple(size), f"{ret.shape} , {tuple(size)}"
             assert dtype_converted[ret.dtype] == dtype_converted[dtype], f"{ret.dtype} , {dtype}"
-            if IS_TORCH_BACKEND:
-                ret = torch.from_numpy(ret).to(self.device)
+
             return ret
         else:
             out = self.prf.integers(low=low, high=high, size=size, dtype=dtype_converted[dtype])
 
             if IS_TORCH_BACKEND:
-                out = torch.from_numpy(out).to(self.device)
+                out = torch.from_numpy(out).to(self.device)  # NUMPY_CONVERSION
             return out
 
     def permutation(self, data, axis):

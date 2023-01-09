@@ -23,7 +23,6 @@ class SecureModule(torch.nn.Module):
     def sub_mode_L_minus_one(self, a, b):
         ret = a - b
         ret[backend.unsigned_gt(b, a)] -= 1
-        # a.numpy().astype(np.uint64, copy=False) > b.numpy().astype(np.uint64, copy=False)
         return ret
 
     # def forward(self):

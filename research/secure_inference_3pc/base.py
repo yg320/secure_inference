@@ -11,12 +11,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 19851
-        self.port_10 = 19852
-        self.port_02 = 19853
-        self.port_20 = 19854
-        self.port_12 = 19855
-        self.port_21 = 19856
+        self.port_01 = 19901
+        self.port_10 = 19902
+        self.port_02 = 19903
+        self.port_20 = 19904
+        self.port_12 = 19905
+        self.port_21 = 19906
 
 
 class NetworkAssets:
@@ -121,6 +121,7 @@ org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, ba
 
 
 def module_67(xxx):
+    # TODO: fix this
     return xxx % 67
     orig_shape = xxx.shape
     xxx = xxx.reshape(-1)
@@ -306,16 +307,16 @@ class TypeConverter:
             if IS_TORCH_BACKEND:
                 return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype))
             else:
-                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
+                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()  # NUMPY_CONVERSION
 
         else:
             if IS_TORCH_BACKEND:
                 return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype))
             else:
-                return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()
+                return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()  # NUMPY_CONVERSION
     @staticmethod
     def i2f(data):
         if IS_TORCH_BACKEND:
             return (data.to(TypeConverter.float_dtype) / TypeConverter.trunc)
         else:
-            return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc
+            return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc  # NUMPY_CONVERSION

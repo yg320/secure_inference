@@ -7,6 +7,7 @@ from typing import Callable, ClassVar, Dict, Optional
 class TimerError(Exception):
     """A custom exception used to report errors in use of Timer class"""
 #TODO: should be like :@Timer("ShareConvertClient")
+
 @dataclass
 class Timer:
     timers: ClassVar[Dict[str, float]] = {}
@@ -41,8 +42,8 @@ class Timer:
         if self.name:
             self.timers[self.name] += elapsed_time
 
-        if self.logger:
-            self.logger(self.name + " " + self.text.format(elapsed_time, self.timers[self.name]))
+        # if self.logger:
+        #     self.logger(self.name + " " + self.text.format(elapsed_time, self.timers[self.name]))
         return elapsed_time
 
     def __enter__(self):
@@ -54,12 +55,18 @@ class Timer:
         """Stop the context manager timer"""
         self.stop()
 
-if __name__ == "__main__":
 
-    with Timer("HHH"):
-        time.sleep(0.7)
+def timer(name):
+    def inner_timer(func):
+        def wrapper(*args, **kwargs):
+            with Timer(name):
+                return func(*args, **kwargs)
+        return wrapper
+    return inner_timer
+#
+def print_timers():
+    for name, elapsed in Timer.timers.items():
+        print(f"{name} Elapsed time: {elapsed:0.4f} seconds")
 
-    with Timer("dsr"):
-        time.sleep(0.7)
-
-    print(Timer.timers)
+import atexit
+atexit.register(print_timers)

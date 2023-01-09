@@ -7,7 +7,7 @@ from research.secure_inference_3pc.base import get_c_party_0, P, module_67
 from research.secure_inference_3pc.conv2d import conv_2d
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
-
+from research.secure_inference_3pc.timer import timer
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
@@ -26,6 +26,7 @@ class SecureConv2DClient(SecureModule):
         self.groups = groups
         self.conv2d_handler = Conv2DHandler(self.device)
 
+    @timer("SecureConv2DClient")
     def forward(self, X_share):
         self.W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
                                                                  high=MAX_VAL,
@@ -69,6 +70,7 @@ class PrivateCompareClient(SecureModule):
         super(PrivateCompareClient, self).__init__(**kwargs)
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
+    @timer("PrivateCompareClient")
     def forward(self, x_bits_0, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
@@ -90,6 +92,7 @@ class ShareConvertClient(SecureModule):
         super(ShareConvertClient, self).__init__(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
+    @timer("ShareConvertClient")
     def forward(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
@@ -129,10 +132,8 @@ class SecureMultiplicationClient(SecureModule):
     def __init__(self, **kwargs):
         super(SecureMultiplicationClient, self).__init__(**kwargs)
 
+    @timer("SecureMultiplicationClient")
     def forward(self, X_share, Y_share):
-        return self.forward_(X_share, Y_share)
-
-    def forward_(self, X_share, Y_share):
 
         A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -177,10 +178,8 @@ class SecureMSBClient(SecureModule):
         self.mult = SecureMultiplicationClient(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
+    @timer("SecureMSBClient")
     def forward(self, a_0):
-        return self.forward_(a_0)
-
-    def forward_(self, a_0):
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
 
@@ -220,6 +219,7 @@ class SecureDReLUClient(SecureModule):
         self.share_convert = ShareConvertClient(**kwargs)
         self.msb = SecureMSBClient(**kwargs)
 
+    @timer("SecureDReLUClient")
     def forward(self, X_share):
 
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -238,10 +238,8 @@ class SecureReLUClient(SecureModule):
         self.mult = SecureMultiplicationClient(**kwargs)
         self.dummy_relu = dummy_relu
 
+    @timer("SecureReLUClient")
     def forward(self, X_share):
-        return self.forward_(X_share)
-
-    def forward_(self, X_share):
         if self.dummy_relu:
             self.network_assets.sender_01.put(X_share)
             return backend.zeros_like(X_share)
@@ -282,6 +280,9 @@ class SecureBlockReLUClient(SecureModule, SecureOptimizedBlockReLU):
         self.DReLU = SecureDReLUClient(**kwargs)
         self.mult = SecureMultiplicationClient(**kwargs)
 
+    @timer("SecureBlockReLUClient")
+    def forward(self, activation):
+        return SecureOptimizedBlockReLU.forward(self, activation)
 
 class PRFFetcherConv2D(PRFFetcherModule):
     def __init__(self, W_shape, stride, dilation, padding, groups, **kwargs):

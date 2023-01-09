@@ -241,5 +241,5 @@ if __name__ == "__main__":
 
     network_assets.done()
 
-    print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
-    print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)
+    # print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
+    # print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)

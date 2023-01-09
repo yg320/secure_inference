@@ -28,8 +28,11 @@
 #     DUMMY_RELU = False
 #     PRF_PREFETCH = False
 #     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second
-
-
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
+if IS_TORCH_BACKEND:
+    DEVICE = "cuda"
+else:
+    DEVICE = "cpu"
 class Params:
     # SECURE_CONFIG_PATH = "/home/yakir/Data2/old_work_dirs/m-v2_256x256_ade20k/baseline/baseline_secure.py"
     # MODEL_PATH = "/home/yakir/Data2/old_work_dirs/m-v2_256x256_ade20k/baseline/iter_160000.pth"
@@ -48,10 +51,10 @@ class Params:
     IMAGE_SHAPE = (1, 3, 224, 224)
 
     NUM_IMAGES = 1
-    CLIENT_DEVICE = "cpu" #"cuda:0"
-    SERVER_DEVICE = "cpu" #"cuda:1"
-    CRYPTO_PROVIDER_DEVICE = "cpu" #"cuda:0"
+    CLIENT_DEVICE = {"cuda":"cuda:0", "cpu":"cpu"}[DEVICE]
+    SERVER_DEVICE = {"cuda":"cuda:1", "cpu":"cpu"}[DEVICE]
+    CRYPTO_PROVIDER_DEVICE = {"cuda":"cuda:0", "cpu":"cpu"}[DEVICE]
     DUMMY_RELU = False
-    DUMMY_MAX_POOL = False
+    DUMMY_MAX_POOL = True
     PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

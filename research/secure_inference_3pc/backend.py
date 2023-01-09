@@ -163,11 +163,15 @@ class TorchBackend:
         return out
 
     def right_shift(self, data, shift, out=None):
-        device = data.device
-        if type(shift) is int:
-            return torch.from_numpy(data.cpu().numpy() >> shift).to(device)
-        else:
-            return torch.from_numpy(data.cpu().numpy() >> shift.cpu().numpy()).to(device)
+        # TODO: is there a more efficient wat?
+        sign = data.sign()
+        shifted = data.abs() >> shift
+        out = self.multiply(sign, shifted, out=shifted)
+        sign = self.subtract(sign, 1, out=sign)
+        sign = sign // 2
+        out = self.add(out, sign, out=out)
+        return out
+
 
     def flip(self, data, axis):
 

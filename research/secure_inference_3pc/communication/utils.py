@@ -34,14 +34,13 @@ class Receiver(Thread):
                 conn.sendall(np.array([]))
                 if len(frame) == 0:
                     return
+                if IS_TORCH_BACKEND:
+                    frame = torch.from_numpy(frame).to(self.device)  # NUMPY_CONVERSION
                 self.numpy_arr_queue.put(frame)
 
     def get(self):
         arr = self.numpy_arr_queue.get()
-        if IS_TORCH_BACKEND:
-            return torch.from_numpy(arr).to(self.device)
-        else:
-            return arr
+        return arr
 
 
 class Sender(Thread):
@@ -74,7 +73,7 @@ class Sender(Thread):
                     s.close()
                     break
                 if type(data) == torch.Tensor:
-                    data = data.numpy()
+                    data = data.cpu().numpy()  # NUMPY_CONVERSION
 
                 arr_size_bytes = data.size * data.itemsize
                 assert arr_size_bytes >= 64
@@ -96,9 +95,7 @@ class Sender(Thread):
     def put(self, arr):
         # TODO: why is this copy needed (related to the monster threading bug)
         if arr is not None:
-            if IS_TORCH_BACKEND:
-                arr = arr.cpu().numpy()
-            else:
+            if not IS_TORCH_BACKEND:
                 arr = arr.copy()
         self.numpy_arr_queue.put(arr)
 

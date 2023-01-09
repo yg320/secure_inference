@@ -13,6 +13,7 @@ from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER,
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import Decompose
 
+import torch
 
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups,  **kwargs):
