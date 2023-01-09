@@ -53,8 +53,8 @@ class NumpyBackend:
         else:
             return np.expand_dims(data, axis=axis)
 
-    def right_shift(self, data, shift):
-        return data >> shift
+    def right_shift(self, data, shift, out=None):
+        return np.right_shift(data, shift, out=out)
 
     def bitwise_and(self, x, y, out=None):
         return np.bitwise_and(x, y, out=out)
@@ -160,9 +160,9 @@ class TorchBackend:
         assert (self.numpy_backend.cumsum(data.numpy(), axis, out) == out.numpy()).all()
         return out
 
-    def right_shift(self, data, shift):
-        if type(shift) is int:
+    def right_shift(self, data, shift, out=None):
 
+        if type(shift) is int:
             return torch.from_numpy(data.numpy() >> shift)
         else:
             return torch.from_numpy(data.numpy() >> shift.numpy())

@@ -14,7 +14,6 @@ from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.bReLU import SecureOptimizedBlockReLU
 
 
-
 class SecureConv2DClient(SecureModule):
 
     def __init__(self, W_shape, stride, dilation, padding, groups, device="cpu", **kwargs):
@@ -28,11 +27,11 @@ class SecureConv2DClient(SecureModule):
         self.conv2d_handler = Conv2DHandler("cuda:0")
         self.device = device
 
-    def forward_(self, X_share):
+    def forward(self, X_share):
         self.W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
-                                                              high=MAX_VAL,
-                                                              size=self.W_shape,
-                                                              dtype=SIGNED_DTYPE)
+                                                                 high=MAX_VAL,
+                                                                 size=self.W_shape,
+                                                                 dtype=SIGNED_DTYPE)
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
 
@@ -57,36 +56,21 @@ class SecureConv2DClient(SecureModule):
             out += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
 
         out = backend.add(out, C_share, out=out)
-        # out = out // self.trunc
-        out = backend.right_shift(out, 16)
+        out = backend.right_shift(out, 16, out=out)
 
-        # out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE)
-        # TODO: This is the proper way, but it's slower and takes more time
-        #  t = out_numpy.dtype
-        #  out = (out_numpy / self.trunc).round().astype(t)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         out = backend.add(out, mu_0, out=out)
 
         return out
 
-    def forward(self, X_share):
-        # with Timer("SecureConv2DClient"):
-        return self.forward_(X_share)
 
 class PrivateCompareClient(SecureModule):
     def __init__(self, **kwargs):
         super(PrivateCompareClient, self).__init__(**kwargs)
 
     def forward(self, x_bits_0, r, beta):
-        # with Timer("PrivateCompareClient"):
-        return self.forward_(x_bits_0, r, beta)
 
-    def forward_(self, x_bits_0, r, beta):
-        # TODO: what about this piece of code??!
-        # print(r.dtype)
-        # if backend.any(r == backend.iinfo(r.dtype).max):  # HERE
-        #     assert False
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
         r[backend.astype(beta, backend.bool)] += 1
         bits = decompose(r)
@@ -107,14 +91,11 @@ class ShareConvertClient(SecureModule):
         self.private_compare = PrivateCompareClient(**kwargs)
 
     def forward(self, a_0):
-        return self.forward_(a_0)
-
-    def forward_(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
-        # alpha = backend.greater_than(r_0 - r, 0)
+
         alpha = backend.astype(0 < r_0 - r, SIGNED_DTYPE)
 
         a_tild_0 = a_0 + r_0

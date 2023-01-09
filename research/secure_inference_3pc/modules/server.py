@@ -30,9 +30,12 @@ class SecureConv2DServer(SecureModule):
 
     def forward(self, X_share):
 
-        W_client = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, size=self.W_plaintext.shape, dtype=SIGNED_DTYPE)
+        W_client = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
+                                                             high=MAX_VAL,
+                                                             size=self.W_plaintext.shape,
+                                                             dtype=SIGNED_DTYPE)
 
-        self.W_share = self.W_plaintext - W_client
+        self.W_share = backend.subtract(self.W_plaintext, W_client, out=W_client)
 
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
@@ -64,7 +67,7 @@ class SecureConv2DServer(SecureModule):
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         out = backend.add(out, C_share, out=out)
-        out = backend.right_shift(out, 16)
+        out = backend.right_shift(out, 16, out=out)
 
         if self.bias is not None:
             out = backend.add(out, self.bias, out=out)
