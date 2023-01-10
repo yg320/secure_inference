@@ -310,7 +310,6 @@ class PRFFetcherConv2D(PRFFetcherModule):
     def forward(self, X_share):
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         out_shape = get_output_shape(X_share, self.W_shape, self.padding, self.dilation, self.stride)
-        # print(f"PRFFetcherConv2D - {X_share.shape}, {self.W_share.shape}, {out_shape}")
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=X_share.dtype)
@@ -450,14 +449,14 @@ class PRFFetcherMaxPool(PRFFetcherModule):
 
         x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
         x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
-                      x[:, :, 0:-1:2, 1:-1:2],
-                      x[:, :, 0:-1:2, 2::2],
-                      x[:, :, 1:-1:2, 0:-1:2],
-                      x[:, :, 1:-1:2, 1:-1:2],
-                      x[:, :, 1:-1:2, 2::2],
-                      x[:, :, 2::2, 0:-1:2],
-                      x[:, :, 2::2, 1:-1:2],
-                      x[:, :, 2::2, 2::2]])
+                           x[:, :, 0:-1:2, 1:-1:2],
+                           x[:, :, 0:-1:2, 2::2],
+                           x[:, :, 1:-1:2, 0:-1:2],
+                           x[:, :, 1:-1:2, 1:-1:2],
+                           x[:, :, 1:-1:2, 2::2],
+                           x[:, :, 2::2, 0:-1:2],
+                           x[:, :, 2::2, 1:-1:2],
+                           x[:, :, 2::2, 2::2]])
 
         out_shape = x.shape[1:]
         x = x.reshape((x.shape[0], -1))

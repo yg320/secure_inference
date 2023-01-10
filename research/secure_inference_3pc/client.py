@@ -21,7 +21,7 @@ from research.pipeline.backbones.secure_resnet import AvgPoolResNet
 from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
-
+from research.secure_inference_3pc.timer import timer
 def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
     shape = tuple(conv_module.weight.shape) + (1, 1)
@@ -70,6 +70,8 @@ class SecureModelClassification(SecureModule):
     def __init__(self, model,  **kwargs):
         super(SecureModelClassification, self).__init__(**kwargs)
         self.model = model
+
+    @timer("Inference")
     def forward(self, img):
         I = TypeConverter.f2i(img)
         I1 = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
@@ -135,10 +137,7 @@ def full_inference_classification(cfg, model, num_images, device):
         img = dataset[sample_id]['img'].data
         img = backend.put_on_device(img.reshape((1,) + img.shape), device)
         gt = dataset.get_gt_labels()[sample_id]
-
-        with Timer("Inference"):
-            out = model(img)
-    #     # gt = dataset.gt_labels[sample_id]
+        out = model(img)
         results_gt.append(gt)
         results_pred.append(out)
     print((backend.array(results_gt) == backend.array(results_pred)).mean())

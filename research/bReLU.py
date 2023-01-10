@@ -92,7 +92,7 @@ class PadHandler:
         return x[:, :, self.pad_x_l:x.shape[2] - self.pad_x_r, self.pad_y_l:x.shape[3] - self.pad_y_r]
 
 
-
+from research.secure_inference_3pc.timer import timer
 class SecureOptimizedBlockReLU(Module):
 
     def __init__(self, block_sizes):
@@ -103,10 +103,9 @@ class SecureOptimizedBlockReLU(Module):
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
         self.pad_handler_class = PadHandler
 
-    def forward(self, activation):
-        # TODO: fuse with next layer
-        if np.all(self.block_sizes == [0, 1]):
-            return activation
+    @timer("prep")
+    def prep(self, activation):
+
         reshaped_inputs = []
         mean_tensors = []
         channels = []
@@ -129,17 +128,29 @@ class SecureOptimizedBlockReLU(Module):
 
         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = backend.concatenate(mean_tensors)
+        return mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers
 
-        sign_tensors = self.DReLU(mean_tensors)
-
-        relu_map = backend.ones_like(activation)  # TODO: here
+    @timer("post")
+    def post(self, activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers):
+        relu_map = backend.ones_like(activation)
         for i in range(len(self.active_block_sizes)):
             sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
             repeats = reshaped_inputs[i].shape[-1]
             tensor = backend.repeat(sign_tensor, repeats)
 
             relu_map[:, channels[i]] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
+        return relu_map
 
+    @timer("bReLU")
+    def forward(self, activation):
+
+        if np.all(self.block_sizes == [0, 1]):
+            return activation
+        mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers = self.prep(activation)
+
+        sign_tensors = self.DReLU(mean_tensors)
+
+        relu_map = self.post(activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers)
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
         return activation
 

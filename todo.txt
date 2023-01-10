@@ -1,8 +1,10 @@
 - Leetcode, Algo1, tabs
 
 ============================================= Following days =============================================
-
-- !!!!!!!!!!!!!!!!!!!!!! Ask about Thesis course !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+- random - Have torch do that!
+- Timer - don't add prefetching!
+- Something is deeply wrong with prf prefetch! - It does too much work! and works with tensors instead of shapes!
+- prep block relu, post block relu, scalar/tensor mult
 - Finetune iterative (itertaive sub channels (with multiple training))
 - Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors)
 - Everybody is idle for a long period of time!
@@ -13,6 +15,7 @@
 - Instead of TRUNC, consider less << (Maybe slows down the process)
 
 ============================================= Research Major =============================================
+- Use loss as distortion measure
 - CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
 
 - Benchmark ops
@@ -115,6 +118,7 @@
 - MaxPool statistics
 
 ============================================= Implementation Minor =============================================
+- fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
 - - Try https://github.com/tensorly/tensorly
 - what about this piece of code??! - assert not backend.any(r == backend.iinfo(r.dtype).max):  # HERE (In PrivateCompareClient)
 - Can we add more LUTs?
