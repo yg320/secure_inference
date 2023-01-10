@@ -77,7 +77,7 @@ class PrivateCompareClient(SecureModule):
         r[backend.astype(beta, backend.bool)] += 1
         bits = self.decompose(r)
         c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
-        backend.multiply(s, c_bits_0, out=s)
+        s = backend.multiply(s, c_bits_0, out=s)
         d_bits_0 = module_67(s)
 
         d_bits_0 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_0, axis=-1)
@@ -91,6 +91,25 @@ class ShareConvertClient(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertClient, self).__init__(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
+
+    @timer("post_compare")
+    def post_compare(self, a_0, eta_pp, delta_0, alpha, beta_0, mu_0):
+        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
+        eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+        t0 = eta_pp * eta_p_0
+        t1 = self.add_mode_L_minus_one(t0, t0)
+        t2 = self.sub_mode_L_minus_one(eta_pp, t1)
+        eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
+
+        t0 = self.add_mode_L_minus_one(delta_0, eta_0)
+        t1 = self.sub_mode_L_minus_one(t0, backend.ones_like(t0))
+        t2 = self.sub_mode_L_minus_one(t1, alpha)
+        theta_0 = self.add_mode_L_minus_one(beta_0, t2)
+
+        y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
+        y_0 = self.add_mode_L_minus_one(y_0, mu_0)
+
+        return y_0
 
     @timer("ShareConvertClient")
     def forward(self, a_0):
@@ -110,27 +129,20 @@ class ShareConvertClient(SecureModule):
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
 
-        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
-        eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
-        t0 = eta_pp * eta_p_0
-        t1 = self.add_mode_L_minus_one(t0, t0)
-        t2 = self.sub_mode_L_minus_one(eta_pp, t1)
-        eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
-
-        t0 = self.add_mode_L_minus_one(delta_0, eta_0)
-        t1 = self.sub_mode_L_minus_one(t0, backend.ones_like(t0))
-        t2 = self.sub_mode_L_minus_one(t1, alpha)
-        theta_0 = self.add_mode_L_minus_one(beta_0, t2)
-
-        y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
-        y_0 = self.add_mode_L_minus_one(y_0, mu_0)
-
-        return y_0
+        return self.post_compare(a_0, eta_pp, delta_0, alpha, beta_0, mu_0)
 
 
 class SecureMultiplicationClient(SecureModule):
     def __init__(self, **kwargs):
         super(SecureMultiplicationClient, self).__init__(**kwargs)
+
+    @timer("SecureMultiplicationClient - exchange shares")
+    def exchange_shares(self, E_share, F_share):
+        E_share_server = self.network_assets.receiver_01.get()
+        self.network_assets.sender_01.put(E_share)
+        F_share_server = self.network_assets.receiver_01.get()
+        self.network_assets.sender_01.put(F_share)
+        return E_share_server, F_share_server
 
     @timer("SecureMultiplicationClient")
     def forward(self, X_share, Y_share):
@@ -142,10 +154,7 @@ class SecureMultiplicationClient(SecureModule):
         E_share = X_share - A_share
         F_share = Y_share - B_share
 
-        E_share_server = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(E_share)
-        F_share_server = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(F_share)
+        E_share_server, F_share_server = self.exchange_shares(E_share, F_share)
 
         E = E_share_server + E_share
         F = F_share_server + F_share
@@ -178,6 +187,20 @@ class SecureMSBClient(SecureModule):
         self.mult = SecureMultiplicationClient(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
+    @timer("SecureMSBClient - post_compare")
+    def post_compare(self, beta, x_bit_0_0, r_mode_2, mu_0):
+        beta = backend.astype(beta, SIGNED_DTYPE)
+        beta_p_0 = self.network_assets.receiver_02.get()
+
+        gamma_0 = beta_p_0 - (2 * beta * beta_p_0)
+        delta_0 = x_bit_0_0 - (2 * r_mode_2 * x_bit_0_0)
+
+        theta_0 = self.mult(gamma_0, delta_0)
+        alpha_0 = gamma_0 + delta_0 - 2 * theta_0
+        alpha_0 = alpha_0 + mu_0
+
+        return alpha_0
+
     @timer("SecureMSBClient")
     def forward(self, a_0):
 
@@ -199,17 +222,7 @@ class SecureMSBClient(SecureModule):
 
         self.private_compare(x_bits_0, r, beta)
 
-        beta = backend.astype(beta, SIGNED_DTYPE)
-        beta_p_0 = self.network_assets.receiver_02.get()
-
-        gamma_0 = beta_p_0 + (0 * beta) - (2 * beta * beta_p_0)
-        delta_0 = x_bit_0_0 - (2 * r_mode_2 * x_bit_0_0)
-
-        theta_0 = self.mult(gamma_0, delta_0)
-        alpha_0 = gamma_0 + delta_0 - 2 * theta_0
-        alpha_0 = alpha_0 + mu_0
-
-        return alpha_0
+        return self.post_compare(beta, x_bit_0_0, r_mode_2, mu_0)
 
 
 class SecureDReLUClient(SecureModule):

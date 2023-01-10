@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
+from research.secure_inference_3pc.timer import timer
 dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8, torch.bool:torch.bool, torch.int32:torch.int32, torch.int64:torch.int64}
 torch_dtype_converted = {torch.int32: np.int32, torch.int64: np.int64, torch.int8:np.int8, torch.bool:np.bool, np.int32:np.int32, np.int64:np.int64, np.int8:np.int8, np.bool:np.bool, None:None}
 
@@ -198,13 +199,14 @@ class TorchBackend:
         out = x & y
         return out
 
+    @timer("unsigned_gt")
     def unsigned_gt(self, a, b):
-        out = a > b
-        out[(a < 0) & (b >= 0)] = True
-        out[(a >= 0) & (b < 0)] = False
-
-        return out
-
+        # out = a > b
+        # out = torch.bitwise_xor(out, b > 0, out=out)
+        # out = torch.bitwise_xor(out, a > 0, out=out)
+        # return out
+        return (a > 0) ^ (b > 0) ^ (a > b)
+        #
     def pad(self, data, pad, mode='constant', value=0):
         assert pad[0][0] == 0 and pad[0][1] == 0
         assert pad[1][0] == 0 and pad[1][1] == 0
