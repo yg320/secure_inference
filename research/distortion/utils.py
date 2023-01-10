@@ -216,6 +216,39 @@ def get_channels_component(params, group=None, group_size=None, seed=123, shuffl
     else:
         return channels
 
+
+def get_channels_subset(seed, params, cur_iter, num_iters):
+    np.random.seed(seed)
+
+    layer_names = params.LAYER_NAMES
+    total_num_channels = get_num_of_channels(params)
+    channel_order_to_layer, channel_order_to_channel, _ = get_channel_order_statistics(params)
+
+    # TODO: remove these once assert is satisfied
+    total_num_channels_ = sum([params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in params.LAYER_NAMES])
+    channel_order_to_channel_ = np.hstack(
+        [np.arange(params.LAYER_NAME_TO_DIMS[layer_name][0]) for layer_name in layer_names])
+    channel_order_to_layer_ = np.hstack(
+        [[layer_name] * params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names])
+    assert total_num_channels == total_num_channels_
+    assert np.all(channel_order_to_channel == channel_order_to_channel_)
+    assert np.all(channel_order_to_layer == channel_order_to_layer_)
+
+    all_channels = np.arange(total_num_channels)
+    np.random.shuffle(all_channels)
+    channels_to_use = np.array_split(all_channels, num_iters)[cur_iter]
+
+    channels_to_run = {layer_name: [] for layer_name in params.LAYER_NAMES}
+    for channel_order in channels_to_use:
+        layer_name = channel_order_to_layer[channel_order]
+        channel_in_layer_index = channel_order_to_channel[channel_order]
+        channels_to_run[layer_name].append(channel_in_layer_index)
+
+    for layer_name in layer_names:
+        channels_to_run[layer_name].sort()
+
+    return channels_to_run
+
 #
 # def center_crop(tensor, size):
 #     if tensor.shape[1] < size or tensor.shape[2] < size:

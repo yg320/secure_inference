@@ -43,8 +43,8 @@ class SecureBottleneck(Bottleneck):
 
             if self.downsample is not None:
                 identity = self.downsample(x)
-
-            out += identity
+            assert False
+            out = out + identity
 
             return out
 
@@ -83,7 +83,7 @@ class SecureBasicBlock(BasicBlock):
             if self.downsample is not None:
                 identity = self.downsample(x)
 
-            out += identity
+            out = out + identity
 
             return out
 

@@ -5,6 +5,7 @@ __pycache__/
 outputs/
 mmlab_models/
 work_dirs/
-data/
+data
 relu_spec_files/
+.idea/
 *.py[cod]

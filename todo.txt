@@ -12,7 +12,6 @@
 - Inplace + optimize..
 - Instead of TRUNC, consider less << (Maybe slows down the process)
 
-
 ============================================= Research Major =============================================
 - CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
 
@@ -139,3 +138,21 @@
 - Implement get_c in Numba! (And maybe even other ops)
 - 2 GPUs 3 parties
 - benchmark on AWS
+
+
+
+
+
+
+
+
+
+
+
+
+
+Deep learning has made a great success in recent years (E.g., []). As a result, DLaaS has been extensively used in recent years (E.g., [refs]).
+However, in many domains, privacy concerns set a glass ceiling on its use. For example, in medical imaging, the privacy of patients is a major concern. In addition, in many other domains, such as autonomous driving, the privacy of the users is a major concern.
+In these domains, the data is sensitive and cannot be shared with the cloud. In addition, the data is often collected from many users,
+and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and
+

@@ -1,5 +1,5 @@
 import torch
-
+import numpy as np
 from mmseg.models.builder import HEADS
 from mmseg.models.decode_heads import ASPPHead
 
@@ -18,6 +18,11 @@ class SecureASPPHead(ASPPHead):
     def __init__(self, dilations=(1, 6, 12, 18), **kwargs):
         super(SecureASPPHead, self).__init__(dilations, **kwargs)
 
+    def cls_seg(self, feat):
+
+        output = self.conv_seg(feat)
+        return output
+
     def _forward_feature(self, inputs):
         """Forward function for feature maps before classifying each pixel with
         ``self.cls_seg`` fc.
@@ -30,10 +35,13 @@ class SecureASPPHead(ASPPHead):
                 H, W) which is feature map for last layer of decoder head.
         """
         x = self._transform_inputs(inputs)
+        assert False, "Go over this code "
+        tmp = self.image_pool(x)
         aspp_outs = [
-            self.image_pool(x).repeat(1, 1 ,*x.shape[2:])
+            tmp.repeat(x.shape[2], axis=2).repeat(x.shape[3], axis=3) # TODO: check if there is a better way to do this
         ]
         aspp_outs.extend(self.aspp_modules(x))
-        aspp_outs = torch.cat(aspp_outs, dim=1)
+        # aspp_outs = torch.cat(aspp_outs, dim=1)
+        aspp_outs = np.concatenate(aspp_outs, axis=1)
         feats = self.bottleneck(aspp_outs)
         return feats

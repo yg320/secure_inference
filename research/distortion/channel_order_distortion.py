@@ -9,7 +9,7 @@ import mmcv
 
 from research.distortion.parameters.factory import param_factory
 from research.distortion.distortion_utils import DistortionUtils
-
+from research.distortion.utils import get_channels_subset
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 
@@ -30,26 +30,11 @@ class ChannelDistortionHandler:
                                         batch_size: int,
                                         baseline_block_size_spec: Dict[str, np.array],
                                         seed: int,
-                                        num_channels_to_run: int):
+                                        cur_iter: int,
+                                        num_iters: int):
 
-        # TODO: there is already a function for this in distortion_utils.py
-        np.random.seed(seed)
-        total_num_channels = sum([self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in self.params.LAYER_NAMES])
-        channel_order_to_channel_in_layer_index = np.hstack([np.arange(self.params.LAYER_NAME_TO_DIMS[layer_name][0]) for layer_name in layer_names])
-        channel_order_to_layer = np.hstack([[layer_name] * self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in layer_names])
+        channels_to_run = get_channels_subset(seed=seed, params=self.params, cur_iter=cur_iter, num_iters=num_iters)
 
-        all_channels = np.arange(total_num_channels)
-        np.random.shuffle(all_channels)
-        channels_to_use = all_channels[:num_channels_to_run]
-
-        channels_to_run = {layer_name: [] for layer_name in self.params.LAYER_NAMES}
-        for channel_order in channels_to_use:
-            layer_name = channel_order_to_layer[channel_order]
-            channel_in_layer_index = channel_order_to_channel_in_layer_index[channel_order]
-            channels_to_run[layer_name].append(channel_in_layer_index)
-
-        for layer_name in layer_names:
-            channels_to_run[layer_name].sort()
         os.makedirs(self.output_path, exist_ok=True)
 
         for layer_name in layer_names:
@@ -71,9 +56,6 @@ class ChannelDistortionHandler:
 
             for channel in tqdm(channels_to_run[layer_name], desc=f"Batch={batch_index} Layer={layer_name}"):
                 for block_size_index, block_size in enumerate(block_sizes):
-                    # if layer_name == "decode_0":
-                    #     if np.prod(block_size) > 1:
-                    #         continue
 
                     orig_block_size = block_size_spec[layer_name][channel].copy()
                     block_size_spec[layer_name][channel] = block_size
@@ -106,6 +88,8 @@ if __name__ == "__main__":
     parser.add_argument('--block_size_spec_file_name', type=str, default=None)
     parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_4/channel_distortions")
     parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--cur_iter', type=int, default=1)
+    parser.add_argument('--num_iters', type=int, default=1)
 
     args = parser.parse_args()
 
@@ -135,4 +119,5 @@ if __name__ == "__main__":
                                         batch_size=args.batch_size,
                                         baseline_block_size_spec=baseline_block_size_spec,
                                         seed=123,
-                                        num_channels_to_run=sum([x[0] for x in params.LAYER_NAME_TO_DIMS.values()]))
+                                        cur_iter=args.cur_iter,
+                                        num_iters=args.num_iters)
