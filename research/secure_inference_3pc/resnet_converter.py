@@ -98,7 +98,7 @@ class SecureGlobalAveragePooling2d(nn.Module):
 
     # TODO: is this the best way to do this?)
     def forward(self, x):
-        return backend.mean(x, axis=(2, 3), keepdims=True)
+        return backend.mean(x, axis=(2, 3), keepdims=True, dtype=x.dtype)
 
 def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)

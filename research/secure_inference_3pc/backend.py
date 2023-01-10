@@ -75,9 +75,9 @@ class NumpyBackend:
     def stack(self, data, axis=0):
         return np.stack(data, axis=axis)
 
-    def mean(self, data, axis, keepdims=False):
+    def mean(self, data, axis, keepdims=False, dtype=None):
         size = sum(data.shape[i] for i in axis)
-        return np.sum(data, axis=axis, keepdims=keepdims) // size
+        return np.sum(data, axis=axis, keepdims=keepdims, dtype=dtype) // size
 
     def sum(self, data, axis, keepdims=False):
         out = np.sum(data, axis=axis, keepdims=keepdims)
@@ -217,13 +217,13 @@ class TorchBackend:
         out = torch.stack(data, dim=axis)
         return out
 
-    def mean(self, data, axis, keepdims=False):
+    def mean(self, data, axis, keepdims=False, dtype=None):
         size = sum(data.shape[i] for i in axis)
-        out = torch.sum(data, dim=axis, keepdim=keepdims) // size
+        out = torch.sum(data, dim=axis, keepdim=keepdims, dtype=dtype) // size
         return out
 
     def sum(self, data, axis, keepdims=False):
-        out = torch.sum(data, dim=axis, keepdim=keepdims)
+        out = torch.sum(data, dim=axis, keepdim=keepdims, dtype=data.dtype)
         return out
 
     def ones_like(self, data):

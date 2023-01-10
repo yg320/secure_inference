@@ -14,7 +14,7 @@ class SecureModule(torch.nn.Module):
         self.prf_handler = crypto_assets
         self.network_assets = network_assets
         self.device = device
-        self.trunc = TRUNC
+
 
     @timer("add_mode_L_minus_one")
     def add_mode_L_minus_one(self, a, b):

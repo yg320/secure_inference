@@ -15,7 +15,7 @@ from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
 
-
+import torch
 class SecureConv2DCryptoProvider(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DCryptoProvider, self).__init__(**kwargs)
@@ -42,6 +42,7 @@ class SecureConv2DCryptoProvider(SecureModule):
             C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
         else:
             C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+            # C = torch.conv2d(A.to("cpu"), B.to("cpu"), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).to(A.device)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
         C_share_0 = backend.subtract(C, C_share_1, out=C)
 
