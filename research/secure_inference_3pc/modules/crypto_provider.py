@@ -200,18 +200,28 @@ class SecureReLUCryptoProvider(SecureModule):
             self.mult(X_share.shape)
             return X_share.reshape(orig_shape)
 
-class SecureBlockReLUCryptoProvider(SecureModule, SecureOptimizedBlockReLU):
+class SecureBlockReLUCryptoProvider(SecureModule):
     def __init__(self, block_sizes, dummy_relu=False, **kwargs):
         SecureModule.__init__(self, **kwargs)
-        SecureOptimizedBlockReLU.__init__(self, block_sizes)
-        self.DReLU = SecureDReLUCryptoProvider(**kwargs)
+        self.secure_DReLU = SecureDReLUCryptoProvider(**kwargs)
         self.secure_mult = SecureMultiplicationCryptoProvider(**kwargs)
+        self.block_sizes = block_sizes
+        self.dummy_relu = dummy_relu
+        self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
 
-    def mult(self, x, y):
-        self.secure_mult(x.shape)
-        return x
+    def forward(self, activation):
+        shape = activation.shape
+        if self.dummy_relu:
+            return activation
 
+        if not np.all(self.block_sizes == [0, 1]):
+            mean_tensor_shape = (int(sum(np.ceil(shape[2] / block_size[0]) * np.ceil(shape[3] / block_size[1]) for block_size in self.block_sizes if 0 not in block_size)),)
+            mult_shape = shape[0], sum(~self.is_identity_channels), shape[2], shape[3]
 
+            self.secure_DReLU(torch.zeros(size=mean_tensor_shape))
+            self.secure_mult(mult_shape)
+
+        return activation
 
 class SecureSelectShareCryptoProvider(SecureModule):
     def __init__(self, **kwargs):

@@ -1,9 +1,15 @@
 - Leetcode, Algo1, tabs
 
 ============================================= Following days =============================================
-- random - Have torch do that!
+- https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
+- bReLU is too expensive
+    ** Start by bReLU in numba
+    ** Use Float32 based pooling
+    ** implement in C++ (and then training will be faster..)
+- https://pytorch.org/tutorials/advanced/cpp_extension.html
+- Have cryptoprovider work with shapes only!
+- random - Have torch do that! (Upgrade if needed)
 - Timer - don't add prefetching!
-- Something is deeply wrong with prf prefetch! - It does too much work! and works with tensors instead of shapes!
 - prep block relu, post block relu, scalar/tensor mult
 - Finetune iterative (itertaive sub channels (with multiple training))
 - Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors)
@@ -40,6 +46,8 @@
 - Unfairness!
 
 ============================================= Implementation Major =============================================
+- A more efficient bReLU (during training as well)
+- A symmetric bReLU
 - torch socket
 - efficient CUDA r_shift
 - Mod %67

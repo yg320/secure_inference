@@ -91,7 +91,6 @@ class PadHandler:
     def unpad(self, x):
         return x[:, :, self.pad_x_l:x.shape[2] - self.pad_x_r, self.pad_y_l:x.shape[3] - self.pad_y_r]
 
-
 from research.secure_inference_3pc.timer import timer
 class SecureOptimizedBlockReLU(Module):
 
@@ -100,45 +99,53 @@ class SecureOptimizedBlockReLU(Module):
         self.block_sizes = np.array(block_sizes)
 
         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
+        self.active_block_sizes_to_channels = [torch.where(torch.Tensor([bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]))[0] for block_size in self.active_block_sizes]
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
         self.pad_handler_class = PadHandler
 
+    def get_mean_and_padder(self, activation, index, mean_tensors, orig_shapes, pad_handlers):
+        cur_channels = self.active_block_sizes_to_channels[index]
+        block_size = self.active_block_sizes[index]
+        cur_input = activation[:, cur_channels]
+        padder = self.pad_handler_class(cur_input, block_size)
+        cur_input = padder.pad(cur_input)
+        reshaped_input = SpaceToDepth(block_size)(cur_input)
+        mean_tensor = backend.sum(reshaped_input, axis=-1, keepdims=True)
+        orig_shapes[index] = mean_tensor.shape
+        mean_tensors[index] = mean_tensor.flatten()
+        pad_handlers[index] = padder
+        return
+
     @timer("prep")
     def prep(self, activation):
+        thread_list = []
 
-        reshaped_inputs = []
-        mean_tensors = []
-        channels = []
-        orig_shapes = []
-        pad_handlers = []
+        mean_tensors = [None] * len(self.active_block_sizes)
+        orig_shapes = [None] * len(self.active_block_sizes)
+        pad_handlers = [None] * len(self.active_block_sizes)
 
-        for block_size in self.active_block_sizes:
-            cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
-            cur_input = activation[:, cur_channels]
-            padder = self.pad_handler_class(cur_input, block_size)
-            cur_input = padder.pad(cur_input)
-            reshaped_input = SpaceToDepth(block_size)(cur_input)
-            mean_tensor = backend.sum(reshaped_input, axis=-1, keepdims=True)
-
-            channels.append(cur_channels)
-            reshaped_inputs.append(reshaped_input)
-            orig_shapes.append(mean_tensor.shape)
-            mean_tensors.append(mean_tensor.flatten())
-            pad_handlers.append(padder)
+        for index, block_size in enumerate(self.active_block_sizes):
+            self.get_mean_and_padder(activation, index, mean_tensors, orig_shapes, pad_handlers)
+        #     thread = threading.Thread(target=self.get_mean_and_padder, args=(activation, index, mean_tensors, orig_shapes, pad_handlers))
+        #     thread_list.append(thread)
+        # for thread in thread_list:
+        #     thread.start()
+        # for thread in thread_list:
+        #     thread.join()
 
         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = backend.concatenate(mean_tensors)
-        return mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers
+        return mean_tensors, cumsum_shapes, orig_shapes, pad_handlers
 
     @timer("post")
-    def post(self, activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers):
+    def post(self, activation, sign_tensors, cumsum_shapes, orig_shapes,  pad_handlers):
         relu_map = backend.ones_like(activation)
-        for i in range(len(self.active_block_sizes)):
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
-            repeats = reshaped_inputs[i].shape[-1]
-            tensor = backend.repeat(sign_tensor, repeats)
+        for i, block_size in enumerate(self.active_block_sizes):
 
-            relu_map[:, channels[i]] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
+            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
+            tensor = backend.repeat(sign_tensor, block_size[0] * block_size[1])
+            cur_channels = self.active_block_sizes_to_channels[i]
+            relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
         return relu_map
 
     @timer("bReLU")
@@ -146,13 +153,76 @@ class SecureOptimizedBlockReLU(Module):
 
         if np.all(self.block_sizes == [0, 1]):
             return activation
-        mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers = self.prep(activation)
+        mean_tensors, cumsum_shapes, orig_shapes, pad_handlers = self.prep(activation)
 
         sign_tensors = self.DReLU(mean_tensors)
 
-        relu_map = self.post(activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers)
+        relu_map = self.post(activation, sign_tensors, cumsum_shapes, orig_shapes, pad_handlers)
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
         return activation
+#
+
+# from research.secure_inference_3pc.timer import timer
+# class SecureOptimizedBlockReLU(Module):
+#
+#     def __init__(self, block_sizes):
+#         super(SecureOptimizedBlockReLU, self).__init__()
+#         self.block_sizes = np.array(block_sizes)
+#
+#         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
+#         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
+#         self.pad_handler_class = PadHandler
+#
+#     @timer("prep")
+#     def prep(self, activation):
+#
+#         reshaped_inputs = []
+#         mean_tensors = []
+#         channels = []
+#         orig_shapes = []
+#         pad_handlers = []
+#
+#         for block_size in self.active_block_sizes:
+#             cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
+#             cur_input = activation[:, cur_channels]
+#             padder = self.pad_handler_class(cur_input, block_size)
+#             cur_input = padder.pad(cur_input)
+#             reshaped_input = SpaceToDepth(block_size)(cur_input)
+#             mean_tensor = backend.sum(reshaped_input, axis=-1, keepdims=True)
+#
+#             channels.append(cur_channels)
+#             reshaped_inputs.append(reshaped_input)
+#             orig_shapes.append(mean_tensor.shape)
+#             mean_tensors.append(mean_tensor.flatten())
+#             pad_handlers.append(padder)
+#
+#         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
+#         mean_tensors = backend.concatenate(mean_tensors)
+#         return mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers
+#
+#     @timer("post")
+#     def post(self, activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers):
+#         relu_map = backend.ones_like(activation)
+#         for i in range(len(self.active_block_sizes)):
+#             sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
+#             repeats = reshaped_inputs[i].shape[-1]
+#             tensor = backend.repeat(sign_tensor, repeats)
+#
+#             relu_map[:, channels[i]] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
+#         return relu_map
+#
+#     @timer("bReLU")
+#     def forward(self, activation):
+#
+#         if np.all(self.block_sizes == [0, 1]):
+#             return activation
+#         mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers = self.prep(activation)
+#
+#         sign_tensors = self.DReLU(mean_tensors)
+#
+#         relu_map = self.post(activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers)
+#         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
+#         return activation
 
 
 
