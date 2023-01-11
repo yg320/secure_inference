@@ -12,6 +12,7 @@ from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, TRUNC_BITS
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import Decompose
+from research.secure_inference_3pc.modules.base import DummyShapeTensor
 
 import torch
 import numpy as np
@@ -319,8 +320,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.dilation = dilation
         self.padding = padding
 
-    def forward(self, tensor):
-        shape = tensor.shape
+    def forward(self, shape):
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
 
@@ -331,7 +331,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=out_shape, dtype=SIGNED_DTYPE)
 
-        return backend.zeros(shape=out_shape, dtype=SIGNED_DTYPE)
+        return DummyShapeTensor(out_shape)
 
 
 class PRFFetcherPrivateCompare(PRFFetcherModule):
@@ -426,15 +426,14 @@ class PRFFetcherReLU(PRFFetcherModule):
         self.mult = PRFFetcherMultiplication(**kwargs)
         self.dummy_relu = dummy_relu
 
-    def forward(self, tensor):
+    def forward(self, shape):
         if not self.dummy_relu:
 
-            shape = tensor.shape
             self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
             self.DReLU((shape[0] * shape[1] * shape[2] * shape[3], ))
             self.mult((shape[0] * shape[1] * shape[2] * shape[3], ))
-        return tensor
+        return shape
 
 
 class PRFFetcherMaxPool(PRFFetcherModule):
@@ -446,9 +445,11 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         self.dReLU = PRFFetcherDReLU( **kwargs)
         self.mult = PRFFetcherMultiplication( **kwargs)
 
-    def forward(self, activation):
+    def forward(self, shape):
         if self.dummy_max_pool:
-            return activation[:, :, ::2, ::2]
+            print(shape, shape, shape)
+            return DummyShapeTensor((shape[0], shape[1], shape[2] // 2, shape[3] // 2))
+
         assert activation.shape[2] == 112
         assert activation.shape[3] == 112
 
@@ -485,8 +486,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
 
         self.dummy_relu = dummy_relu
 
-    def forward(self, tensor):
-        shape = tensor.shape
+    def forward(self, shape):
         if self.dummy_relu:
             return shape
 
@@ -497,7 +497,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
             self.secure_DReLU(mean_tensor_shape)
             self.secure_mult(mult_shape)
 
-        return tensor
+        return shape
 
 
 class PRFFetcherSecureModelSegmentation(SecureModule):
@@ -518,8 +518,8 @@ class PRFFetcherSecureModelClassification(SecureModule):
         self.model = model
 
     def forward(self, img):
-        shape = img.shape
+        shape = DummyShapeTensor(img.shape)
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=shape)
-        out = self.model.backbone(img)[0]
+        out = self.model.backbone(shape)[0]
         out = self.model.neck(out)
         out_0 = self.model.head.fc(out)

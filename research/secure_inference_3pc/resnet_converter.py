@@ -5,6 +5,7 @@ from research.distortion.arch_utils.factory import arch_utils_factory
 from functools import partial
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.backend import backend
+from research.secure_inference_3pc.modules.base import DummyShapeTensor
 
 def securify_resnet18_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=None, relu_spec_file=None):
     model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
@@ -100,7 +101,16 @@ class SecureGlobalAveragePooling2d(nn.Module):
     def forward(self, x):
         return backend.mean(x, axis=(2, 3), keepdims=True, dtype=x.dtype)
 
-def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+class PRFPrefetchSecureGlobalAveragePooling2d(nn.Module):
+    def __init__(self):
+        super(PRFPrefetchSecureGlobalAveragePooling2d, self).__init__()
+
+    # TODO: is this the best way to do this?)
+    def forward(self, x):
+        return DummyShapeTensor((x[0], x[1], 1, 1))
+
+
+def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
     model.backbone.bn1 = torch.nn.Identity()
     model.backbone.relu = build_secure_relu()
@@ -128,7 +138,10 @@ def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu,
 
     model.head.fc = build_secure_fully_connected(conv_module=model.head.fc, bn_module=None)
 
-    model.neck = SecureGlobalAveragePooling2d()
+    if prf_prefetch:
+        model.neck = PRFPrefetchSecureGlobalAveragePooling2d()
+    else:
+        model.neck = SecureGlobalAveragePooling2d()
 
 def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, max_pool, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, dummy_max_pool=False, prf_fetcher=None, device="cpu"):
 
@@ -194,7 +207,8 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
         network_assets=network_assets,
         dummy_relu=dummy_relu,
         block_relu=secure_block_relu,
-        relu_spec_file=relu_spec_file)
+        relu_spec_file=relu_spec_file,
+        prf_prefetch=True)
 
     if relu_spec_file:
         secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)

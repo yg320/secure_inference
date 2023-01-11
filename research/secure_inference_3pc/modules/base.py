@@ -70,3 +70,8 @@ class Decompose(SecureModule):
             value_bits = backend.bitwise_and(r_shift, 1, out=value_bits)  # TODO: backend.int8(1) instead of 1
         ret = value_bits.reshape(orig_shape + [self.num_of_compare_bits - self.ignore_msb_bits])
         return ret
+
+
+class DummyShapeTensor(tuple):
+    def __add__(self, other):
+        return self
