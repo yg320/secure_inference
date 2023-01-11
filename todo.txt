@@ -3,13 +3,13 @@
 ============================================= Following days =============================================
 - https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
 - bReLU is too expensive
+    ** Build dummy one - to understand by how much thing can be cheaper
     ** Start by bReLU in numba
-    ** Use Float32 based pooling
-    ** implement in C++ (and then training will be faster..)
-- https://pytorch.org/tutorials/advanced/cpp_extension.html
+    ** Use Float32 based pooling?
+    ** implement in C++ (and then training will be faster..) [https://pytorch.org/tutorials/advanced/cpp_extension.html]
 - Have cryptoprovider work with shapes only!
 - random - Have torch do that! (Upgrade if needed)
-- Timer - don't add prefetching!
+- Always first put when you have things ready (Similary, get as late as possible) - why doesn't work?
 - prep block relu, post block relu, scalar/tensor mult
 - Finetune iterative (itertaive sub channels (with multiple training))
 - Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors)
@@ -19,7 +19,8 @@
 - Method & Intro (freestyle talk on our research. vision oriented), use FALCON.
 - Inplace + optimize..
 - Instead of TRUNC, consider less << (Maybe slows down the process)
-
+- Timer - don't add prefetching!
+- Consider descarding ret[ret == - 1] = 0.
 ============================================= Research Major =============================================
 - Use loss as distortion measure
 - CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
