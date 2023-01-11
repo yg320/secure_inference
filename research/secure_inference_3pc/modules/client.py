@@ -73,7 +73,6 @@ class PrivateCompareClient(SecureModule):
         super(PrivateCompareClient, self).__init__(**kwargs)
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
-    @timer("PrivateCompareClient")
     def forward(self, x_bits_0, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
@@ -296,7 +295,6 @@ class SecureBlockReLUClient(SecureModule, SecureOptimizedBlockReLU):
         self.DReLU = SecureDReLUClient(**kwargs)
         self.mult = SecureMultiplicationClient(**kwargs)
 
-    @timer("SecureBlockReLUClient")
     def forward(self, activation):
         return SecureOptimizedBlockReLU.forward(self, activation)
 

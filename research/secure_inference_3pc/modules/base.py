@@ -27,7 +27,6 @@ class SecureModule(torch.nn.Module):
         ret[ret == - 1] = 0   # If ret were uint64, then the condition would be ret == 2**64 - 1
         return ret
 
-    @timer("sub_mode_L_minus_one")
     def sub_mode_L_minus_one(self, a, b):
         ret = a - b
         if IS_TORCH_BACKEND:
@@ -58,7 +57,6 @@ class Decompose(SecureModule):
         end = None if self.ignore_msb_bits == 0 else -self.ignore_msb_bits
         self.powers = backend.put_on_device(backend.flip(self.powers, axis=-1)[:, NUM_BITS - self.num_of_compare_bits:end], self.device)
 
-    @timer("decompose")
     def forward(self, value):
         orig_shape = list(value.shape)
         value = value.reshape(-1, 1)

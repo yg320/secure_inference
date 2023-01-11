@@ -146,6 +146,8 @@ class TorchBackend:
             if type(data[0]) is torch.Tensor:
                 data = [d.cpu() for d in data]
             return np.array(data)
+        elif type(data) is np.ndarray:
+            return torch.from_numpy(data)
         else:
             raise ValueError("Unsupported type")
 
@@ -199,7 +201,6 @@ class TorchBackend:
         out = x & y
         return out
 
-    @timer("unsigned_gt")
     def unsigned_gt(self, a, b):
         # out = a > b
         # out = torch.bitwise_xor(out, b > 0, out=out)

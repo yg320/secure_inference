@@ -46,7 +46,6 @@ class PRFWrapper:
             out = torch.from_numpy(out).to(self.device)# NUMPY_CONVERSION
         self.queue.put(out)
 
-    @timer("integers")
     def integers(self, low, high, size, dtype):
         if self.fetch:
             # with Timer("Integers - fetch"):
