@@ -15,6 +15,7 @@ import shutil
 from research.distortion.distortion_utils import get_num_relus, get_brelu_bandwidth
 from research.distortion.utils import get_channel_order_statistics
 from research.distortion.parameters.factory import param_factory
+from research.distortion.utils import get_channels_subset
 # from research.share_array import make_shared_array, get_shared_array
 import gc
 import time
@@ -449,36 +450,30 @@ class IO_Buffer:
 
 
 class MultipleChoiceKnapsack:
-    def __init__(self, params, cost_type, division, ratio, seed, num_channels, channel_distortion_path, shuffle):
+    def __init__(self, params, cost_type, division, ratio, seed, channel_distortion_path, cur_iter, num_iters):
         self.params = params
         self.cost_type = cost_type
         self.division = division
         self.ratio = ratio
         self.seed = seed
-        self.num_channels = num_channels if num_channels else sum([x[0] for x in params.LAYER_NAME_TO_DIMS.values()])
         self.channel_distortion_path = channel_distortion_path
-        self.shuffle = shuffle
+        self.cur_iter = cur_iter
+        self.num_iters = num_iters
 
         self.channel_order_to_layer, self.channel_order_to_channel, self.channel_order_to_dim = \
             get_channel_order_statistics(self.params)
 
-        # assert len(set([len(set(tuple(x) for x in self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])) for layer_name in self.params.LAYER_NAMES])) == 1
-        # self.block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_names[0]]
-        # self.block_sizes = np.array(self.block_sizes[:-1])
-        # assert np.max(self.block_sizes) < 255
-
         self.layer_name_to_noise = dict()
         self.read_noise_files()
 
+        _, self.channel_orders = get_channels_subset(self.seed, self.params, self.cur_iter, self.num_iters)
+        self.num_channels = len(self.channel_orders)
 
-        np.random.seed(self.seed)
-        total_num_channels = sum([self.params.LAYER_NAME_TO_DIMS[layer_name][0] for layer_name in self.params.LAYER_NAMES])
-        all_channels = np.arange(total_num_channels)
-        if self.shuffle:
-            np.random.shuffle(all_channels)
-        self.channel_orders = all_channels[:self.num_channels]
+        get_baseline_cost = lambda channel_order: get_cost(block_size=(1, 1),
+                                                           activation_dim=self.channel_order_to_dim[channel_order],
+                                                           cost_type=self.cost_type,
+                                                           division=self.division)
 
-        get_baseline_cost = lambda channel_order: get_cost(block_size=(1, 1), activation_dim=self.channel_order_to_dim[channel_order], cost_type=self.cost_type, division=self.division)
         max_cost = sum(get_baseline_cost(channel_order) for channel_order in self.channel_orders)
         self.max_cost = int(max_cost * self.ratio)
 
@@ -545,8 +540,6 @@ class MultipleChoiceKnapsack:
 
             signal = np.stack([pickle.load(open(f, 'rb'))["Signal"] for f in files])
             signal = signal.mean(axis=0).mean(axis=2).T
-            # if layer_name == "decode_0":
-            #     signal[:] = signal[0]
 
             noise = noise / signal
             noise = noise[:-1]
@@ -563,6 +556,8 @@ class MultipleChoiceKnapsack:
             layer_dim = self.params.LAYER_NAME_TO_DIMS[layer_name][1]
 
             block_sizes = np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])[:-1]  # TODO: either use [1,0] or don't infer it at all
+            assert np.max(block_sizes) < 255
+
             W = np.array([get_cost(tuple(block_size), layer_dim, self.cost_type, self.division) for block_size in block_sizes])
             P = self.layer_name_to_noise[layer_name][channel_index]
 
@@ -638,24 +633,30 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    # parser.add_argument('--iter', type=int)
     parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/PycharmProjects/secure_inference/relu_spec_files/classification/block_size_spec_0.05.pickle")
     parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/tmp/channel_distortions")
     parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet18_8xb16_cifar10/resnet18_8xb16_cifar10.py")
     parser.add_argument('--ratio', type=float, default=0.05)
-    parser.add_argument('--seed', type=float, default=123)
-    parser.add_argument('--num_channels', type=float, default=None)
     parser.add_argument('--cost_type', type=str, default="Bandwidth")
     parser.add_argument('--division', type=int, default=128)
-    parser.add_argument('--shuffle', type=bool, default=False)
+    parser.add_argument('--cur_iter', type=int, default=1)
+    parser.add_argument('--num_iters', type=int, default=1)
+
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
 
     params = param_factory(cfg)
     layer_names = params.LAYER_NAMES
     ratio = args.ratio
+    mck = MultipleChoiceKnapsack(params=params,
+                                 cost_type=args.cost_type,
+                                 division=args.division,
+                                 ratio=args.ratio,
+                                 seed=123,
+                                 channel_distortion_path=args.channel_distortion_path,
+                                 cur_iter=args.cur_iter,
+                                 num_iters=args.num_iters)
 
-    mck = MultipleChoiceKnapsack(params, args.cost_type, args.division, args.ratio, args.seed, args.num_channels, args.channel_distortion_path, args.shuffle)
     block_size_spec = mck.get_optimal_block_sizes()
 
     if not os.path.exists(os.path.dirname(args.block_size_spec_file_name)):

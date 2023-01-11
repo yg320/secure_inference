@@ -33,7 +33,7 @@ class ChannelDistortionHandler:
                                         cur_iter: int,
                                         num_iters: int):
 
-        channels_to_run = get_channels_subset(seed=seed, params=self.params, cur_iter=cur_iter, num_iters=num_iters)
+        channels_to_run, _ = get_channels_subset(seed=seed, params=self.params, cur_iter=cur_iter, num_iters=num_iters)
 
         os.makedirs(self.output_path, exist_ok=True)
 

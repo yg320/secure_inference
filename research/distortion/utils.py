@@ -247,7 +247,7 @@ def get_channels_subset(seed, params, cur_iter, num_iters):
     for layer_name in layer_names:
         channels_to_run[layer_name].sort()
 
-    return channels_to_run
+    return channels_to_run, channels_to_use
 
 #
 # def center_crop(tensor, size):
