@@ -3,10 +3,11 @@
 ============================================= Following days =============================================
 - https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
 - bReLU is too expensive
-    ** Build dummy one - to understand by how much thing can be cheaper
+    ** Build dummy one - to understand by how much thing can be cheaper (Found it to be relatively negligible - 7% !)
     ** Start by bReLU in numba
     ** Use Float32 based pooling?
     ** implement in C++ (and then training will be faster..) [https://pytorch.org/tutorials/advanced/cpp_extension.html]
+
 - Have cryptoprovider work with shapes only!
 - random - Have torch do that! (Upgrade if needed)
 - Always first put when you have things ready (Similary, get as late as possible) - why doesn't work?
