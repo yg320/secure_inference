@@ -51,12 +51,12 @@ class BlockRelu(Module):
         self.block_sizes = np.array(block_sizes)
         self.active_block_sizes = np.unique(self.block_sizes, axis=0)
 
-        self.regular_relu_channels = torch.nn.Parameter(torch.from_numpy(np.all(self.block_sizes == [1, 1], axis=1)), requires_grad=False)
-        self.zero_channels = torch.nn.Parameter(torch.from_numpy(np.all(self.block_sizes == [1, 0], axis=1)), requires_grad=False)
-        self.identity_channels = torch.nn.Parameter(torch.from_numpy(np.all(self.block_sizes == [0, 1], axis=1)), requires_grad=False)
+        self.regular_relu_channels = torch.from_numpy(np.all(self.block_sizes == [1, 1], axis=1))
+        self.zero_channels = torch.from_numpy(np.all(self.block_sizes == [1, 0], axis=1))
+        self.identity_channels = torch.from_numpy(np.all(self.block_sizes == [0, 1], axis=1))
 
         self.active_block_sizes = [block_size for block_size in self.active_block_sizes if not (np.all(block_size == [1, 1]) or np.all(block_size == [0, 1]) or np.all(block_size == [1, 0]))]
-        self.channels = torch.nn.ParameterList([torch.nn.Parameter(torch.from_numpy(np.all(self.block_sizes == block_size, axis=1)), requires_grad=False) for block_size in self.active_block_sizes])
+        self.channels = [torch.from_numpy(np.all(self.block_sizes == block_size, axis=1)) for block_size in self.active_block_sizes]
         self.avg_pools = [torch.nn.AvgPool2d(
                     kernel_size=tuple(block_size),
                     stride=tuple(block_size), ceil_mode=True) for block_size in self.active_block_sizes]

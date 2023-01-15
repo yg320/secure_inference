@@ -22,7 +22,7 @@ class ChannelDistortionHandler:
         self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params, cfg=self.cfg)
         self.output_path = output_path
 
-        self.keys = ["Noise", "Signal", "Distorted Loss", "Baseline Loss"]
+        self.keys = ["Noise", "Signal"] #, "Distorted Loss", "Baseline Loss"]
 
     def extract_deformation_channel_ord(self,
                                         batch_index: int,
@@ -84,9 +84,9 @@ if __name__ == "__main__":
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--gpu_id', type=int, default=0)
     parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/classification/resnet50_8xb32_in1k_20210831-ea4938fc.pth")
-    parser.add_argument('--block_size_spec_file_name', type=str, default= "/home/yakir/PycharmProjects/secure_inference/relu_spec_files/classification/block_size_spec_0.05.pickle")
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_5/channel_distortions")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14.pth")
+    parser.add_argument('--block_size_spec_file_name', type=str, default=None)
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_6/channel_distortions")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)

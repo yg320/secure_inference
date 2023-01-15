@@ -450,7 +450,7 @@ class IO_Buffer:
 
 
 class MultipleChoiceKnapsack:
-    def __init__(self, params, cost_type, division, ratio, seed, channel_distortion_path, cur_iter, num_iters):
+    def __init__(self, params, cost_type, division, ratio, seed, channel_distortion_path, cur_iter, num_iters, max_cost=None):
         self.params = params
         self.cost_type = cost_type
         self.division = division
@@ -474,8 +474,11 @@ class MultipleChoiceKnapsack:
                                                            cost_type=self.cost_type,
                                                            division=self.division)
 
-        max_cost = sum(get_baseline_cost(channel_order) for channel_order in self.channel_orders)
-        self.max_cost = int(max_cost * self.ratio)
+        if max_cost is None:
+            max_cost = sum(get_baseline_cost(channel_order) for channel_order in self.channel_orders)
+            self.max_cost = int(max_cost * self.ratio)
+        else:
+            self.max_cost = max_cost
 
     @staticmethod
     def run_multiple_choice(Ws, Ps, num_rows, num_columns):
@@ -633,14 +636,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/PycharmProjects/secure_inference/relu_spec_files/classification/block_size_spec_0.05.pickle")
-    parser.add_argument('--channel_distortion_path', type=str, default=f"/home/yakir/Data2/assets_v4/distortions/tmp/channel_distortions")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet18_8xb16_cifar10/resnet18_8xb16_cifar10.py")
-    parser.add_argument('--ratio', type=float, default=0.05)
-    parser.add_argument('--cost_type', type=str, default="Bandwidth")
-    parser.add_argument('--division', type=int, default=128)
-    parser.add_argument('--cur_iter', type=int, default=1)
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/block_size_spec_4x4_algo.pickle")
+    parser.add_argument('--channel_distortion_path', type=str, default="/home/yakir/resnet50_8xb32_in1k_finetune_0.0001_avg_pool_dummy")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py")
+    parser.add_argument('--ratio', type=float, default=None)
+    parser.add_argument('--cost_type', type=str, default="ReLU")
+    parser.add_argument('--division', type=int, default=1)
+    parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
+    parser.add_argument('--max_cost', type=int, default=644224)
 
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
@@ -655,7 +659,8 @@ if __name__ == "__main__":
                                  seed=123,
                                  channel_distortion_path=args.channel_distortion_path,
                                  cur_iter=args.cur_iter,
-                                 num_iters=args.num_iters)
+                                 num_iters=args.num_iters,
+                                 max_cost=args.max_cost)
 
     block_size_spec = mck.get_optimal_block_sizes()
 
