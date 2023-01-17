@@ -6,11 +6,10 @@ from research.secure_inference_3pc.backend import backend
 
 
 from research.secure_inference_3pc.base import P, module_67
-from research.secure_inference_3pc.conv2d import conv_2d
+from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
-from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
@@ -28,7 +27,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.padding = padding
         self.groups = groups
 
-        self.conv2d_handler = Conv2DHandler(self.device)
+        self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
     def forward(self, X_share):
 
@@ -40,11 +39,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         A = backend.add(A_share_0, A_share_1, out=A_share_0)
         B = backend.add(B_share_0, B_share_1, out=B_share_0)
 
-        if self.device == "cpu":
-            C = conv_2d(A, B, None, None, self.padding, self.stride, self.dilation, self.groups)
-        else:
-            C = self.conv2d_handler.conv2d(A, B, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-            # C = torch.conv2d(A.to("cpu"), B.to("cpu"), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).to(A.device)
+        C = self.conv2d_handler.conv2d(A, B, None, None, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=C.shape, dtype=SIGNED_DTYPE)
         C_share_0 = backend.subtract(C, C_share_1, out=C)
 

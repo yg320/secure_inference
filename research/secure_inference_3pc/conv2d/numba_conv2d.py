@@ -435,78 +435,82 @@ def single_conv_2d_mat_mul(A, B, padding, stride, dilation):
 
     return E
 
+class Conv2DHandler:
+    def __init__(self):
+        pass
 
-def conv_2d(A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1, method=NUMBA_CONV):
-    if type(A) is not np.ndarray:
-        is_torch = True
-    else:
-        is_torch = False
-
-    if is_torch:
-        A = A.numpy()
-        B = B.numpy()
-        if C is not None:
-            C = C.numpy()
-            D = D.numpy()
-
-    if groups == 1:
-        if method == NUMBA_CONV:
-            if C is None:
-                out = single_conv_2d(A, B, padding, stride, dilation)
-            else:
-                out =  double_conv_2d(A, B, C, D, padding, stride, dilation)
+    def conv2d(self, A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1, method=NUMBA_CONV):
+        if type(padding) is int:
+            padding = (padding, padding)
+        if type(stride) is int:
+            stride = (stride, stride)
+        if type(dilation) is int:
+            dilation = (dilation, dilation)
+        if type(A) is not np.ndarray:
+            is_torch = True
         else:
-            if C is None:
-                out =  single_conv_2d_mat_mul(A, B, padding, stride, dilation)
+            is_torch = False
+
+        if is_torch:
+            A = A.numpy()
+            B = B.numpy()
+            if C is not None:
+                C = C.numpy()
+                D = D.numpy()
+
+        if groups == 1:
+            if method == NUMBA_CONV:
+                if C is None:
+                    out = single_conv_2d(A, B, padding, stride, dilation)
+                else:
+                    out = double_conv_2d(A, B, C, D, padding, stride, dilation)
             else:
-                out =  double_conv_2d_mat_mul(A, B, C, D, padding, stride, dilation)
-    else:
-        assert method == NUMBA_CONV
-        assert groups == B.shape[0]
-        if C is None:
-            out =  single_conv_2d(A, B, padding, stride, dilation, groups=groups)
+                if C is None:
+                    out =  single_conv_2d_mat_mul(A, B, padding, stride, dilation)
+                else:
+                    out = double_conv_2d_mat_mul(A, B, C, D, padding, stride, dilation)
         else:
-            out =  double_conv_2d(A, B, C, D, padding, stride, dilation, groups=groups)
+            assert method == NUMBA_CONV
+            assert groups == B.shape[0]
+            if C is None:
+                out = single_conv_2d(A, B, padding, stride, dilation, groups=groups)
+            else:
+                out = double_conv_2d(A, B, C, D, padding, stride, dilation, groups=groups)
 
-    if is_torch:
-        out = torch.from_numpy(out)
+        if is_torch:
+            out = torch.from_numpy(out)
+        return out
 
-    return out
-
-# TODO: put in init
-def compile_numba_funcs():
-    in_channel = 512
-    out_channel = 128
-    dilation = (1, 1)
-    padding = (1, 1)
-    stride = (1, 1)
-    nb_rows = 24
-
-    A = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(1, in_channel, nb_rows, nb_rows))
-    B_3x3 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 3, 3))
-    B_1x1 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 1, 1))
-    C = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(1, in_channel, nb_rows, nb_rows))
-    D_3x3 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 3, 3))
-    D_1x1 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 1, 1))
-
-    conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
-    conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
-
-    conv_2d(A, B_3x3[:, :1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
-            groups=B_3x3.shape[0])
-    conv_2d(A, B_3x3[:, :1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV,
-            groups=B_3x3.shape[0])
-
-    conv_2d(A, B_1x1, C, D_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
-    conv_2d(A, B_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
-
-    conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
-    conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
-
-
-# TODO: allocate one array and reuse it
-# TODO: unravel stuff
-
-if __name__ == "__main__":
-
-    compile_numba_funcs()
+# # TODO: put in init
+# def compile_numba_funcs():
+#     conv2d_handler = Conv2DHandler()
+#     in_channel = 512
+#     out_channel = 128
+#     dilation = (1, 1)
+#     padding = (1, 1)
+#     stride = (1, 1)
+#     nb_rows = 24
+#
+#     A = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(1, in_channel, nb_rows, nb_rows))
+#     B_3x3 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 3, 3))
+#     B_1x1 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 1, 1))
+#     C = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(1, in_channel, nb_rows, nb_rows))
+#     D_3x3 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 3, 3))
+#     D_1x1 = np.random.randint(np.iinfo(SIGNED_DTYPE).min, np.iinfo(SIGNED_DTYPE).max, size=(out_channel, in_channel, 1, 1))
+#
+#     conv2d_handler.conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
+#     conv2d_handler.conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
+#     conv2d_handler.conv_2d(A, B_3x3[:, :1], C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=B_3x3.shape[0])
+#     conv2d_handler.conv_2d(A, B_3x3[:, :1], padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV, groups=B_3x3.shape[0])
+#     conv2d_handler.conv_2d(A, B_1x1, C, D_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
+#     conv2d_handler.conv_2d(A, B_1x1, padding=padding, stride=stride, dilation=dilation, method=NUMBA_CONV)
+#     conv2d_handler.conv_2d(A, B_3x3, C, D_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
+#     conv2d_handler.conv_2d(A, B_3x3, padding=padding, stride=stride, dilation=dilation, method=NUMBA_MATMUL)
+#
+#
+# # TODO: allocate one array and reuse it
+# # TODO: unravel stuff
+#
+# if __name__ == "__main__":
+#
+#     compile_numba_funcs()

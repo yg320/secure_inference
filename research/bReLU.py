@@ -126,6 +126,7 @@ class PadHandler:
         return x[:, :, self.pad_x_l:x.shape[2] - self.pad_x_r, self.pad_y_l:x.shape[3] - self.pad_y_r]
 
 from research.secure_inference_3pc.timer import timer
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 class SecureOptimizedBlockReLU(Module):
 
     def __init__(self, block_sizes):
@@ -134,6 +135,8 @@ class SecureOptimizedBlockReLU(Module):
 
         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
         self.active_block_sizes_to_channels = [torch.where(torch.Tensor([bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]))[0] for block_size in self.active_block_sizes]
+        if not IS_TORCH_BACKEND:
+            self.active_block_sizes_to_channels = [x.numpy() for x in self.active_block_sizes_to_channels]
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
         self.pad_handler_class = PadHandler
 

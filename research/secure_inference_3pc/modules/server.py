@@ -6,8 +6,7 @@ from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS, IGNORE_MSB_
 
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.base import get_c_party_1, module_67
-from research.secure_inference_3pc.conv2d import conv_2d
-from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
+from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, TRUNC_BITS
 from research.bReLU import SecureOptimizedBlockReLU
@@ -30,7 +29,7 @@ class SecureConv2DServer(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
-        self.conv2d_handler = Conv2DHandler(self.device)
+        self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
     def forward(self, X_share):
 
@@ -62,14 +61,7 @@ class SecureConv2DServer(SecureModule):
 
         self.W_share = backend.subtract(self.W_share, F, out=self.W_share)
 
-        if self.device == "cpu":
-            out = conv_2d(E, self.W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
-        else:
-            # out = torch.conv2d(E.to("cpu"), self.W_share.to("cpu"), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).to(E.device)
-            # out += torch.conv2d(X_share.to("cpu"), F.to("cpu"), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).to(E.device)
-
-            out = self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-            out += self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out = self.conv2d_handler.conv2d(E, self.W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 

@@ -4,13 +4,12 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.base import get_c_party_0, P, module_67
-from research.secure_inference_3pc.conv2d import conv_2d
+from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS, TRUNC_BITS
 from research.secure_inference_3pc.timer import timer
 from research.secure_inference_3pc.modules.conv2d import get_output_shape
 from research.secure_inference_3pc.modules.base import Decompose
-from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 
@@ -27,7 +26,7 @@ class SecureConv2DClient(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
-        self.conv2d_handler = Conv2DHandler(self.device)
+        self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
     @timer("SecureConv2DClient")
     def forward(self, X_share):
@@ -52,11 +51,14 @@ class SecureConv2DClient(SecureModule):
         E = backend.add(E_share_server, E_share, out=E_share)
         F = backend.add(F_share_server, F_share, out=F_share)
 
-        if self.device == "cpu":
-            out = conv_2d(X_share, F, E, self.W_share, self.padding, self.stride, self.dilation, self.groups)
-        else:
-            out = self.conv2d_handler.conv2d(X_share, F, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
-            out += self.conv2d_handler.conv2d(E, self.W_share, padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups)
+        out = self.conv2d_handler.conv2d(X_share,
+                                         F,
+                                         E,
+                                         self.W_share,
+                                         padding=self.padding,
+                                         stride=self.stride,
+                                         dilation=self.dilation,
+                                         groups=self.groups)
 
         out = backend.add(out, C_share, out=out)
         out = backend.right_shift(out, TRUNC_BITS, out=out)

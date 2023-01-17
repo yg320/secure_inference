@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
+
 class Conv2DHandler:
     def __init__(self, device):
         self.device = device
@@ -22,8 +23,14 @@ class Conv2DHandler:
         self.mask13_4 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(52, 56))]).astype(np.int64))[0].to(device)
         self.mask14_4 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(56, 60))]).astype(np.int64))[0].to(device)
         self.mask15_4 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(60, 64))]).astype(np.int64))[0].to(device)
-        self.mask4_x = torch.stack([self.mask0_4, self.mask1_4, self.mask2_4, self.mask3_4, self.mask4_4, self.mask5_4, self.mask6_4, self.mask7_4, self.mask8_4, self.mask9_4, self.mask10_4, self.mask11_4, self.mask12_4, self.mask13_4, self.mask14_4, self.mask15_4]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3)
-        self.mask4_y = torch.stack([self.mask15_4, self.mask14_4, self.mask13_4, self.mask12_4, self.mask11_4, self.mask10_4, self.mask9_4, self.mask8_4, self.mask7_4, self.mask6_4, self.mask5_4, self.mask4_4, self.mask3_4, self.mask2_4, self.mask1_4, self.mask0_4]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).unsqueeze_(1)
+        self.mask4_x = torch.stack(
+            [self.mask0_4, self.mask1_4, self.mask2_4, self.mask3_4, self.mask4_4, self.mask5_4, self.mask6_4,
+             self.mask7_4, self.mask8_4, self.mask9_4, self.mask10_4, self.mask11_4, self.mask12_4, self.mask13_4,
+             self.mask14_4, self.mask15_4]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3)
+        self.mask4_y = torch.stack(
+            [self.mask15_4, self.mask14_4, self.mask13_4, self.mask12_4, self.mask11_4, self.mask10_4, self.mask9_4,
+             self.mask8_4, self.mask7_4, self.mask6_4, self.mask5_4, self.mask4_4, self.mask3_4, self.mask2_4,
+             self.mask1_4, self.mask0_4]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).unsqueeze_(1)
         self.shift_x = torch.arange(0, 64, 4).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device)
         self.shift_y = torch.arange(60, -4, -4).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device).unsqueeze(1)
         self.mask0_8 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(0, 8))]).astype(np.int64))[0].to(device)
@@ -47,30 +54,75 @@ class Conv2DHandler:
         x = x.reshape(1, x.shape[0] * x.shape[1], x.shape[2], x.shape[3]).to(dtype)
         y = y.reshape(y.shape[0] * y.shape[1], y.shape[2], y.shape[3], y.shape[4]).to(dtype)
 
-        res_float = (torch.conv2d(x[:, :-15*a.shape[1]], y[15*b.shape[0]:], **kwargs, groups=1).sum(axis=0, keepdim=True)).to(torch.int64) << 0
-        res_float += (torch.conv2d(x, y, **kwargs, groups=16).reshape(16,  res_float.shape[1], res_float.shape[2], res_float.shape[3]).sum(axis=0, keepdim=True)).to(torch.int64) << 60
-        res_float += (torch.conv2d(x[:, :-1 * a.shape[1]], y[1* b.shape[0]:], **kwargs, groups=15).reshape(15, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 56
-        res_float += (torch.conv2d(x[:, :-2 * a.shape[1]], y[2* b.shape[0]:], **kwargs, groups=14).reshape(14, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 52
-        res_float += (torch.conv2d(x[:, :-3 * a.shape[1]], y[3* b.shape[0]:], **kwargs, groups=13).reshape(13, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 48
-        res_float += (torch.conv2d(x[:, :-4 * a.shape[1]], y[4* b.shape[0]:], **kwargs, groups=12).reshape(12, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 44
-        res_float += (torch.conv2d(x[:, :-5 * a.shape[1]], y[5* b.shape[0]:], **kwargs, groups=11).reshape(11, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 40
-        res_float += (torch.conv2d(x[:, :-6 * a.shape[1]], y[6* b.shape[0]:], **kwargs, groups=10).reshape(10, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 36
-        res_float += (torch.conv2d(x[:, :-7 * a.shape[1]], y[7* b.shape[0]:], **kwargs, groups=9).reshape(  9, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 32
-        res_float += (torch.conv2d(x[:, :-8 * a.shape[1]], y[8* b.shape[0]:], **kwargs, groups=8).reshape(  8, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 28
-        res_float += (torch.conv2d(x[:, :-9 * a.shape[1]], y[9* b.shape[0]:], **kwargs, groups=7).reshape(  7, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 24
-        res_float += (torch.conv2d(x[:, :-10 * a.shape[1]], y[10*b.shape[0]:], **kwargs, groups=6).reshape(  6, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 20
-        res_float += (torch.conv2d(x[:, :-11 * a.shape[1]], y[11*b.shape[0]:], **kwargs, groups=5).reshape(  5, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 16
-        res_float += (torch.conv2d(x[:, :-12 * a.shape[1]], y[12*b.shape[0]:], **kwargs, groups=4).reshape(  4, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 12
-        res_float += (torch.conv2d(x[:, :-13 * a.shape[1]], y[13*b.shape[0]:], **kwargs, groups=3).reshape(  3, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 8
-        res_float += (torch.conv2d(x[:, :-14 * a.shape[1]], y[14*b.shape[0]:], **kwargs, groups=2).reshape(  2, *res_float.shape[1:]).sum(axis=0, keepdim=True)).to(torch.int64) << 4
+        res_float = (torch.conv2d(x[:, :-15 * a.shape[1]], y[15 * b.shape[0]:], **kwargs, groups=1).sum(axis=0,
+                                                                                                        keepdim=True)).to(
+            torch.int64) << 0
+        res_float += (torch.conv2d(x, y, **kwargs, groups=16).reshape(16, res_float.shape[1], res_float.shape[2],
+                                                                      res_float.shape[3]).sum(axis=0, keepdim=True)).to(
+            torch.int64) << 60
+        res_float += (torch.conv2d(x[:, :-1 * a.shape[1]], y[1 * b.shape[0]:], **kwargs, groups=15).reshape(15,
+                                                                                                            *res_float.shape[
+                                                                                                             1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 56
+        res_float += (torch.conv2d(x[:, :-2 * a.shape[1]], y[2 * b.shape[0]:], **kwargs, groups=14).reshape(14,
+                                                                                                            *res_float.shape[
+                                                                                                             1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 52
+        res_float += (torch.conv2d(x[:, :-3 * a.shape[1]], y[3 * b.shape[0]:], **kwargs, groups=13).reshape(13,
+                                                                                                            *res_float.shape[
+                                                                                                             1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 48
+        res_float += (torch.conv2d(x[:, :-4 * a.shape[1]], y[4 * b.shape[0]:], **kwargs, groups=12).reshape(12,
+                                                                                                            *res_float.shape[
+                                                                                                             1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 44
+        res_float += (torch.conv2d(x[:, :-5 * a.shape[1]], y[5 * b.shape[0]:], **kwargs, groups=11).reshape(11,
+                                                                                                            *res_float.shape[
+                                                                                                             1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 40
+        res_float += (torch.conv2d(x[:, :-6 * a.shape[1]], y[6 * b.shape[0]:], **kwargs, groups=10).reshape(10,
+                                                                                                            *res_float.shape[
+                                                                                                             1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 36
+        res_float += (torch.conv2d(x[:, :-7 * a.shape[1]], y[7 * b.shape[0]:], **kwargs, groups=9).reshape(9,
+                                                                                                           *res_float.shape[
+                                                                                                            1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 32
+        res_float += (torch.conv2d(x[:, :-8 * a.shape[1]], y[8 * b.shape[0]:], **kwargs, groups=8).reshape(8,
+                                                                                                           *res_float.shape[
+                                                                                                            1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 28
+        res_float += (torch.conv2d(x[:, :-9 * a.shape[1]], y[9 * b.shape[0]:], **kwargs, groups=7).reshape(7,
+                                                                                                           *res_float.shape[
+                                                                                                            1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 24
+        res_float += (torch.conv2d(x[:, :-10 * a.shape[1]], y[10 * b.shape[0]:], **kwargs, groups=6).reshape(6,
+                                                                                                             *res_float.shape[
+                                                                                                              1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 20
+        res_float += (torch.conv2d(x[:, :-11 * a.shape[1]], y[11 * b.shape[0]:], **kwargs, groups=5).reshape(5,
+                                                                                                             *res_float.shape[
+                                                                                                              1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 16
+        res_float += (torch.conv2d(x[:, :-12 * a.shape[1]], y[12 * b.shape[0]:], **kwargs, groups=4).reshape(4,
+                                                                                                             *res_float.shape[
+                                                                                                              1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 12
+        res_float += (torch.conv2d(x[:, :-13 * a.shape[1]], y[13 * b.shape[0]:], **kwargs, groups=3).reshape(3,
+                                                                                                             *res_float.shape[
+                                                                                                              1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 8
+        res_float += (torch.conv2d(x[:, :-14 * a.shape[1]], y[14 * b.shape[0]:], **kwargs, groups=2).reshape(2,
+                                                                                                             *res_float.shape[
+                                                                                                              1:]).sum(
+            axis=0, keepdim=True)).to(torch.int64) << 4
 
         return res_float
 
-
     def conv2d_torch_4(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
-        
+
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
-        
+
         if not IS_TORCH_BACKEND:
             a = torch.from_numpy(a).to(self.device)
             b = torch.from_numpy(b).to(self.device)
@@ -126,7 +178,6 @@ class Conv2DHandler:
         # (torch.conv2d(x0, y14, **kwargs) + torch.conv2d(x1, y13, **kwargs) + torch.conv2d(x2, y12, **kwargs) + torch.conv2d(x3, y11, **kwargs) + torch.conv2d(x4, y10, **kwargs) + torch.conv2d(x5, y9, **kwargs) + torch.conv2d(x6, y8, **kwargs) + torch.conv2d(x7, y7, **kwargs) + torch.conv2d(x8, y6, **kwargs) + torch.conv2d(x9, y5, **kwargs) + torch.conv2d(x10, y4, **kwargs) + torch.conv2d(x11, y3, **kwargs) + torch.conv2d(x12, y2, **kwargs) + torch.conv2d(x13, y1, **kwargs) + torch.conv2d(x14, y0, **kwargs) << 56).round().to(torch.int64) + \
         # (torch.conv2d(x0, y15, **kwargs) + torch.conv2d(x1, y14, **kwargs) + torch.conv2d(x2, y13, **kwargs) + torch.conv2d(x3, y12, **kwargs) + torch.conv2d(x4, y11, **kwargs) + torch.conv2d(x5, y10, **kwargs) + torch.conv2d(x6, y9, **kwargs) + torch.conv2d(x7, y8, **kwargs) + torch.conv2d(x8, y7, **kwargs) + torch.conv2d(x9, y6, **kwargs) + torch.conv2d(x10, y5, **kwargs) + torch.conv2d(x11, y4, **kwargs) + torch.conv2d(x12, y3, **kwargs) + torch.conv2d(x13, y2, **kwargs) + torch.conv2d(x14, y1, **kwargs) + torch.conv2d(x15, y0, **kwargs) << 60).round().to(torch.int64)
         # return res_float.cpu().numpy()
-
 
         res_float = (torch.conv2d(x0, y0, **kwargs).to(torch.int64) << 0)
         res_float += (torch.conv2d(x0, y1, **kwargs).to(torch.int64) << 4)
@@ -304,7 +355,7 @@ class Conv2DHandler:
         #
         # return None
 
-        res_float =  (torch.conv2d(x0, y0, **kwargs).to(torch.int64) << 0)
+        res_float = (torch.conv2d(x0, y0, **kwargs).to(torch.int64) << 0)
         res_float += (torch.conv2d(x0, y1, **kwargs).to(torch.int64) << 8)
         res_float += (torch.conv2d(x0, y2, **kwargs).to(torch.int64) << 16)
         res_float += (torch.conv2d(x0, y3, **kwargs).to(torch.int64) << 24)
@@ -343,11 +394,9 @@ class Conv2DHandler:
 
         return res_float
 
-    def conv2d(self, a, b, stride, padding, dilation, groups):
+    def single_conv2d(self, a, b, stride, padding, dilation, groups):
         num_mult = b.shape[1] * b.shape[2] * b.shape[3]
-        # print(num_mult)
-        # print(a.shape, b.shape, stride, padding, dilation, groups)
-        # TODO: clean up
+
         if groups > 1:
             out = self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
         elif num_mult >= 4096:
@@ -361,19 +410,11 @@ class Conv2DHandler:
             return out
         else:
             return out.cpu().numpy()
-    # def conv2d(self, a, b, stride, padding, dilation, groups):
-    #     num_mult = b.shape[1] * b.shape[2] * b.shape[3]
-    #
-    #     # TODO: clean up
-    #     if num_mult < 16:
-    #         return self.conv2d_torch_4(a, b, stride, padding, dilation, groups, dtype=torch.float32)
-    #     if num_mult < 256:
-    #         return self.conv2d_torch_4(a, b, stride, padding, dilation, groups, dtype=torch.float32)
-    #
-    #     return self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
-    #     #     # 2^8 + 2^8
-    #     # if num_mult > 255:
-    #     #     return self.conv2d_torch_4(a, b, stride, padding, dilation, groups)
-    #     # else:
-    #     #     return self.conv2d_torch_8(a, b, stride, padding, dilation, groups)
-    #
+
+    def conv2d(self, A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1):
+        ret = self.single_conv2d(A, B, stride, padding, dilation, groups)
+        if C is not None:
+            ret += self.single_conv2d(C, D, stride, padding, dilation, groups)
+
+        return ret
+

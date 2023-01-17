@@ -5,15 +5,10 @@ from research.secure_inference_3pc.backend import backend
 
 from research.secure_inference_3pc.base import fuse_conv_bn,  get_assets, TypeConverter
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.conv2d import conv_2d
-from research.secure_inference_3pc.conv2d_torch import Conv2DHandler
-from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.server import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
-
-from research.bReLU import SecureOptimizedBlockReLU
 
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
