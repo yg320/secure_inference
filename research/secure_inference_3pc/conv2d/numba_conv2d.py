@@ -435,6 +435,7 @@ def single_conv_2d_mat_mul(A, B, padding, stride, dilation):
 
     return E
 
+
 class Conv2DHandler:
     def __init__(self):
         pass

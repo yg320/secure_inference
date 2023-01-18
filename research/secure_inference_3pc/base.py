@@ -12,12 +12,12 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.port_01 = 21001
-        self.port_10 = 21002
-        self.port_02 = 21003
-        self.port_20 = 21004
-        self.port_12 = 21005
-        self.port_21 = 21006
+        self.port_01 = 21131
+        self.port_10 = 21132
+        self.port_02 = 21133
+        self.port_20 = 21134
+        self.port_12 = 21135
+        self.port_21 = 21136
 
 
 class NetworkAssets:
@@ -120,6 +120,7 @@ min_org_shit = -283206
 max_org_shit = 287469
 org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, backend.int8)
 
+# @timer("module_67")
 def module_67(xxx):
     if IS_TORCH_BACKEND:
     # TODO: fix this
@@ -193,6 +194,7 @@ def fuse_conv_bn(conv_module, batch_norm_module):
 
     return W, B
 
+# @timer("get_c_party_0")
 def get_c_party_0(x_bits, multiplexer_bits, beta):
     beta = backend.unsqueeze(beta, -1)
     beta = 2 * beta  # Not allowed to change beta inplace
