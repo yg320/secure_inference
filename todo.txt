@@ -1,13 +1,19 @@
 - Leetcode, Algo1, tabs
 
 ============================================= Following days =============================================
+- vectorized functions
+- AWS!
+- Channel distortion random seed
+- Try working with learning rate warmup!
+- It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
 - https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
 - bReLU is too expensive
     ** Build dummy one - to understand by how much thing can be cheaper (Found it to be relatively negligible - 7% !)
     ** Start by bReLU in numba
     ** Use Float32 based pooling?
     ** implement in C++ (and then training will be faster..) [https://pytorch.org/tutorials/advanced/cpp_extension.html]
-
+- Train with DReLU sign flips..
+- We really need to compare Porthos implementation to ours on the same machine..
 - Have cryptoprovider work with shapes only!
 - random - Have torch do that! (Upgrade if needed)
 - Always first put when you have things ready (Similary, get as late as possible) - why doesn't work?
@@ -22,6 +28,7 @@
 - Instead of TRUNC, consider less << (Maybe slows down the process)
 - Timer - don't add prefetching!
 - Consider descarding ret[ret == - 1] = 0.
+- More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
 ============================================= Research Major =============================================
 - Use loss as distortion measure
 - CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
@@ -39,15 +46,17 @@
 - Dmei Avt
 - Use eagerpy
 - ImageNet classification - compare with Porthos
-- Explore 32bits, use trunc and understand when things go wrong
+- Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consider what is best, torch or numpy - avoid converting between them.
 - Classification and Detection
-- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
+
 - Replace Max Pool with Avg Pool with correction
 - Allow for softmax via maxpool derivative (Or FALCON implementation)
 - Unfairness!
-
+- Stochastic sign flips to training (to train stochastic DReLUs)
+- Compare to EIGEN library
 ============================================= Implementation Major =============================================
+
 - A more efficient bReLU (during training as well)
 - A symmetric bReLU
 - torch socket
@@ -77,7 +86,7 @@
 - MaxPool/ReLU flip
 - Verify +1 in integer_random
 - Go over protocol again. Verify implementation
-
+- Consider using batch size > 1 in distortion extraction (and infer few block sizes simultaneously)
 
 ============================================= Paper notes =============================================
 - Table: ours (Knapsack) vs. Naive
@@ -100,6 +109,7 @@
 - People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
 - We chose not to decompose to offline/online, but this can be done.
 - We propose suite of ops, and show that they can be used in a variety of tasks. We show PoC on 3PC. (Paper is written as Generic tool)
+- We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 
 ======================================== Reading Minor =============================================
 - FALCON, 2pc, 3pc, OT, HE
@@ -125,8 +135,7 @@
 - Further datasets/architectures/models/tasks
 - QAT
 - Should FC and GAP be part of distortion?
-- MaxPool statistics
-
+- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
 ============================================= Implementation Minor =============================================
 - fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
 - - Try https://github.com/tensorly/tensorly

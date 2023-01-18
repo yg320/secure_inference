@@ -152,7 +152,7 @@ class SecureOptimizedBlockReLU(Module):
         pad_handlers[index] = padder
         return
 
-    @timer("prep")
+    # @timer("prep")
     def prep_fake(self, activation):
 
         pad_handlers = [self.pad_handler_class(activation.shape[2:], block_size) for block_size in self.active_block_sizes]
@@ -161,7 +161,7 @@ class SecureOptimizedBlockReLU(Module):
         mean_tensors = torch.zeros(size=(sum(a), ), dtype=activation.dtype, device=activation.device)
         return mean_tensors, cumsum_shapes, pad_handlers
 
-    @timer("prep")
+    # @timer("prep")
     def prep(self, activation):
 
         mean_tensors = [None] * len(self.active_block_sizes)
@@ -174,7 +174,7 @@ class SecureOptimizedBlockReLU(Module):
         mean_tensors = backend.concatenate(mean_tensors)
         return mean_tensors, cumsum_shapes, pad_handlers
 
-    @timer("post")
+    # @timer("post")
     def post(self, activation, sign_tensors, cumsum_shapes, pad_handlers):
         relu_map = backend.ones_like(activation)
         for i, block_size in enumerate(self.active_block_sizes):
@@ -185,7 +185,7 @@ class SecureOptimizedBlockReLU(Module):
             relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
         return relu_map
 
-    @timer("bReLU")
+    # @timer("bReLU")
     def forward(self, activation):
 
         if np.all(self.block_sizes == [0, 1]):
@@ -199,7 +199,7 @@ class SecureOptimizedBlockReLU(Module):
 
         return activation
 
-    @timer("final_mult")
+    # @timer("final_mult")
     def final_mult(self, activation, relu_map):
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
                                                               activation[:, ~self.is_identity_channels])
