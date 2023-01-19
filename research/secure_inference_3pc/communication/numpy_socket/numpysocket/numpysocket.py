@@ -6,7 +6,7 @@ import numpy as np
 from io import BytesIO
 import torch
 
-
+from research.secure_inference_3pc.timer import Timer
 class NumpySocket(socket.socket):
     def sendall(self, frame):
         if not isinstance(frame, np.ndarray):
@@ -17,25 +17,21 @@ class NumpySocket(socket.socket):
         logging.debug("frame sent")
 
 
-    def recv(self, bufsize=4096):
+    def recv(self, bufsize=65536):
 
-        data = super().recv(bufsize)
+        length_str = super().recv(12)
 
-        if len(data) == 0:
+        if len(length_str) == 0:
             return np.array([])
         else:
-            frameBuffer = bytearray()
-            length_str, ignored, data = data.partition(b':')
             length = int(length_str)
-
-            frameBuffer += data
+            frameBuffer = bytearray()
 
             while len(frameBuffer) < length:
-                data = super().recv(bufsize)
+                data = super().recv(length - len(frameBuffer))
                 frameBuffer += data
 
-        frame = np.load(BytesIO(frameBuffer), allow_pickle=True)['frame']
-        return frame
+            return np.load(BytesIO(frameBuffer), allow_pickle=False)
 
     def accept(self):
         fd, addr = super()._accept()
@@ -48,15 +44,17 @@ class NumpySocket(socket.socket):
 
     @staticmethod
     def __pack_frame(frame):
+        # out_0 = frame.tobytes()
+        # out_0 = len(out_0).to_bytes(12, byteorder='big') + out_0
+        # return out_0
         f = BytesIO()
-        np.savez(f, frame=frame)
+        np.save(f, arr=frame)
 
-        packet_size = len(f.getvalue())
-        header = '{0}:'.format(packet_size)
+        packet_size = str(len(f.getvalue())).zfill(12)
+        header = packet_size
         header = bytes(header.encode())  # prepend length of array
-
-        out = bytearray()
-        out += header
+        out = bytearray(header)
+        # out += header
 
         f.seek(0)
         out += f.read()
