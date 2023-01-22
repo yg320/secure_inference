@@ -1,55 +1,43 @@
 ============================================= Following days =============================================
-- Everything to Numba (Vectorize?)
-- Simulated annealing
+- Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67
+- Simulated annealing (With very short finetuning every k steps, loss >30 doesn't feel right)
 - Finish Methods and Results
+- Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
+- Use loss as distortion measure
+- Channel distortion random seed
 
 ============================================= Major =============================================
 
 - Try working with learning rate warmup!
-- https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
-- bReLU is too expensive?
-- Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors). It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
-- Fetch ops that don't depend on anything
-- Inplace + optimize..
-- More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
 - We really need to compare Porthos implementation to ours on the same machine..
 - Have cryptoprovider work with shapes only!
 - random - Have torch do that! (Upgrade if needed)
-- Always first put when you have things ready (Similary, get as late as possible) - why doesn't work? - Verify that everything is sent as soon as we have it
+- Verify that everything is sent as soon as we have it, and gotten as late as possible
 - AWS!
-- Channel distortion random seed
-- Use loss as distortion measure
-- CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
 - Find optimal stochastic ReLU params
 - Final Seg/Clss results
-- Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
-- Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
-- Soft training?
 - A more efficient bReLU (during training as well)
 - A symmetric bReLU
-- efficient CUDA r_shift
-- Mod %67
-- Make forward_fetch and forward_regular
-- make dummy in base class
-- Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
-- Agnostic prf prefetch
-- Further optimize Convs
+- Verify +1 in integer_random
+- MaxPool/ReLU flip
+- Implement Load Balancing in ReLU (same as Porthos)
 - Replace mult in ReLU with select share
 - Send Image Size
 - Download ImageNet
-- change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
-- CUDA is able to perform integer operations, conv2d is not available due to cudnn. Maybe we can use matrix multiplication instead? Or any other solution.
-- out = out // self.trunc? or just shift? (out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE))
-- Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
-- Use newer torch version with inplace << and bit_wise and
-- Reorganize configs (from scratch) as well as models, parametrs and MMLab tools (Just download everything once more)
-- Vector2Scalar multiplication. (for the bReLU)
-- Implement Load Balancing in ReLU (same as Porthos)
-- If all ReLUs are [0,1] - fuse with next layer
-- MaxPool/ReLU flip
-- Verify +1 in integer_random
 - Go over protocol again. Verify implementation
-- Consider using batch size > 1 in distortion extraction (and infer few block sizes simultaneously)
+- out = out // self.trunc? or just shift? (out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE))
+- Vector2Scalar multiplication. (for the bReLU)
+
+- CUDA:
+    (*) https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
+    (*) Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors). It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
+    (*) More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
+    (*) CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
+    (*) Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
+    (*) Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
+    (*) CUDA is able to perform integer operations, conv2d is not available due to cudnn. Maybe we can use matrix multiplication instead? Or any other solution.
+    (*) efficient CUDA r_shift
+
 
 ============================================= Paper notes =============================================
 - Table: benchmark Conv2d on Cuda
@@ -59,18 +47,15 @@
 - Non matmul implementation
 - Remove negligble ops (such as test for 1/2**64)
 - We set real benchmark on (Datasets) and Tasks
-- Runtime as Function of Bandwidth
 - Added CUDA implementation
-- People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
 - We chose not to decompose to offline/online, but this can be done.
-- We propose suite of ops, and show that they can be used in a variety of tasks. We show PoC on 3PC. (Paper is written as Generic tool)
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 
-
-
 ============================================= Minor! =============================================
+
+- Use newer torch version with inplace << and bit_wise and
 - fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
-- - Try https://github.com/tensorly/tensorly
+- Try https://github.com/tensorly/tensorly
 - what about this piece of code??! - assert not backend.any(r == backend.iinfo(r.dtype).max):  # HERE (In PrivateCompareClient)
 - Can we add more LUTs?
 - Understand the += issue
@@ -103,6 +88,12 @@
 - Train with DReLU sign flips..
 - Stochastic sign flips to training (to train stochastic DReLUs)
 - Compare to EIGEN library
+- Make forward_fetch and forward_regular
+- Consider using batch size > 1 in distortion extraction (and infer few block sizes simultaneously)
+- Reorganize configs (from scratch) as well as models, parametrs and MMLab tools (Just download everything once more)
+- make dummy in base class
+- Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
+- change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 
 ======================================== Reading  =============================================
 - Benchmark ops

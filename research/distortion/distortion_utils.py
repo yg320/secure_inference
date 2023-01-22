@@ -105,6 +105,7 @@ class DistortionUtils:
         np.random.shuffle(self.shuffled_indices)
 
     def get_loss(self, out, ground_truth):
+        return self.model.head.loss(out, ground_truth.to(torch.long))['loss'].cpu().numpy()
         loss_ce_list = []
         for sample_id in range(out.shape[0]):
             loss_ce_list.append(
@@ -165,7 +166,7 @@ class DistortionUtils:
                     if block_name in output_block_names:
                         block_name_to_activation[block_name] = activation
 
-                if False: #output_block_names[-1] == self.params.BLOCK_NAMES[-2]:  # TODO: why do we have None in the end of self.BLOCK_NAMES?
+                if True: #output_block_names[-1] == self.params.BLOCK_NAMES[-2]:  # TODO: why do we have None in the end of self.BLOCK_NAMES?
                     losses = self.get_loss(activation, ground_truth)
                 else:
                     losses = np.nan * np.ones(shape=(input_tensor.shape[0],))
