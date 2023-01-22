@@ -12,7 +12,8 @@ from research.distortion.distortion_utils import DistortionUtils, get_block_spec
 from research.distortion.utils import get_channel_order_statistics, get_num_of_channels
 from research.distortion.utils import get_channels_subset
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
-
+from research.distortion.arch_utils.factory import arch_utils_factory
+import torch
 class SimulatedAnnealingHandler:
     def __init__(self, gpu_id, params, cfg, input_block_spec_path, output_block_spec_path):
 
@@ -30,37 +31,17 @@ class SimulatedAnnealingHandler:
 
         self.dim_to_channels = {dim: np.argwhere(self.channel_order_to_dim == dim)[:,0] for dim in np.unique(self.channel_order_to_dim)}
         self.flipped = 0
+        self.arch_utils = arch_utils_factory(self.cfg)
+        self.distortion_utils.model.train()
+
     def get_sibling_channels(self):
         random_channel_a = np.random.choice(self.num_channels)
         channels_b = self.dim_to_channels[self.channel_order_to_dim[random_channel_a]]
         random_channel_b = np.random.choice(channels_b)
         return random_channel_a, random_channel_b
 
-    # def single_channel_proposal(self):
-    #
-    #     random_channel = np.random.choice(self.num_channels)
-    #     layer_name = self.channel_order_to_layer[random_channel]
-    #     block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
-    #     channel = self.channel_order_to_channel[random_channel]
-    #     old_block_size_index = np.argwhere((self.block_size_spec[layer_name][channel] == block_sizes).all(axis=1))[0,0]
-    #     old_block_size = block_sizes[old_block_size_index]
-    #     new_block_size_index = old_block_size_index
-    #
-    #     while new_block_size_index == old_block_size_index:
-    #         min_val = max(0, old_block_size_index - 4)
-    #         max_val = min(len(block_sizes) - 1, old_block_size_index + 4)
-    #         new_block_size_index = np.random.randint(min_val, max_val)
-    #
-    #     new_block_size = block_sizes[new_block_size_index]
-    #     # print(old_block_size, new_block_size)
-    #     layer_num_channels = self.params.LAYER_NAME_TO_DIMS[layer_name][0]
-    #     if channel >= layer_num_channels:
-    #         assert False
-    #     return layer_name, channel, new_block_size
-    #
     def get_suggested_block_size(self, iteration):
-        if iteration == 0:
-            return self.block_size_spec
+
         while True:
             suggest_block_size_spec = copy.deepcopy(self.block_size_spec)
             sibling_channel_a, sibling_channel_b = self.get_sibling_channels()
@@ -75,24 +56,9 @@ class SimulatedAnnealingHandler:
                 suggest_block_size_spec[layer_name_a][channel_a] = suggest_block_size_spec[layer_name_b][channel_b]
                 suggest_block_size_spec[layer_name_b][channel_b] = tmp
                 return suggest_block_size_spec
-    # def get_suggested_block_size(self, iteration):
-    #     suggest_block_size_spec = copy.deepcopy(self.block_size_spec)
-    #     layer_name, channel, new_block_size = self.single_channel_proposal()
-    #     suggest_block_size_spec[layer_name][channel] = new_block_size
-    #
-    #     while True:
-    #         layer_name, channel, new_block_size = self.single_channel_proposal()
-    #         old_block_size = suggest_block_size_spec[layer_name][channel]
-    #         suggest_block_size_spec[layer_name][channel] = new_block_size
-    #
-    #         if get_block_spec_num_relus(suggest_block_size_spec, params) == self.num_of_drelus:
-    #             break
-    #         else:
-    #             suggest_block_size_spec[layer_name][channel] = old_block_size
-    #     return suggest_block_size_spec
 
     def get_batch_size(self, iteration):
-        return 128
+        return 512
 
     def get_batch_index(self, iteration):
         return 0
@@ -101,33 +67,38 @@ class SimulatedAnnealingHandler:
 
     def extract_deformation_channel_ord(self, iteations):
 
-        first_layer = self.params.LAYER_NAMES[0]
-        input_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[first_layer]
-        output_block_name = self.params.BLOCK_NAMES[-2]
-        np.random.shuffle(self.distortion_utils.shuffled_indices)
-        noise = np.inf
+        steps = []
+        distorted_losses = []
+        baseline_losses = []
         for iteration in range(iteations):
+            torch.cuda.empty_cache()
+            print(iteration)
             batch_size = self.get_batch_size(iteration)
             batch_index = self.get_batch_index(iteration)
             suggest_block_size_spec = self.get_suggested_block_size(iteration)
 
-            cur_assets = self.distortion_utils.get_batch_distortion(
-                baseline_block_size_spec=self.block_size_spec,
-                block_size_spec=suggest_block_size_spec,
-                batch_index=batch_index,
-                batch_size=batch_size,
-                input_block_name=input_block_name,
-                output_block_name=output_block_name)
+            np.random.shuffle(self.distortion_utils.shuffled_indices)
+            batch, ground_truth = self.distortion_utils.get_samples(batch_index, batch_size)
+            ground_truth = ground_truth.to(torch.long)
 
-            baseline_loss = cur_assets["Baseline Loss"]
-            distorted_loss = cur_assets['Distorted Loss']
+            self.arch_utils.set_bReLU_layers(self.distortion_utils.model, self.block_size_spec)
+            baseline_loss = float(self.distortion_utils.model(batch, gt_label=ground_truth, return_loss=True)['loss'].detach().cpu().numpy())
 
+            self.arch_utils.set_bReLU_layers(self.distortion_utils.model, suggest_block_size_spec)
+            distorted_loss = float(self.distortion_utils.model(batch, gt_label=ground_truth, return_loss=True)['loss'].detach().cpu().numpy())
 
             if distorted_loss < baseline_loss:
+                steps.append(iteration)
+                distorted_losses.append(distorted_loss)
+                baseline_losses.append(baseline_loss)
                 self.flipped += 1
                 self.block_size_spec = suggest_block_size_spec
-                pickle.dump(obj=suggest_block_size_spec, file=open(self.output_block_spec_path, "wb"))
-                print(iteration, self.flipped, float(distorted_loss))
+
+                if self.flipped % 100 == 1:
+                    pickle.dump(obj=self.block_size_spec, file=open(self.output_block_spec_path, "wb"))
+                    pickle.dump(obj=steps, file=open("/storage/yakir/secure_inference/steps.pickle", "wb"))
+                    pickle.dump(obj=distorted_losses, file=open("/storage/yakir/secure_inference/distorted_losses.pickle", "wb"))
+                    pickle.dump(obj=baseline_losses, file=open("/storage/yakir/secure_inference/baseline_losses.pickle", "wb"))
 
 
 
@@ -135,12 +106,12 @@ if __name__ == "__main__":
     # checkpoint = "/home/yakir/epoch_14.pth"
     # input_block_spec_path = "/home/yakir/block_size_spec_4x4_algo.pickle"
     # output_block_spec_path = "/home/yakir/block_size_spec_4x4_algo_out.pickle"
-    # config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py"
+    # config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
 
     checkpoint = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
     input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
-    output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v3.pickle"
-    config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.005_4.py"
+    output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v4.pickle"
+    config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
 
     # block_size_spec = pickle.load(open(input_block_spec, 'rb'))
     gpu_id = 0
@@ -150,9 +121,9 @@ if __name__ == "__main__":
     params = param_factory(cfg)
 
     params.CHECKPOINT = checkpoint
-
-    SimulatedAnnealingHandler(gpu_id=gpu_id,
-                              params=params,
-                              cfg=cfg,
-                              input_block_spec_path=input_block_spec_path,
-                              output_block_spec_path=output_block_spec_path).extract_deformation_channel_ord(iteations=100000000)
+    with torch.no_grad():
+        SimulatedAnnealingHandler(gpu_id=gpu_id,
+                                  params=params,
+                                  cfg=cfg,
+                                  input_block_spec_path=input_block_spec_path,
+                                  output_block_spec_path=output_block_spec_path).extract_deformation_channel_ord(iteations=100000000)
