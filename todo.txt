@@ -1,11 +1,15 @@
 ============================================= Following days =============================================
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67
-- Simulated annealing (With very short finetuning every k steps, loss >30 doesn't feel right)
 - Finish Methods and Results
-- Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
+- Simulated annealing (With very short finetuning every k steps, loss >30 doesn't feel right)
+
 - Use loss as distortion measure
+- What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
+- Final Seg/Clss results
 - Channel distortion random seed
 
+- Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
+- Consult Shai about codebase and acceptance date
 ============================================= Major =============================================
 
 - Try working with learning rate warmup!
@@ -15,7 +19,6 @@
 - Verify that everything is sent as soon as we have it, and gotten as late as possible
 - AWS!
 - Find optimal stochastic ReLU params
-- Final Seg/Clss results
 - A more efficient bReLU (during training as well)
 - A symmetric bReLU
 - Verify +1 in integer_random
