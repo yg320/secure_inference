@@ -61,9 +61,8 @@ class Decompose(SecureModule):
     def forward(self, value):
         orig_shape = list(value.shape)
         value = value.reshape(-1, 1)
-        with Timer("new array"):
-            # value_bits = backend.zeros(shape=(value.shape[0], self.num_of_compare_bits - self.ignore_msb_bits), dtype=backend.int8)
-            value_bits = Decompose.buffer[:value.shape[0]]
+        # value_bits = backend.zeros(shape=(value.shape[0], self.num_of_compare_bits - self.ignore_msb_bits), dtype=backend.int8)
+        value_bits = Decompose.buffer[:value.shape[0]]
         value_bits = backend.right_shift(value, self.powers, out=value_bits)
         value_bits = backend.bitwise_and(value_bits, 1, out=value_bits)
         ret = value_bits.reshape(orig_shape + [self.num_of_compare_bits - self.ignore_msb_bits])

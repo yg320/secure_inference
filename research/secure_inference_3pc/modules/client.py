@@ -8,7 +8,7 @@ from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_h
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS, TRUNC_BITS
 from research.secure_inference_3pc.timer import timer, Timer
-from research.secure_inference_3pc.modules.conv2d import get_output_shape
+from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.secure_inference_3pc.modules.base import Decompose
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
@@ -28,25 +28,30 @@ class SecureConv2DClient(SecureModule):
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
-    # @timer("SecureConv2DClient")
+    @timer("SecureConv2DClient")
     def forward(self, X_share):
-        self.W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL,
-                                                                 high=MAX_VAL,
-                                                                 size=self.W_shape,
-                                                                 dtype=SIGNED_DTYPE)
-        assert self.W_share.shape[2] == self.W_share.shape[3]
-        assert (self.W_share.shape[1] == X_share.shape[1]) or self.groups > 1
+        # self.network_assets.sender_01.put(np.arange(10))
+        # self.network_assets.receiver_02.get()
 
-        A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
-        B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_share.shape, dtype=SIGNED_DTYPE)
-        C_share = self.network_assets.receiver_02.get()
+        assert self.W_shape[2] == self.W_shape[3]
+        assert (self.W_shape[1] == X_share.shape[1]) or self.groups > 1
 
-        E_share = backend.subtract(X_share, A_share, out=A_share)
-        F_share = backend.subtract(self.W_share, B_share, out=B_share)
+        with Timer("SecureConv2DClient: preprocessing..."):
+            W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
+            A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
+            B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=W_share.shape, dtype=SIGNED_DTYPE)
 
-        share_server = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(backend.concatenate([E_share.flatten(), F_share.flatten()]))
-        E_share_server, F_share_server = share_server[:backend.size(E_share)].reshape(E_share.shape), share_server[backend.size(E_share):].reshape(F_share.shape)
+            with Timer("SecureConv2DClient: subtractions..."):
+                E_share = backend.subtract(X_share, A_share, out=A_share)
+                F_share = backend.subtract(W_share, B_share, out=B_share)
+
+            self.network_assets.sender_01.put(E_share)
+            self.network_assets.sender_01.put(F_share)
+
+        E_share_server = self.network_assets.receiver_01.get()
+        F_share_server = self.network_assets.receiver_01.get()
+
+        # E_share_server, F_share_server = share_server[:backend.size(E_share)].reshape(E_share.shape), share_server[backend.size(E_share):].reshape(F_share.shape)
 
         E = backend.add(E_share_server, E_share, out=E_share)
         F = backend.add(F_share_server, F_share, out=F_share)
@@ -54,11 +59,12 @@ class SecureConv2DClient(SecureModule):
         out = self.conv2d_handler.conv2d(X_share,
                                          F,
                                          E,
-                                         self.W_share,
+                                         W_share,
                                          padding=self.padding,
                                          stride=self.stride,
                                          dilation=self.dilation,
                                          groups=self.groups)
+        C_share = self.network_assets.receiver_02.get()
 
         out = backend.add(out, C_share, out=out)
         out = backend.right_shift(out, TRUNC_BITS, out=out)
@@ -66,6 +72,8 @@ class SecureConv2DClient(SecureModule):
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         out = backend.add(out, mu_0, out=out)
+        # self.network_assets.sender_01.put(np.arange(10))
+        # self.network_assets.receiver_02.get()
 
         return out
 
@@ -116,12 +124,13 @@ class ShareConvertClient(SecureModule):
 
         return y_0
 
-    @timer("ShareConvertClient")
     def forward(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
+
+        # with Timer("ShareConvertClient - processing..."):
 
         alpha = backend.astype(0 < r_0 - r, SIGNED_DTYPE)
 
@@ -244,7 +253,7 @@ class SecureDReLUClient(SecureModule):
         self.share_convert = ShareConvertClient(**kwargs)
         self.msb = SecureMSBClient(**kwargs)
 
-    @timer("SecureDReLUClient")
+    # @timer("SecureDReLUClient")
     def forward(self, X_share):
 
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)

@@ -61,6 +61,9 @@ class BlockRelu(Module):
                     kernel_size=tuple(block_size),
                     stride=tuple(block_size), ceil_mode=True) for block_size in self.active_block_sizes]
 
+        # self.num_soft_start_steps = 150000
+        # self.training_forward_counter = 0
+
     def forward(self, activation):
 
         with torch.no_grad():
@@ -76,6 +79,13 @@ class BlockRelu(Module):
                 cur_relu_map = avg_pool(cur_input).gt_(0)
                 o = F.interpolate(input=cur_relu_map, scale_factor=tuple(block_size))
                 relu_map[:, channels] = o[:, :, :activation.shape[2], :activation.shape[3]]
+
+            # if self.training and (self.training_forward_counter < self.num_soft_start_steps):
+            #     alpha = self.training_forward_counter / self.num_soft_start_steps
+            #     relu_map = relu_map.mul_(alpha)
+            #     tmp = activation.sign().add_(1).div_(2).mul_(1-alpha)
+            #     relu_map = relu_map.add_(tmp)
+            #     self.training_forward_counter += 1
 
         return relu_map.mul_(activation)
 

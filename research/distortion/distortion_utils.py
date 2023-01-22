@@ -50,6 +50,15 @@ def get_num_relus(block_size, activation_dim):
     return num_relus
 
 
+def get_block_spec_num_relus(block_spec, params):
+    num_relus = 0
+    for layer_name, block_sizes in block_spec.items():
+        activation_dim = params.LAYER_NAME_TO_DIMS[layer_name][1]
+        for block_size in block_sizes:
+            num_relus += get_num_relus(tuple(block_size), activation_dim)
+    return num_relus
+
+
 @lru_cache(maxsize=None)
 def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8, protocol="Porthos", scalar_vector_optimization=True, with_prf=True):
     assert with_prf

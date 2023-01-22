@@ -15,7 +15,7 @@ from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 if IS_TORCH_BACKEND:
     empty_arr = torch.Tensor([])
 else:
-    empty_arr = np.array([])
+    empty_arr = np.array([], dtype=np.int8)
 class Receiver(Thread):
     def __init__(self, port, device):
         super(Receiver, self).__init__()

@@ -9,7 +9,7 @@ from research.secure_inference_3pc.base import P, module_67
 from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
-from research.secure_inference_3pc.modules.conv2d import get_output_shape
+from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
@@ -56,6 +56,17 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
     def forward(self, X_share):
+        # self.network_assets.sender_02.put(np.arange(10))
+        # self.network_assets.receiver_12.get()
+        out = self.forward_(X_share)
+
+        # self.network_assets.sender_02.put(np.arange(10))
+        # self.network_assets.receiver_12.get()
+
+        return out
+
+    @timer("SecureConv2DCryptoProvider")
+    def forward_(self, X_share):
 
         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
@@ -85,11 +96,6 @@ class PrivateCompareCryptoProvider(SecureModule):
         d = d % P
         beta_p = backend.astype((d == 0).any(axis=-1), SIGNED_DTYPE)
 
-        # is_zero = backend.equal(d, 0, out=d)
-        # beta_p = backend.astype(is_zero.any(axis=-1), SIGNED_DTYPE)
-        #
-        # # beta_p = backend.any(is_zero, axis=-1, out=is_zero[..., 0])
-        # # assert False
         return beta_p
 
 
@@ -99,21 +105,28 @@ class ShareConvertCryptoProvider(SecureModule):
         self.private_compare = PrivateCompareCryptoProvider(**kwargs)
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
+    # @timer("ShareConvertCryptoProvider")
     def forward(self, size):
+        # with Timer("ShareConvertCryptoProvider: prf... "):
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS,), dtype=backend.int8)
+        delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
+
+        # with Timer("ShareConvertCryptoProvider: get... "):
+
         a_tild_0 = self.network_assets.receiver_02.get()
         a_tild_1 = self.network_assets.receiver_12.get()
+
+        # with Timer("ShareConvertCryptoProvider: Processing - 0 "):
         x = backend.add(a_tild_0, a_tild_1, out=a_tild_1)
-
         x_bits = self.decompose(x)
-
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS,), dtype=backend.int8)
         x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
-        self.network_assets.sender_12.put(backend.astype(x_bits_1, backend.int8))
+        x_bits_1 = backend.astype(x_bits_1, backend.int8)
+
+        self.network_assets.sender_12.put(x_bits_1)
 
         diff = backend.subtract(a_tild_0, x, out=a_tild_0)
         delta = backend.greater(diff, 0, out=diff)
 
-        delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         delta_0 = self.sub_mode_L_minus_one(delta, delta_1)
         self.network_assets.sender_02.put(delta_0)
 
@@ -154,37 +167,33 @@ class SecureMSBCryptoProvider(SecureModule):
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, size):
-        with Timer("CryptoProvider - MSB - Prep"):
-            with Timer("CryptoProvider - MSB - prfs"):
 
-                x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
-                x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=(size[0], 20), dtype=backend.int8)
-                x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
-                x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
+        x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=(size[0], 20), dtype=backend.int8)
+        x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
+        x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
 
-            # with Timer("CryptoProvider - MSB - Decompose + processing"):
-            #     x_bits_1, x_0, x_bit_0_1 = processing_numba(x, x_1, x_bit_0_0, x_bits_0,
-            #                                                 x.astype(np.uint64, copy=False),
-            #                                                 x_1.astype(np.uint64, copy=False),
-            #                                                 NUM_OF_COMPARE_BITS,
-            #                                                 IGNORE_MSB_BITS)
+        # with Timer("CryptoProvider - MSB - Decompose + processing"):
+        # x_bits_1, x_0, x_bit_0_1 = processing_numba(x, x_1, x_bit_0_0, x_bits_0,
+        #                                             x.astype(np.uint64, copy=False),
+        #                                             x_1.astype(np.uint64, copy=False),
+        #                                             NUM_OF_COMPARE_BITS,
+        #                                             IGNORE_MSB_BITS)
 
-            with Timer("CryptoProvider - MSB - Decompose + processing"):
-                x_bits = self.decompose(x)
+        x_bits = self.decompose(x)
 
 
-                x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
-                x_0 = self.sub_mode_L_minus_one(x, x_1)
-                x_bit0 = np.bitwise_and(x, 1, out=x)  # x_bit0 = x % 2
-                x_bit_0_1 = backend.subtract(x_bit0, x_bit_0_0, out=x_bit0)
+        x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
+        x_0 = self.sub_mode_L_minus_one(x, x_1)
+        x_bit0 = np.bitwise_and(x, 1, out=x)  # x_bit0 = x % 2
+        x_bit_0_1 = backend.subtract(x_bit0, x_bit_0_0, out=x_bit0)
 
-            with Timer("CryptoProvider - MSB - put"):
 
-                self.network_assets.sender_02.put(x_0)
-                self.network_assets.sender_02.put(x_bit_0_0)
+        self.network_assets.sender_02.put(x_0)
+        self.network_assets.sender_02.put(x_bit_0_0)
 
-                self.network_assets.sender_12.put(x_bits_1)
-                self.network_assets.sender_12.put(x_bit_0_1)
+        self.network_assets.sender_12.put(x_bits_1)
+        self.network_assets.sender_12.put(x_bit_0_1)
 
         beta_p = self.private_compare()
 

@@ -44,9 +44,7 @@ class NumpySocket(socket.socket):
 
     @staticmethod
     def __pack_frame(frame):
-        # out_0 = frame.tobytes()
-        # out_0 = len(out_0).to_bytes(12, byteorder='big') + out_0
-        # return out_0
+
         f = BytesIO()
         np.save(f, arr=frame)
 
@@ -54,7 +52,6 @@ class NumpySocket(socket.socket):
         header = packet_size
         header = bytes(header.encode())  # prepend length of array
         out = bytearray(header)
-        # out += header
 
         f.seek(0)
         out += f.read()

@@ -1,85 +1,48 @@
-- Leetcode, Algo1, tabs
-
 ============================================= Following days =============================================
-- vectorized functions
-- AWS!
-- Channel distortion random seed
+- Everything to Numba (Vectorize?)
+- Simulated annealing
+- Finish Methods and Results
+
+============================================= Major =============================================
+
 - Try working with learning rate warmup!
-- It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
 - https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
-- bReLU is too expensive
-    ** Build dummy one - to understand by how much thing can be cheaper (Found it to be relatively negligible - 7% !)
-    ** Start by bReLU in numba
-    ** Use Float32 based pooling?
-    ** implement in C++ (and then training will be faster..) [https://pytorch.org/tutorials/advanced/cpp_extension.html]
-- Train with DReLU sign flips..
+- bReLU is too expensive?
+- Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors). It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
+- Fetch ops that don't depend on anything
+- Inplace + optimize..
+- More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
 - We really need to compare Porthos implementation to ours on the same machine..
 - Have cryptoprovider work with shapes only!
 - random - Have torch do that! (Upgrade if needed)
-- Always first put when you have things ready (Similary, get as late as possible) - why doesn't work?
-- prep block relu, post block relu, scalar/tensor mult
-- Finetune iterative (itertaive sub channels (with multiple training))
-- Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors)
-- Everybody is idle for a long period of time!
-- Fetch ops that don't depend on anything
-- Options!
-- Method & Intro (freestyle talk on our research. vision oriented), use FALCON.
-- Inplace + optimize..
-- Instead of TRUNC, consider less << (Maybe slows down the process)
-- Timer - don't add prefetching!
-- Consider descarding ret[ret == - 1] = 0.
-- More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
-============================================= Research Major =============================================
+- Always first put when you have things ready (Similary, get as late as possible) - why doesn't work? - Verify that everything is sent as soon as we have it
+- AWS!
+- Channel distortion random seed
 - Use loss as distortion measure
 - CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
-
-- Benchmark ops
 - Find optimal stochastic ReLU params
 - Final Seg/Clss results
-- Replace max-pool with ReLUs? (what abound avg pool)
-- Classification - 32bits
-- Use blocksize [1,0] or discard!
-- Float16? uint8?
 - Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
-- ablation finetuning
-- Don't put back on CPU
-- Dmei Avt
-- Use eagerpy
-- ImageNet classification - compare with Porthos
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
-- Consider what is best, torch or numpy - avoid converting between them.
-- Classification and Detection
-
-- Replace Max Pool with Avg Pool with correction
-- Allow for softmax via maxpool derivative (Or FALCON implementation)
-- Unfairness!
-- Stochastic sign flips to training (to train stochastic DReLUs)
-- Compare to EIGEN library
-============================================= Implementation Major =============================================
-
+- Soft training?
 - A more efficient bReLU (during training as well)
 - A symmetric bReLU
-- torch socket
 - efficient CUDA r_shift
 - Mod %67
 - Make forward_fetch and forward_regular
 - make dummy in base class
 - Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
 - Agnostic prf prefetch
-- Further optimize Convs (Don't send back to cpu before second conv)
-- Consider adding Numba implementation in case CUDA isn't available. (Maybe stick to Pytorch instead of Numpy?!)
+- Further optimize Convs
 - Replace mult in ReLU with select share
-- Call .integers() without arguments
 - Send Image Size
 - Download ImageNet
 - change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 - CUDA is able to perform integer operations, conv2d is not available due to cudnn. Maybe we can use matrix multiplication instead? Or any other solution.
-- Modulo 67
 - out = out // self.trunc? or just shift? (out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE))
 - Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
 - Use newer torch version with inplace << and bit_wise and
 - Reorganize configs (from scratch) as well as models, parametrs and MMLab tools (Just download everything once more)
-- Make a Unified bReLU - make it a symmetric one.
 - Vector2Scalar multiplication. (for the bReLU)
 - Implement Load Balancing in ReLU (same as Porthos)
 - If all ReLUs are [0,1] - fuse with next layer
@@ -89,21 +52,13 @@
 - Consider using batch size > 1 in distortion extraction (and infer few block sizes simultaneously)
 
 ============================================= Paper notes =============================================
-- Table: ours (Knapsack) vs. Naive
 - Table: benchmark Conv2d on Cuda
-- Figure - Layer reduction histogram
-- Figure - Method explaination
-- Figure - graph - (Non secure!) - Performance degredation as function of number of comparisons
 - Analysis - Maybe will help in KnapSack separation (due to proper additivity)
 - A paragraph on information leakage
-- Paper should be written as a generic tool!
-- Mention that most of our contributions are not related directly to the protocol, and are relevant to many other protocols. (E.g. FALCON)
 - Float implementation
-- Stochastic ReLU
 - Non matmul implementation
 - Remove negligble ops (such as test for 1/2**64)
 - We set real benchmark on (Datasets) and Tasks
-- We deliver a secure package over MMLab project
 - Runtime as Function of Bandwidth
 - Added CUDA implementation
 - People want to use crypto efficient ops, but this is not what the community has been optimizing in the past 10 years (E.g., l2 instead of ReLU), on the other hand, these ops are expensive. etc.
@@ -111,7 +66,46 @@
 - We propose suite of ops, and show that they can be used in a variety of tasks. We show PoC on 3PC. (Paper is written as Generic tool)
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 
-======================================== Reading Minor =============================================
+
+
+============================================= Minor! =============================================
+- fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
+- - Try https://github.com/tensorly/tensorly
+- what about this piece of code??! - assert not backend.any(r == backend.iinfo(r.dtype).max):  # HERE (In PrivateCompareClient)
+- Can we add more LUTs?
+- Understand the += issue
+- Do we always send minimal data types?
+- Consider MultiThreaded ReLU
+- Can we optimize beta in P0/P1/P2?
+- Try to make float conv2 with numba. If it works - verify that group conv is optimized
+- Is GLOO slowing us down?
+- Clean up threads
+- Consider to implement PRF fetcher in a different approach
+- Verify L and L-1
+- Major refactoring - Bunch of redundancies
+- Can some ReLU ops be fetched?
+- 2 GPUs 3 parties
+- Finetune iterative (itertaive sub channels (with multiple training))
+- Add quantization noise (to allow for 32bit inference) - QAT
+- Can we fuze mobilenet 1x1 and 3x3 convolutions?
+- Clip TRUNC every k'th conv
+- Why first image is slow
+- Start analysis (Analysis with noise to KnapSack matrix)
+- Detection
+- Further datasets/architectures/models/tasks
+- QAT
+- Should FC and GAP be part of distortion?
+- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties
+- Allow for softmax via maxpool derivative (Or FALCON implementation)
+- Use eagerpy
+- Use blocksize [1,0] or discard!
+- Soft start (alpha * relu + (1-alpha) * bReLU)
+- Train with DReLU sign flips..
+- Stochastic sign flips to training (to train stochastic DReLUs)
+- Compare to EIGEN library
+
+======================================== Reading  =============================================
+- Benchmark ops
 - FALCON, 2pc, 3pc, OT, HE
 - ABY3
 - How can 3PC be converted to 2PC? (Using OT)
@@ -122,60 +116,6 @@
 - Understand Porthos float2int and int2float methods
 - Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
 
-============================================= Research Minor =============================================
-- Add quantization noise (to allow for 32bit inference) - QAT
-- Distortion extraction that already uses AvgPool
-- Can we fuze mobilenet 1x1 and 3x3 convolutions?
-- Clip TRUNC every k'th conv
-- Why first image is slow
-- Soft training?
+============================================= Never =============================================
+
 - CRF
-- Start analysis (Analysis with noise to KnapSack matrix)
-- Detection
-- Further datasets/architectures/models/tasks
-- QAT
-- Should FC and GAP be part of distortion?
-- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties?
-============================================= Implementation Minor =============================================
-- fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
-- - Try https://github.com/tensorly/tensorly
-- what about this piece of code??! - assert not backend.any(r == backend.iinfo(r.dtype).max):  # HERE (In PrivateCompareClient)
-- Can we add more LUTs?
-- Can we convert more ops into inplace ones?
-- Understand the += issue
-- Do we always send minimal data types?
-- Consider MultiThreaded ReLU
-- Verify that everything is sent as soon as we have it
-- Can we optimize beta in P0/P1/P2?
-- Try to make float conv2 with numba. If it works - verify that group conv is optimized
-- Consider to further optimize Numba if it's still relevant
-- Make sure all protocols are
-- Is GLOO slowing us down?
-- Clean up threads
-- Consider to implement PRF fetcher in a different approach
-- Verify L and L-1
-- Verify that there aren't any fetches that crypto_provider can do (that hinder us)
-- Major refactoring - Bunch of redundancies
-- Verify fetchers are not slowing us down. Also verify that they are really needed
-- Can some ReLU ops be fetched?
-- Implement get_c in Numba! (And maybe even other ops)
-- 2 GPUs 3 parties
-- benchmark on AWS
-
-
-
-
-
-
-
-
-
-
-
-
-
-Deep learning has made a great success in recent years (E.g., []). As a result, DLaaS has been extensively used in recent years (E.g., [refs]).
-However, in many domains, privacy concerns set a glass ceiling on its use. For example, in medical imaging, the privacy of patients is a major concern. In addition, in many other domains, such as autonomous driving, the privacy of the users is a major concern.
-In these domains, the data is sensitive and cannot be shared with the cloud. In addition, the data is often collected from many users,
-and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and the data is not owned by a single entity. In these cases, the data cannot be shared with the cloud. In addition, the data is often collected from many users, and
-

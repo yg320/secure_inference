@@ -412,7 +412,7 @@ class Conv2DHandler:
             return out.cpu().numpy()
 
     def conv2d(self, A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1):
-        print(A.shape, B.shape, padding, stride, dilation, groups)
+
         ret = self.single_conv2d(A, B, stride, padding, dilation, groups)
         if C is not None:
             ret += self.single_conv2d(C, D, stride, padding, dilation, groups)
