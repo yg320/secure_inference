@@ -92,7 +92,7 @@ class SimulatedAnnealingHandler:
     #     return suggest_block_size_spec
 
     def get_batch_size(self, iteration):
-        return 128
+        return 16
 
     def get_batch_index(self, iteration):
         return 0
@@ -106,7 +106,7 @@ class SimulatedAnnealingHandler:
         output_block_name = self.params.BLOCK_NAMES[-2]
 
         noise = np.inf
-        for iteration in tqdm(range(iteations)):
+        for iteration in range(iteations):
             batch_size = self.get_batch_size(iteration)
             batch_index = self.get_batch_index(iteration)
             suggest_block_size_spec = self.get_suggested_block_size(iteration)
@@ -125,7 +125,7 @@ class SimulatedAnnealingHandler:
                 self.block_size_spec = suggest_block_size_spec
                 noise = suggest_block_size_noise
                 pickle.dump(obj=suggest_block_size_spec, file=open(self.output_block_spec_path, "wb"))
-                print(noise)
+            print(iteration, noise)
 
 
 
@@ -134,6 +134,11 @@ if __name__ == "__main__":
     input_block_spec_path = "/home/yakir/block_size_spec_4x4_algo.pickle"
     output_block_spec_path = "/home/yakir/block_size_spec_4x4_algo_out.pickle"
     config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py"
+
+    # checkpoint = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
+    # input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
+    # output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing.pickle"
+    # config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.005_4.py"
 
     # block_size_spec = pickle.load(open(input_block_spec, 'rb'))
     gpu_id = 0
@@ -148,4 +153,4 @@ if __name__ == "__main__":
                               params=params,
                               cfg=cfg,
                               input_block_spec_path=input_block_spec_path,
-                              output_block_spec_path=output_block_spec_path).extract_deformation_channel_ord(iteations=1000000)
+                              output_block_spec_path=output_block_spec_path).extract_deformation_channel_ord(iteations=100000000)
