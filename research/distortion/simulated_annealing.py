@@ -27,7 +27,7 @@ class SimulatedAnnealingHandler:
                             'seed': 1563879445,
                             'sampler_cfg': None,
                             'samples_per_gpu': 512,
-                            'workers_per_gpu': 32}
+                            'workers_per_gpu': 16}
         self.data_loader = build_dataloader(self.distortion_utils.dataset, **train_loader_cfg)
 
         self.keys = ["Noise", "Signal"]
@@ -89,16 +89,16 @@ class SimulatedAnnealingHandler:
                 self.arch_utils.set_bReLU_layers(self.distortion_utils.model, suggest_block_size_spec)
                 distorted_loss = float(self.distortion_utils.model(batch, gt_label=gt, return_loss=True)['loss'].detach().cpu().numpy())
 
-                if distorted_loss < baseline_loss:
+                if (distorted_loss / baseline_loss) < 0.994:
                     steps.append(iteration)
                     distorted_losses.append(distorted_loss)
                     baseline_losses.append(baseline_loss)
                     self.flipped += 1
                     self.block_size_spec = suggest_block_size_spec
 
-                    if self.flipped % 100 == 1:
+                    if self.flipped % 10 == 0:
                         pickle.dump(obj=self.block_size_spec, file=open(self.output_block_spec_path, "wb"))
-                        pickle.dump(obj=(steps,distorted_losses,baseline_losses), file=open("/storage/yakir/secure_inference/data.pickle", "wb"))
+                        pickle.dump(obj=(steps, distorted_losses, baseline_losses), file=open("/storage/yakir/secure_inference/data_2.pickle", "wb"))
 
 
 
