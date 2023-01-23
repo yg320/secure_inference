@@ -17,6 +17,8 @@ from mmcls.datasets import build_dataloader
 import torch
 from research.distortion.utils import get_model, get_data
 from research.utils import build_data
+import time
+import multiprocessing
 
 class SimulatedAnnealingHandler:
     def __init__(self, device_ids, params, cfg, input_block_spec_path, output_block_spec_path, checkpoint_path):
@@ -34,12 +36,12 @@ class SimulatedAnnealingHandler:
 
         train_loader_cfg = {
             'num_gpus': len(self.device_ids),
-            'dist': False,
+            'dist': True,
             'round_up': True,
             'seed': 1563879445,
             'sampler_cfg': None,
-            'samples_per_gpu': 64,
-            'workers_per_gpu': 4
+            'samples_per_gpu': 512 // len(self.device_ids),
+            'workers_per_gpu': multiprocessing.cpu_count() // len(self.device_ids)
         }
 
         self.data_loader = build_dataloader(self.dataset, **train_loader_cfg)
@@ -90,6 +92,7 @@ class SimulatedAnnealingHandler:
                                                    inputs=batch,
                                                    kwargs_tup=kwargs_tup,
                                                    devices=self.device_ids)
+
         loss = sum([float(x['loss'].cpu()) for x in outputs]) / len(self.device_ids)
 
         return loss
@@ -102,9 +105,10 @@ class SimulatedAnnealingHandler:
         iteration = 0
 
         while True:
+            # t0 = time.time()
             for _, data in tqdm(enumerate(self.data_loader)):
+                # t1 = time.time()
                 iteration += 1
-                print(iteration)
                 torch.cuda.empty_cache()
 
                 suggest_block_size_spec = self.get_suggested_block_size()
@@ -113,10 +117,18 @@ class SimulatedAnnealingHandler:
                 gt = torch.nn.parallel.scatter(data['gt_label'], self.device_ids)
                 kwargs_tup = tuple(dict(return_loss=True, gt_label=gt[i]) for i in range(len(self.device_ids)))
 
+                # t2 = time.time()
                 baseline_loss = self.get_loss(batch, kwargs_tup, self.block_size_spec)
                 distorted_loss = self.get_loss(batch, kwargs_tup, suggest_block_size_spec)
+                # t3 = time.time()
 
-                if (distorted_loss / baseline_loss) < 0.994:
+                # print(f"================{iteration}======================")
+                # print("data load time: ", t1 - t0)
+                # print("data processing time: ", t2 - t1)
+                # print("get loss time: ", t3 - t2)
+                # print("total time: ", t3 - t0)
+                t0 = time.time()
+                if (distorted_loss / baseline_loss) < 0.99:
                     steps.append(iteration)
                     distorted_losses.append(distorted_loss)
                     baseline_losses.append(baseline_loss)
@@ -124,8 +136,9 @@ class SimulatedAnnealingHandler:
                     self.block_size_spec = suggest_block_size_spec
 
                     if self.flipped % 10 == 0:
+                        print("Dumping - Flipped: ", self.flipped)
                         pickle.dump(obj=self.block_size_spec, file=open(self.output_block_spec_path, "wb"))
-                        pickle.dump(obj=(steps, distorted_losses, baseline_losses), file=open("/storage/yakir/secure_inference/data_2.pickle", "wb"))
+                        pickle.dump(obj=(steps, distorted_losses, baseline_losses), file=open("/storage/yakir/secure_inference/data_4.pickle", "wb"))
 
 
 
@@ -138,9 +151,9 @@ if __name__ == "__main__":
     #
     # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
     # input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
-    # output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v6.pickle"
+    # output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v8.pickle"
     # config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
-    # device_ids = [0, 1, 2, 3, 4, 5, 6, 7]
+    # device_ids = [0, 1]
 
     cfg = mmcv.Config.fromfile(config)
     params = param_factory(cfg)
