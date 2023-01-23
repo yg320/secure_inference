@@ -15,33 +15,50 @@ from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why
 from research.distortion.arch_utils.factory import arch_utils_factory
 from mmcls.datasets import build_dataloader
 import torch
-class SimulatedAnnealingHandler:
-    def __init__(self, gpu_id, params, cfg, input_block_spec_path, output_block_spec_path):
+from research.distortion.utils import get_model, get_data
+from research.utils import build_data
 
+class SimulatedAnnealingHandler:
+    def __init__(self, device_ids, params, cfg, input_block_spec_path, output_block_spec_path, checkpoint_path):
+        self.device_ids = device_ids
         self.params = params
         self.cfg = cfg
-        self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params, cfg=self.cfg)
-        train_loader_cfg = {'num_gpus': 1,
-                            'dist': False,
-                            'round_up': True,
-                            'seed': 1563879445,
-                            'sampler_cfg': None,
-                            'samples_per_gpu': 512,
-                            'workers_per_gpu': 16}
-        self.data_loader = build_dataloader(self.distortion_utils.dataset, **train_loader_cfg)
+
+        self.model = get_model(
+            config=self.cfg,
+            gpu_id=None,
+            checkpoint_path=checkpoint_path
+        )
+
+        self.dataset = build_data(self.cfg, train=True)
+
+        train_loader_cfg = {
+            'num_gpus': len(self.device_ids),
+            'dist': False,
+            'round_up': True,
+            'seed': 1563879445,
+            'sampler_cfg': None,
+            'samples_per_gpu': 64,
+            'workers_per_gpu': 4
+        }
+
+        self.data_loader = build_dataloader(self.dataset, **train_loader_cfg)
 
         self.keys = ["Noise", "Signal"]
         self.block_size_spec = pickle.load(open(input_block_spec_path, "rb"))
         self.output_block_spec_path = output_block_spec_path
+
         self.channel_order_to_layer, self.channel_order_to_channel, self.channel_order_to_dim = get_channel_order_statistics(self.params)
-
         self.num_channels = get_num_of_channels(self.params)
-        self.num_of_drelus = get_block_spec_num_relus(self.block_size_spec, self.params)
+        self.dim_to_channels = {dim: np.argwhere(self.channel_order_to_dim == dim)[:, 0] for dim in np.unique(self.channel_order_to_dim)}
 
-        self.dim_to_channels = {dim: np.argwhere(self.channel_order_to_dim == dim)[:,0] for dim in np.unique(self.channel_order_to_dim)}
         self.flipped = 0
         self.arch_utils = arch_utils_factory(self.cfg)
-        self.distortion_utils.model.train()
+
+        self.model.train()
+        self.model.cuda()
+
+        self.replicas = torch.nn.parallel.replicate(self.model, self.device_ids)
 
     def get_sibling_channels(self):
         random_channel_a = np.random.choice(self.num_channels)
@@ -49,7 +66,7 @@ class SimulatedAnnealingHandler:
         random_channel_b = np.random.choice(channels_b)
         return random_channel_a, random_channel_b
 
-    def get_suggested_block_size(self, iteration):
+    def get_suggested_block_size(self):
 
         while True:
             suggest_block_size_spec = copy.deepcopy(self.block_size_spec)
@@ -66,28 +83,38 @@ class SimulatedAnnealingHandler:
                 suggest_block_size_spec[layer_name_b][channel_b] = tmp
                 return suggest_block_size_spec
 
+    def get_loss(self, batch, kwargs_tup, block_size_spec):
+        for replica in self.replicas:
+            self.arch_utils.set_bReLU_layers(replica, block_size_spec)
+        outputs = torch.nn.parallel.parallel_apply(modules=self.replicas,
+                                                   inputs=batch,
+                                                   kwargs_tup=kwargs_tup,
+                                                   devices=self.device_ids)
+        loss = sum([float(x['loss'].cpu()) for x in outputs]) / len(self.device_ids)
 
-    def extract_deformation_channel_ord(self, iteations):
+        return loss
+
+    def extract_deformation_channel_ord(self):
 
         steps = []
         distorted_losses = []
         baseline_losses = []
         iteration = 0
+
         while True:
-            for _, data in enumerate(self.data_loader):
+            for _, data in tqdm(enumerate(self.data_loader)):
                 iteration += 1
                 print(iteration)
                 torch.cuda.empty_cache()
 
-                suggest_block_size_spec = self.get_suggested_block_size(iteration)
+                suggest_block_size_spec = self.get_suggested_block_size()
 
-                batch = data['img'].to("cuda:0")
-                gt = data['gt_label'].to("cuda:0")
-                self.arch_utils.set_bReLU_layers(self.distortion_utils.model, self.block_size_spec)
-                baseline_loss = float(self.distortion_utils.model(batch, gt_label=gt, return_loss=True)['loss'].detach().cpu().numpy())
+                batch = torch.nn.parallel.scatter(data['img'], self.device_ids)
+                gt = torch.nn.parallel.scatter(data['gt_label'], self.device_ids)
+                kwargs_tup = tuple(dict(return_loss=True, gt_label=gt[i]) for i in range(len(self.device_ids)))
 
-                self.arch_utils.set_bReLU_layers(self.distortion_utils.model, suggest_block_size_spec)
-                distorted_loss = float(self.distortion_utils.model(batch, gt_label=gt, return_loss=True)['loss'].detach().cpu().numpy())
+                baseline_loss = self.get_loss(batch, kwargs_tup, self.block_size_spec)
+                distorted_loss = self.get_loss(batch, kwargs_tup, suggest_block_size_spec)
 
                 if (distorted_loss / baseline_loss) < 0.994:
                     steps.append(iteration)
@@ -103,27 +130,25 @@ class SimulatedAnnealingHandler:
 
 
 if __name__ == "__main__":
-    # checkpoint = "/home/yakir/epoch_14.pth"
-    # input_block_spec_path = "/home/yakir/block_size_spec_4x4_algo.pickle"
-    # output_block_spec_path = "/home/yakir/block_size_spec_4x4_algo_out.pickle"
-    # config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
-
-    checkpoint = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
-    input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
-    output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v5.pickle"
-    config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
-
-    # block_size_spec = pickle.load(open(input_block_spec, 'rb'))
-    gpu_id = 0
+    checkpoint_path = "/home/yakir/epoch_14.pth"
+    input_block_spec_path = "/home/yakir/block_size_spec_4x4_algo.pickle"
+    output_block_spec_path = "/home/yakir/block_size_spec_4x4_algo_out.pickle"
+    config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
+    device_ids = [0, 1]
+    #
+    # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
+    # input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
+    # output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v6.pickle"
+    # config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
+    # device_ids = [0, 1, 2, 3, 4, 5, 6, 7]
 
     cfg = mmcv.Config.fromfile(config)
-    gpu_id = gpu_id
     params = param_factory(cfg)
 
-    params.CHECKPOINT = checkpoint
     with torch.no_grad():
-        SimulatedAnnealingHandler(gpu_id=gpu_id,
+        SimulatedAnnealingHandler(device_ids=device_ids,
                                   params=params,
                                   cfg=cfg,
                                   input_block_spec_path=input_block_spec_path,
-                                  output_block_spec_path=output_block_spec_path).extract_deformation_channel_ord(iteations=100000000)
+                                  output_block_spec_path=output_block_spec_path,
+                                  checkpoint_path=checkpoint_path).extract_deformation_channel_ord()
