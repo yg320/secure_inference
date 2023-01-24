@@ -24,6 +24,7 @@ class ChannelDistortionHandler:
 
         self.keys = ["Noise", "Signal"] #, "Distorted Loss", "Baseline Loss"]
 
+        # self.distortion_utils.model.train()
     def extract_deformation_channel_ord(self,
                                         batch_index: int,
                                         layer_names: List[str],
