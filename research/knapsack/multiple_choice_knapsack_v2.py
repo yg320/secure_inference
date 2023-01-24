@@ -386,9 +386,9 @@ def get_cost(block_size, activation_dim, cost_type, division=1):
 #     return layer_name_to_block_size, dp_arg
 
 class IO_Buffer:
-    def __init__(self, word_size, package="numpy", load=False, buffer_size=10):
+    def __init__(self, word_size, package="numpy", load=False, buffer_size=10, device=0):
         self.buffer_size = buffer_size
-        self.buffer_dir = f"/home/yakir/Data2/buffer_dir/{package}"
+        self.buffer_dir = f"/home/yakir/Data2/buffer_dir/{package}_{device}"
 
         self.word_size = word_size
         self.buffer_init_value = 255
@@ -450,7 +450,7 @@ class IO_Buffer:
 
 
 class MultipleChoiceKnapsack:
-    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, target_snr=None, snr_seeds_file=None):
+    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, target_snr=None, snr_seeds_file=None, device=0):
         self.params = params
         self.cost_type = cost_type
         self.division = division
@@ -491,9 +491,9 @@ class MultipleChoiceKnapsack:
         else:
             self.snr_seeds = None
 
+        self.device = device
     @staticmethod
-    def run_multiple_choice(Ws, Ps, num_rows, num_columns):
-        device = torch.device("cuda:0")
+    def run_multiple_choice(Ws, Ps, num_rows, num_columns, device=0):
         Ws = torch.from_numpy(Ws)
         Ps = torch.from_numpy(Ps)
 
@@ -504,7 +504,7 @@ class MultipleChoiceKnapsack:
         buffer = torch.zeros(size=(num_columns,), dtype=torch.float64)
         boolean_index_buffer = torch.zeros(size=(num_columns,), dtype=torch.bool)
 
-        dp_arg = IO_Buffer(num_columns, package="torch", buffer_size=1)
+        dp_arg = IO_Buffer(num_columns, package="torch", buffer_size=1, device=device)
         dp = - float("Inf") * torch.ones(size=(num_columns + 1,), dtype=torch.float64)
 
         init_row = dp_arg[0].clone()
@@ -513,6 +513,7 @@ class MultipleChoiceKnapsack:
         dp[Ws[0]] = Ps[0]
 
         negative_one = -torch.ones(size=(1,), dtype=torch.int64)
+        device = torch.device(f"cuda:{device}")
 
         Ws = Ws.to(device)  # (torch.Size([14272, 56]), torch.int64)                6.39M
         Ps = Ps.to(device)  # (torch.Size([14272, 56]), torch.float64)              6.39M
@@ -617,7 +618,7 @@ class MultipleChoiceKnapsack:
 
         Ps, Ws, block_size_tracker = self.prepare_matrices()
 
-        dp_arg, dp = self.run_multiple_choice(Ws, Ps, self.num_channels, self.max_cost)
+        dp_arg, dp = self.run_multiple_choice(Ws, Ps, self.num_channels, self.max_cost, self.device)
 
         block_size_spec = self.convert_dp_arg_to_block_size_spec(dp_arg, Ws, block_size_tracker)
 
@@ -662,6 +663,7 @@ if __name__ == "__main__":
     parser.add_argument('--max_cost', type=int, default=644224)
     parser.add_argument('--target_snr', type=float, default=0.0001)
     parser.add_argument('--snr_seed_file', type=str, default=None)
+    parser.add_argument('--device', type=int, default=0)
 
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
@@ -680,7 +682,8 @@ if __name__ == "__main__":
                                  num_iters=args.num_iters,
                                  max_cost=args.max_cost,
                                  target_snr=args.target_snr,
-                                 snr_seeds_file=args.snr_seed_file)
+                                 snr_seeds_file=args.snr_seed_file,
+                                 device=args.device)
 
     block_size_spec = mck.get_optimal_block_sizes()
 

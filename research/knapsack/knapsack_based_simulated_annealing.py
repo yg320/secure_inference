@@ -14,7 +14,7 @@ from research.distortion.utils import get_model, get_data
 from research.utils import build_data
 import multiprocessing
 import os
-
+import time
 
 class SimpleTest:
     def __init__(self, device_ids, params, cfg):
@@ -89,7 +89,7 @@ if __name__ == "__main__":
     snr = "20000"
     PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/home/yakir/PycharmProjects/secure_inference\"; '
     block_size_spec_file_format = "/home/yakir/relu_spec_files_test/{seed}.pickle"
-    snr_seed_file = "/home/yakir/snr_seed_file.pickle"
+    snr_seed_file = "/home/yakir/snr_seed_file_{device}.pickle"
     knap_script = "/home/yakir/PycharmProjects/secure_inference/research/knapsack/multiple_choice_knapsack_v2.py"
     device_ids = [0, 1]
 
@@ -100,15 +100,16 @@ if __name__ == "__main__":
 
     loss = np.inf
     seeds_to_use = []
-    pickle.dump(obj=seeds_to_use, file=open(snr_seed_file, 'wb'))
 
-    for seed in range(100000):
-        seeds_to_use.append(seed)
-        pickle.dump(obj=seeds_to_use, file=open(snr_seed_file, 'wb'))
+    for seed_group in range(100000):
+        block_size_spec_files = []
+        for device in device_ids:
+            seed = len(device_ids) * seed_group + device
+            cur_seed_file = snr_seed_file.format(device=device)
+            pickle.dump(obj=seeds_to_use + [seed], file=open(cur_seed_file, 'wb'))
 
-        block_size_spec_file = block_size_spec_file_format.format(seed=seed)
-
-        if seed > 0:
+            block_size_spec_file = block_size_spec_file_format.format(seed=seed)
+            block_size_spec_files.append(block_size_spec_file)
             os.system(PYTHON_PATH_EXPORT +
                       f'python {knap_script} '
                       f'--block_size_spec_file_name {block_size_spec_file} '
@@ -120,13 +121,24 @@ if __name__ == "__main__":
                       '--num_iters 1 '
                       '--max_cost 644224 '
                       f'--target_snr {snr} '
-                      f'--snr_seed_file {snr_seed_file} > /dev/null 2>&1') #
+                      f'--snr_seed_file {cur_seed_file} '
+                      f'--device {device} & ') #  > /dev/null 2>&1 &
 
-        block_size_spec = pickle.load(open(file=block_size_spec_file, mode='rb'))
-        cur_loss = simple_test.get_block_size_spec_loss(block_size_spec_path=block_size_spec_file)
-        if cur_loss < loss:
-            loss = cur_loss
-            pickle.dump(obj=seeds_to_use, file=open(file=snr_seed_file, mode='wb'))
-        else:
-            seeds_to_use.pop()
-        print(f"seed: {seed}, loss: {loss}, cur_loss {cur_loss}")
+        while True:
+            if all([os.path.exists(x) for x in block_size_spec_files]):
+                break
+            else:
+                time.sleep(1)
+        optimal_device = None
+        for device in device_ids:
+            seed = len(device_ids) * seed_group + device
+            block_size_spec_file = block_size_spec_file_format.format(seed=seed)
+            cur_loss = simple_test.get_block_size_spec_loss(block_size_spec_path=block_size_spec_file)
+            print("seed group: ", seed_group, "device: ", device, "loss: ", cur_loss)
+            if cur_loss < loss:
+                loss = cur_loss
+                optimal_device = device
+
+        if optimal_device is not None:
+            seeds_to_use.append(len(device_ids) * seed_group + optimal_device)
+        print(seeds_to_use)
