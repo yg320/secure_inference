@@ -1,17 +1,19 @@
 ============================================= Following days =============================================
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67
 - Finish Methods and Results
-- Simulated annealing (With very short finetuning every k steps, loss >30 doesn't feel right)
+- Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
 
+- Divide by block size in block ReLU (in order not to exceed MSB dummy bits)
 - Use loss as distortion measure
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
 - Final Seg/Clss results
-- Channel distortion random seed
+- Channel distortion random seed, and multi-GPUs
 
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consult Shai about codebase and acceptance date
+- More samples in noise estimation
 ============================================= Major =============================================
-
+- Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!
 - We really need to compare Porthos implementation to ours on the same machine..
 - Have cryptoprovider work with shapes only!
@@ -53,7 +55,7 @@
 - Added CUDA implementation
 - We chose not to decompose to offline/online, but this can be done.
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
-
+- Discarding MSB practically share no information, as weight decay is so common.
 ============================================= Minor! =============================================
 
 - Use newer torch version with inplace << and bit_wise and
@@ -82,7 +84,6 @@
 - Detection
 - Further datasets/architectures/models/tasks
 - QAT
-- Should FC and GAP be part of distortion?
 - How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties
 - Allow for softmax via maxpool derivative (Or FALCON implementation)
 - Use eagerpy

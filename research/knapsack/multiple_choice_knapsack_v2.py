@@ -450,12 +450,12 @@ class IO_Buffer:
 
 
 class MultipleChoiceKnapsack:
-    def __init__(self, params, cost_type, division, ratio, seed, channel_distortion_path, cur_iter, num_iters, max_cost=None):
+    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, target_snr=None, snr_seed=0):
         self.params = params
         self.cost_type = cost_type
         self.division = division
         self.ratio = ratio
-        self.seed = seed
+        self.channel_subset_seed = channel_subset_seed
         self.channel_distortion_path = channel_distortion_path
         self.cur_iter = cur_iter
         self.num_iters = num_iters
@@ -466,8 +466,12 @@ class MultipleChoiceKnapsack:
         self.layer_name_to_noise = dict()
         self.read_noise_files()
 
-        _, self.channel_orders = get_channels_subset(self.seed, self.params, self.cur_iter, self.num_iters)
-        self.num_channels = len(self.channel_orders)
+        if self.channel_subset_seed:
+            _, self.channel_orders = get_channels_subset(self.channel_subset_seed, self.params, self.cur_iter, self.num_iters)
+            self.num_channels = len(self.channel_orders)
+        else:
+            self.num_channels = len(self.channel_order_to_layer)
+            self.channel_orders = np.arange(self.num_channels)
 
         get_baseline_cost = lambda channel_order: get_cost(block_size=(1, 1),
                                                            activation_dim=self.channel_order_to_dim[channel_order],
@@ -480,6 +484,9 @@ class MultipleChoiceKnapsack:
         else:
             self.max_cost = max_cost
 
+        self.target_snr = target_snr
+        self.snr_seed = snr_seed
+        self.snr_prf = np.random.default_rng(self.snr_seed)
     @staticmethod
     def run_multiple_choice(Ws, Ps, num_rows, num_columns):
         device = torch.device("cuda:0")
@@ -564,6 +571,10 @@ class MultipleChoiceKnapsack:
             W = np.array([get_cost(tuple(block_size), layer_dim, self.cost_type, self.division) for block_size in block_sizes])
             P = self.layer_name_to_noise[layer_name][channel_index]
 
+            if self.target_snr is not None:
+                noise = np.sqrt(1/self.target_snr) * self.snr_prf.normal(loc=0, scale=P.std(), size=P.shape)
+                P = P + noise
+
             block_size_groups = defaultdict(list)
             for block_size_index, block_size in enumerate(block_sizes):
                 cur_cost = get_cost(tuple(block_size), layer_dim, self.cost_type, self.division)  # 1 here to avoid weird stuff
@@ -645,6 +656,8 @@ if __name__ == "__main__":
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
     parser.add_argument('--max_cost', type=int, default=644224)
+    parser.add_argument('--target_snr', type=float, default=0.0001)
+    parser.add_argument('--snr_seed', type=int, default=0)
 
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
@@ -656,11 +669,13 @@ if __name__ == "__main__":
                                  cost_type=args.cost_type,
                                  division=args.division,
                                  ratio=args.ratio,
-                                 seed=123,
+                                 channel_subset_seed=None,
                                  channel_distortion_path=args.channel_distortion_path,
                                  cur_iter=args.cur_iter,
                                  num_iters=args.num_iters,
-                                 max_cost=args.max_cost)
+                                 max_cost=args.max_cost,
+                                 target_snr=args.target_snr,
+                                 snr_seed=args.snr_seed)
 
     block_size_spec = mck.get_optimal_block_sizes()
 
