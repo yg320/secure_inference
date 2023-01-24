@@ -450,7 +450,7 @@ class IO_Buffer:
 
 
 class MultipleChoiceKnapsack:
-    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, target_snr=None, snr_seed=0):
+    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, target_snr=None, snr_seeds_file=None):
         self.params = params
         self.cost_type = cost_type
         self.division = division
@@ -485,8 +485,12 @@ class MultipleChoiceKnapsack:
             self.max_cost = max_cost
 
         self.target_snr = target_snr
-        self.snr_seed = snr_seed
-        self.snr_prf = np.random.default_rng(self.snr_seed)
+
+        if snr_seeds_file is not None:
+            self.snr_seeds = pickle.load(file=open(snr_seeds_file, "rb"))
+        else:
+            self.snr_seeds = None
+
     @staticmethod
     def run_multiple_choice(Ws, Ps, num_rows, num_columns):
         device = torch.device("cuda:0")
@@ -541,19 +545,20 @@ class MultipleChoiceKnapsack:
 
     def read_noise_files(self):
         for layer_name in self.params.LAYER_NAMES:
-            glob_pattern = os.path.join(self.channel_distortion_path, f"{layer_name}_*.pickle")
-            files = glob.glob(glob_pattern)
-            assert len(files) > 0, glob_pattern
+            self.layer_name_to_noise[layer_name] = np.load(os.path.join(self.channel_distortion_path, f"{layer_name}.npy"))
 
-            noise = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
-            noise = noise.mean(axis=0).mean(axis=2).T  # noise.shape = [N-block-sizes, N-channels]
+    def add_noise(self, channel_order, P):
+        max_possible_channels = 100000
+        P_shape = P.shape
+        P_std = P.std()
 
-            signal = np.stack([pickle.load(open(f, 'rb'))["Signal"] for f in files])
-            signal = signal.mean(axis=0).mean(axis=2).T
+        for seed in self.snr_seeds:
+            if seed > 0:
+                np.random.seed(seed * max_possible_channels + channel_order)
+                noise = np.sqrt(1 / self.target_snr) * np.random.normal(loc=0, scale=P_std, size=P_shape)
+                P = P + noise
 
-            noise = noise / signal
-            noise = noise[:-1]
-            self.layer_name_to_noise[layer_name] = -np.array(noise).T
+        return P
 
     def prepare_matrices(self):
         Ps = []
@@ -572,8 +577,7 @@ class MultipleChoiceKnapsack:
             P = self.layer_name_to_noise[layer_name][channel_index]
 
             if self.target_snr is not None:
-                noise = np.sqrt(1/self.target_snr) * self.snr_prf.normal(loc=0, scale=P.std(), size=P.shape)
-                P = P + noise
+                P = self.add_noise(channel_order, P)
 
             block_size_groups = defaultdict(list)
             for block_size_index, block_size in enumerate(block_sizes):
@@ -657,7 +661,7 @@ if __name__ == "__main__":
     parser.add_argument('--num_iters', type=int, default=1)
     parser.add_argument('--max_cost', type=int, default=644224)
     parser.add_argument('--target_snr', type=float, default=0.0001)
-    parser.add_argument('--snr_seed', type=int, default=0)
+    parser.add_argument('--snr_seed_file', type=str, default=None)
 
     args = parser.parse_args()
     cfg = mmcv.Config.fromfile(args.config)
@@ -665,6 +669,7 @@ if __name__ == "__main__":
     params = param_factory(cfg)
     layer_names = params.LAYER_NAMES
     ratio = args.ratio
+
     mck = MultipleChoiceKnapsack(params=params,
                                  cost_type=args.cost_type,
                                  division=args.division,
@@ -675,7 +680,7 @@ if __name__ == "__main__":
                                  num_iters=args.num_iters,
                                  max_cost=args.max_cost,
                                  target_snr=args.target_snr,
-                                 snr_seed=args.snr_seed)
+                                 snr_seeds_file=args.snr_seed_file)
 
     block_size_spec = mck.get_optimal_block_sizes()
 
@@ -684,3 +689,23 @@ if __name__ == "__main__":
 
     with open(args.block_size_spec_file_name, "wb") as f:
         pickle.dump(obj=block_size_spec, file=f)
+
+
+
+# def collect(layer_names, bash_path, out_path):
+#     os.makedirs(out_path, exist_ok=True)
+#     for layer_name in tqdm(layer_names):
+#         glob_pattern = os.path.join(bash_path, f"{layer_name}_*.pickle")
+#         files = glob.glob(glob_pattern)
+#         assert len(files) > 0, glob_pattern
+#
+#         noise = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
+#         noise = noise.mean(axis=0).mean(axis=2).T  # noise.shape = [N-block-sizes, N-channels]
+#
+#         signal = np.stack([pickle.load(open(f, 'rb'))["Signal"] for f in files])
+#         signal = signal.mean(axis=0).mean(axis=2).T
+#
+#         noise = noise / signal
+#         noise = noise[:-1]
+#         tt = -np.array(noise).T
+#         np.save(os.path.join(out_path, f"{layer_name}.npy"), tt)
