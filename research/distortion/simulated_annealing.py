@@ -54,6 +54,19 @@ class SimulatedAnnealingHandler:
         self.num_channels = get_num_of_channels(self.params)
         self.dim_to_channels = {dim: np.argwhere(self.channel_order_to_dim == dim)[:, 0] for dim in np.unique(self.channel_order_to_dim)}
 
+
+        self.channel_order_to_num_relus = np.array([
+            get_num_relus(tuple(self.block_size_spec[self.channel_order_to_layer[channel]][self.channel_order_to_channel[channel]]),self.channel_order_to_dim[channel])
+            for channel in range(self.num_channels)])
+
+        self.sibling_channels = [np.argwhere(
+            np.logical_and.reduce((
+                self.channel_order_to_dim == self.channel_order_to_dim[channel],
+                self.channel_order_to_num_relus != self.channel_order_to_num_relus[channel],
+                np.minimum(self.channel_order_to_num_relus, self.channel_order_to_num_relus[channel]) / (
+                            np.maximum(self.channel_order_to_num_relus,
+                                       self.channel_order_to_num_relus[channel]) + 1e-7) >= 0.75,
+            )))[:, 0] for channel in tqdm(range(self.num_channels))]
         self.flipped = 0
         self.arch_utils = arch_utils_factory(self.cfg)
 
@@ -63,8 +76,11 @@ class SimulatedAnnealingHandler:
         self.replicas = torch.nn.parallel.replicate(self.model, self.device_ids)
 
     def get_sibling_channels(self):
-        random_channel_a = np.random.choice(self.num_channels)
-        channels_b = self.dim_to_channels[self.channel_order_to_dim[random_channel_a]]
+        while True:
+            random_channel_a = np.random.choice(self.num_channels)
+            channels_b = self.sibling_channels[random_channel_a]
+            if len(channels_b):
+                break
         random_channel_b = np.random.choice(channels_b)
         return random_channel_a, random_channel_b
 
@@ -128,7 +144,7 @@ class SimulatedAnnealingHandler:
                 # print("get loss time: ", t3 - t2)
                 # print("total time: ", t3 - t0)
                 t0 = time.time()
-                if (distorted_loss / baseline_loss) < 0.99:
+                if (distorted_loss / baseline_loss) < 0.995:
                     steps.append(iteration)
                     distorted_losses.append(distorted_loss)
                     baseline_losses.append(baseline_loss)
@@ -138,22 +154,22 @@ class SimulatedAnnealingHandler:
                     if self.flipped % 10 == 0:
                         print("Dumping - Flipped: ", self.flipped)
                         pickle.dump(obj=self.block_size_spec, file=open(self.output_block_spec_path, "wb"))
-                        pickle.dump(obj=(steps, distorted_losses, baseline_losses), file=open("/storage/yakir/secure_inference/data_4.pickle", "wb"))
+                        pickle.dump(obj=(steps, distorted_losses, baseline_losses), file=open("/storage/yakir/secure_inference/data_5.pickle", "wb"))
 
 
 
 if __name__ == "__main__":
-    checkpoint_path = "/home/yakir/epoch_14.pth"
-    input_block_spec_path = "/home/yakir/block_size_spec_4x4_algo.pickle"
-    output_block_spec_path = "/home/yakir/block_size_spec_4x4_algo_out.pickle"
-    config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
-    device_ids = [0, 1]
-    #
-    # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
-    # input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
-    # output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v8.pickle"
-    # config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
+    # checkpoint_path = "/home/yakir/epoch_14.pth"
+    # input_block_spec_path = "/home/yakir/block_size_spec_4x4_algo.pickle"
+    # output_block_spec_path = "/home/yakir/block_size_spec_4x4_algo_out.pickle"
+    # config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
     # device_ids = [0, 1]
+    #
+    checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
+    input_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo.pickle"
+    output_block_spec_path = "./relu_spec_files/classification/resnet50_8xb32_in1k/iterative/num_iters_1/iter_0/block_size_spec_4x4_algo_simulated_annealing_v9.pickle"
+    config = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
+    device_ids = [0, 1]
 
     cfg = mmcv.Config.fromfile(config)
     params = param_factory(cfg)
