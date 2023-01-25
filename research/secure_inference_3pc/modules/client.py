@@ -15,6 +15,24 @@ from research.secure_inference_3pc.modules.base import DummyShapeTensor
 
 import torch
 import numpy as np
+from numba import njit, prange
+@njit('(int32[:,:])(int32[:,:], int64[:], int8[:,:], int8[:],  uint8, uint8)', parallel=True,  nogil=True, cache=True)
+def private_compare_numba(s, r, x_bits_0, beta, bits, ignore_msb_bits):
+
+    for i in prange(x_bits_0.shape[0]):
+        r[i] = r[i] + beta[i]
+
+        counter = 0
+
+        for j in range(bits - ignore_msb_bits):
+            decompose_bit = (r[i] >> (bits - 1 - j)) & 1
+            decompose_bit = -2 * decompose_bit * x_bits_0[i, j] + x_bits_0[i, j]
+            counter = counter + decompose_bit
+
+            tmp = (counter - decompose_bit) + x_bits_0[i, j] * (2 * beta[i] - 1)
+            s[i, j] = (tmp * s[i, j]) % 67
+
+    return s
 
 class SecureConv2DClient(SecureModule):
 
@@ -30,6 +48,8 @@ class SecureConv2DClient(SecureModule):
 
     @timer("SecureConv2DClient")
     def forward(self, X_share):
+        # out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
+        # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_01.put(np.arange(10))
         # self.network_assets.receiver_02.get()
 
@@ -83,15 +103,16 @@ class PrivateCompareClient(SecureModule):
         super(PrivateCompareClient, self).__init__(**kwargs)
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
-    # @timer("PrivateCompareClient")
+    @timer("PrivateCompareClient")
     def forward(self, x_bits_0, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
-        r[backend.astype(beta, backend.bool)] += 1
-        bits = self.decompose(r)
-        c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
-        s = backend.multiply(s, c_bits_0, out=s)
-        d_bits_0 = module_67(s)
+        d_bits_0 = private_compare_numba(s, r, x_bits_0, beta, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS)
+        # r[backend.astype(beta, backend.bool)] += 1
+        # bits = self.decompose(r)
+        # c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
+        # s = backend.multiply(s, c_bits_0, out=s)
+        # d_bits_0 = module_67(s)
 
         d_bits_0 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_0, axis=-1)
 
@@ -129,8 +150,7 @@ class ShareConvertClient(SecureModule):
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
-
-        # with Timer("ShareConvertClient - processing..."):
+        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
 
         alpha = backend.astype(0 < r_0 - r, SIGNED_DTYPE)
 
@@ -138,7 +158,6 @@ class ShareConvertClient(SecureModule):
         beta_0 = backend.astype(0 < a_0 - a_tild_0, SIGNED_DTYPE)
         self.network_assets.sender_02.put(a_tild_0)
 
-        x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
@@ -328,6 +347,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
 
     def forward(self, shape):
         out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+        # return DummyShapeTensor(out_shape)
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)

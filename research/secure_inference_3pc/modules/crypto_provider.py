@@ -43,6 +43,21 @@ def processing_numba(x, x_1, x_bit_0_0, x_bits_0, x_uint64, x_1_uint64, bits, ig
 
     return x_bits_1, x_0, x_bit_0_1
 
+@njit('(int64[:])(int32[:,:], int32[:,:])', parallel=True,  nogil=True, cache=True)
+def numba_private_compare(d_bits_0, d_bits_1):
+    out = np.zeros(shape=(d_bits_0.shape[0],), dtype=np.int64)
+    for i in prange(d_bits_0.shape[0]):
+        r = 0
+        for j in range(d_bits_0.shape[1]):
+            a = (d_bits_0[i, j] + d_bits_1[i, j])
+            if a == 0 or a == 67:
+                r = 1
+                break
+
+        out[i] = r
+    return out
+
+
 class SecureConv2DCryptoProvider(SecureModule):
     def __init__(self, W_shape, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DCryptoProvider, self).__init__(**kwargs)
@@ -56,6 +71,8 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
     def forward(self, X_share):
+        # out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
+        # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_02.put(np.arange(10))
         # self.network_assets.receiver_12.get()
         out = self.forward_(X_share)
@@ -92,9 +109,10 @@ class PrivateCompareCryptoProvider(SecureModule):
     def forward(self):
         d_bits_0 = self.network_assets.receiver_02.get()
         d_bits_1 = self.network_assets.receiver_12.get()
-        d = backend.add(d_bits_0, d_bits_1, out=d_bits_0)
-        d = d % P
-        beta_p = backend.astype((d == 0).any(axis=-1), SIGNED_DTYPE)
+        beta_p = numba_private_compare(d_bits_0, d_bits_1)
+        # d = backend.add(d_bits_0, d_bits_1, out=d_bits_0)
+        # d = d % P
+        # beta_p = backend.astype((d == 0).any(axis=-1), SIGNED_DTYPE)
 
         return beta_p
 
@@ -297,6 +315,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
     def forward(self, shape):
 
         out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+        # return DummyShapeTensor(out_shape)
 
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)

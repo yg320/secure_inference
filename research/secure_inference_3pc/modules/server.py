@@ -75,6 +75,31 @@ import numpy as np
 #     out = numba_double_conv2d(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
 #     return out[np.newaxis]
 
+from numba import njit, prange
+
+
+@njit('(int32[:,:])(int32[:,:], int64[:], int8[:,:], int8[:],  uint8,  uint8)', parallel=True, nogil=True,
+      cache=True)
+def private_compare_numba_server(s, r, x_bits_1, beta, bits, ignore_msb_bits):
+    for i in prange(x_bits_1.shape[0]):
+        r[i] = r[i] + beta[i]
+        counter = 0
+        for j in range(bits - ignore_msb_bits):
+            multiplexer_bit = (r[i] >> (bits - 1 - j)) & 1
+
+            w = -2 * multiplexer_bit * x_bits_1[i, j] + x_bits_1[i, j] + multiplexer_bit
+
+            counter = counter + w
+            w_cumsum = counter - w
+
+            multiplexer_bit = multiplexer_bit - x_bits_1[i, j]
+            multiplexer_bit = multiplexer_bit * (-2 * beta[i] + 1)
+            multiplexer_bit = multiplexer_bit + 1
+            w_cumsum = w_cumsum + multiplexer_bit
+
+            s[i, j] = (s[i, j] * w_cumsum) % 67
+    return s
+
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DServer, self).__init__(**kwargs)
@@ -92,6 +117,8 @@ class SecureConv2DServer(SecureModule):
 
     @timer("SecureConv2DServer")
     def forward(self, X_share):
+        # out_shape = get_output_shape(X_share.shape, self.W_plaintext.shape, self.padding, self.dilation, self.stride)
+        # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_12.put(np.arange(10))
         # self.network_assets.receiver_01.get()
 
@@ -155,16 +182,13 @@ class PrivateCompareServer(SecureModule):
     def forward(self, x_bits_1, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=backend.int32)
+        d_bits_1 = private_compare_numba_server(s, r, x_bits_1, beta, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS)
 
-        r[backend.astype(beta, backend.bool)] += 1
-
-        bits = self.decompose(r)
-
-        c_bits_1 = get_c_party_1(x_bits_1, bits, beta)
-
-        s = backend.multiply(s, c_bits_1, out=s)
-
-        d_bits_1 = module_67(s)
+        # r[backend.astype(beta, backend.bool)] += 1
+        # bits = self.decompose(r)
+        # c_bits_1 = get_c_party_1(x_bits_1, bits, beta)
+        # s = backend.multiply(s, c_bits_1, out=s)
+        # d_bits_1 = module_67(s)
 
         d_bits_1 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_1, axis=-1)
 
@@ -383,6 +407,8 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.padding = padding
 
     def forward(self, shape):
+        # out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+        # return DummyShapeTensor(out_shape)
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
 
