@@ -23,23 +23,24 @@ from numba import njit, prange
 def processing_numba(x, x_1, x_bit_0_0, x_bits_0, x_uint64, x_1_uint64, bits, ignore_msb_bits):
     x_bits_1 = x_bits_0
     x_0 = x_1
-    x_bit_0_1 = x_bit_0_0
+    x_bit_0_1 = x
+
     # bits = bits - 1
     for i in prange(x_bits_1.shape[0]):
         for j in range(bits - ignore_msb_bits):
-            a = (x[i] >> (bits - 1 - j)) & 1
+            x_bit = (x[i] >> (bits - 1 - j)) & 1  # x_bits
 
-            if a >= x_bits_0[i, j]:
-                x_bits_1[i][j] = a - x_bits_0[i, j]
+            if x_bit >= x_bits_0[i, j]:
+                x_bits_1[i][j] = x_bit - x_bits_0[i, j]
             else:
-                x_bits_1[i][j] = a - x_bits_0[i, j] + P
+                x_bits_1[i][j] = x_bit - x_bits_0[i, j] + P
 
-        if x_uint64[i] > x_1_uint64[i]:
+        if x_uint64[i] < x_1_uint64[i]:
             x_0[i] = x[i] - x_1[i] - 1
         else:
             x_0[i] = x[i] - x_1[i]
-
-        x_bit_0_1[i] = x[i] % 2 - x_bit_0_0[i]
+        x_bit0 = x[i] % 2
+        x_bit_0_1[i] = x_bit0 - x_bit_0_0[i]
 
     return x_bits_1, x_0, x_bit_0_1
 
@@ -191,20 +192,17 @@ class SecureMSBCryptoProvider(SecureModule):
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
 
-        # with Timer("CryptoProvider - MSB - Decompose + processing"):
-        # x_bits_1, x_0, x_bit_0_1 = processing_numba(x, x_1, x_bit_0_0, x_bits_0,
-        #                                             x.astype(np.uint64, copy=False),
-        #                                             x_1.astype(np.uint64, copy=False),
-        #                                             NUM_OF_COMPARE_BITS,
-        #                                             IGNORE_MSB_BITS)
+        x_bits_1, x_0, x_bit_0_1 = processing_numba(x, x_1, x_bit_0_0, x_bits_0,
+                                                    x.astype(np.uint64, copy=False),
+                                                    x_1.astype(np.uint64, copy=False),
+                                                    NUM_OF_COMPARE_BITS,
+                                                    IGNORE_MSB_BITS)
 
-        x_bits = self.decompose(x)
-
-
-        x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
-        x_0 = self.sub_mode_L_minus_one(x, x_1)
-        x_bit0 = np.bitwise_and(x, 1, out=x)  # x_bit0 = x % 2
-        x_bit_0_1 = backend.subtract(x_bit0, x_bit_0_0, out=x_bit0)
+        # x_bits = self.decompose(x)
+        # x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
+        # x_0 = self.sub_mode_L_minus_one(x, x_1)
+        # x_bit0 = np.bitwise_and(x, 1, out=x)  # x_bit0 = x % 2
+        # x_bit_0_1 = backend.subtract(x_bit0, x_bit_0_0, out=x_bit0)
 
 
         self.network_assets.sender_02.put(x_0)
