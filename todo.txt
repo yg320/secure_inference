@@ -1,5 +1,5 @@
 ============================================= Following days =============================================
-- Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67
+- Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!!
 - Finish Methods and Results
 - Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
 

@@ -18,6 +18,8 @@ from mmcls.utils import (auto_select_device, get_root_logger,
                          setup_multi_processes, wrap_distributed_model,
                          wrap_non_distributed_model)
 
+from research.distortion.arch_utils.factory import arch_utils_factory
+import pickle
 
 def parse_args():
     parser = argparse.ArgumentParser(description='mmcls test model')
@@ -165,6 +167,7 @@ def main():
 
     # build the model and load checkpoint
     model = build_classifier(cfg.model)
+
     fp16_cfg = cfg.get('fp16', None)
     if fp16_cfg is not None:
         wrap_fp16_model(model)
@@ -178,6 +181,11 @@ def main():
         warnings.warn('Class names are not saved in the checkpoint\'s '
                       'meta data, use imagenet by default.')
         CLASSES = ImageNet.CLASSES
+
+    if hasattr(cfg, "relu_spec_file") and cfg.relu_spec_file is not None:
+        layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
+        arch_utils = arch_utils_factory(cfg)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
     if not distributed:
         model = wrap_non_distributed_model(

@@ -82,7 +82,7 @@ def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8, protocol="Port
 
 
 class DistortionUtils:
-    def __init__(self, gpu_id, params, cfg):
+    def __init__(self, gpu_id, params, cfg, mode):
 
         self.gpu_id = gpu_id
         self.device = f"cuda:{gpu_id}"
@@ -98,7 +98,7 @@ class DistortionUtils:
         # TODO: Replaced test with train
         # TODO: find a more elegant way to do this
         # TODO: this is copied again and again
-        self.dataset = build_data(self.cfg, train=True)
+        self.dataset = build_data(self.cfg, mode=mode)
 
         np.random.seed(123)
         self.shuffled_indices = np.arange(len(self.dataset))

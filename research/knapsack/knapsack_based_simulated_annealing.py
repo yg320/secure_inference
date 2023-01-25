@@ -58,12 +58,12 @@ class SimpleTest:
 
         return loss
 
-    def get_block_size_spec_loss(self, block_size_spec_path):
+    def get_block_size_spec_loss(self, block_size_spec_paths):
 
-        dataset = build_data(self.cfg, train=True)
+        dataset = build_data(self.cfg, mode="train")
         data_loader = build_dataloader(dataset, **self.train_loader_cfg)
 
-        block_size_spec = pickle.load(open(block_size_spec_path, 'rb'))
+        block_size_specs = [pickle.load(open(block_size_spec_path, 'rb')) for block_size_spec_path in block_size_spec_paths]
         losses = []
 
         for data_index, data in enumerate(data_loader):
@@ -72,87 +72,131 @@ class SimpleTest:
 
             gt = torch.nn.parallel.scatter(data['gt_label'], self.device_ids)
             kwargs_tup = tuple(dict(return_loss=True, gt_label=gt[i]) for i in range(len(self.device_ids)))
-
-            loss = self.get_loss(batch, kwargs_tup, block_size_spec)
-            losses.append(loss)
+            cur_losses = []
+            for block_size_spec in block_size_specs:
+                loss = self.get_loss(batch, kwargs_tup, block_size_spec)
+                cur_losses.append(loss)
+            losses.append(cur_losses)
 
             if data_index == self.num_batches:
                 break
 
-        return np.mean(losses)
+        return np.array(losses).mean(axis=0)
 
+
+def add_noise_to_distortion(source_dir, target_dir, snr, seed, params):
+    assert os.path.exists(source_dir)
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+
+    random_generator = np.random.default_rng(seed=seed)
+
+    for layer_name in params.LAYER_NAMES:
+        distortion = np.load(os.path.join(source_dir, f"{layer_name}.npy"))
+
+        noise = np.sqrt(1 / snr) * random_generator.normal(loc=0,
+                                                           scale=distortion.std(),
+                                                           size=distortion.shape)
+
+        np.save(os.path.join(target_dir, layer_name), distortion + noise)
 
 if __name__ == "__main__":
+    # export PYTHONPATH=/storage/yakir/secure_inference; python research/knapsack/knapsack_based_simulated_annealing.py
+    snr = 100000
 
-    checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
-    config_path = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.001_4_baseline.py"
-    channel_distortion_path = "outputs/distortions/classification/resnet50_8xb32_in1k_iterative/num_iters_1/iter_0_collected/"
-    PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/storage/yakir/secure_inference\"; '
-    block_size_spec_file_format = "/storage/yakir/secure_inference/relu_spec_files/classification/sim_anneal/specs/{seed}.pickle"
-    snr_seed_file = "/storage/yakir/secure_inference/relu_spec_files/classification/sim_anneal/specs/lists/snr_seed_file_{device}.pickle"
-    knap_script = "research/knapsack/multiple_choice_knapsack_v2.py"
-    device_ids = [0, 1, 2, 3, 4, 5]
-    batch_size = 516
-    num_batches = 128
+    # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
+    # config_path = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.005_4.py"
+    # channel_distortion_path = "outputs/distortions/classification/resnet50_8xb32_in1k_iterative/num_iters_1/iter_0_collected/"
+    # PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/storage/yakir/secure_inference\"; '
+    # block_size_spec_file_format = "/storage/yakir/secure_inference/relu_spec_files/classification/sim_anneal/specs/{snr}_{seed}.pickle"
+    # knap_script = "research/knapsack/multiple_choice_knapsack_v2.py"
+    # device_ids = [0, 1, 2, 3, 4, 5]
+    # batch_size = 3072
+    # num_batches = 12
+    # seeds_to_use_file_path = f"./outputs/seeds_to_use_{snr}.pickle"
 
-    # checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
-    # config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
-    # channel_distortion_path = "/home/yakir/iter_0_collected"
-    # PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/home/yakir/PycharmProjects/secure_inference\"; '
-    # block_size_spec_file_format = "/home/yakir/relu_spec_files_test/{seed}.pickle"
-    # snr_seed_file = "/home/yakir/snr_seed_file_{device}.pickle"
-    # knap_script = "/home/yakir/PycharmProjects/secure_inference/research/knapsack/multiple_choice_knapsack_v2.py"
-    # device_ids = [0, 1]
-    # batch_size = 256
-    # num_batches = 64
-    # snr = "20000"
+    out_stat_dir = "/home/yakir/knap_base_dim_annel"
+    checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
+    config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
+    optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
+    PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/home/yakir/PycharmProjects/secure_inference\"; '
+    knap_script = "/home/yakir/PycharmProjects/secure_inference/research/knapsack/multiple_choice_knapsack_v2.py"
+    device_ids = [0, 1]
+    batch_size = 256
+    num_batches = 64
+
+    stats_out_path = os.path.join(out_stat_dir, "stats_out_path.pickle")
+    noised_channel_distortion_base_path = os.path.join(out_stat_dir, "iter_0_collected_with_noise")
+    block_size_spec_files_dir = os.path.join(out_stat_dir, "relu_spec_files")
+
+    os.makedirs(block_size_spec_files_dir)
+    os.makedirs(noised_channel_distortion_base_path)
 
     cfg = mmcv.Config.fromfile(config_path)
     params = param_factory(cfg)
 
     simple_test = SimpleTest(device_ids=device_ids, params=params, cfg=cfg, batch_size=batch_size, num_batches=num_batches)
-
     loss = np.inf
+
+    all_losses = []
     seeds_to_use = []
+    all_cur_losses = []
 
     for seed_group in range(100000):
-        block_size_spec_files = []
+        print('==================================')
+        block_size_spec_paths = []
+        iter_seeds = []
+
+        t0 = time.time()
+
         for device in device_ids:
             seed = len(device_ids) * seed_group + device
-            cur_seed_file = snr_seed_file.format(device=device)
-            pickle.dump(obj=seeds_to_use + [seed], file=open(cur_seed_file, 'wb'))
+            iter_seeds.append(seed)
+            cur_iter_dir = os.path.join(noised_channel_distortion_base_path, str(seed))
+            add_noise_to_distortion(source_dir=optimal_channel_distortion_path,
+                                    target_dir=cur_iter_dir,
+                                    snr=snr,
+                                    seed=seed,
+                                    params=params)
 
-            block_size_spec_file = block_size_spec_file_format.format(seed=seed)
-            block_size_spec_files.append(block_size_spec_file)
+            block_size_spec_file = os.path.join(block_size_spec_files_dir, f"{seed}.pickle")
+            block_size_spec_paths.append(block_size_spec_file)
             os.system(PYTHON_PATH_EXPORT +
                       f'python {knap_script} '
                       f'--block_size_spec_file_name {block_size_spec_file} '
-                      f'--channel_distortion_path {channel_distortion_path} '
+                      f'--channel_distortion_path {cur_iter_dir} '
                       f'--config {config_path} '
                       '--cost_type ReLU '
                       '--division 1 '
                       '--cur_iter 0 '
                       '--num_iters 1 '
                       '--max_cost 644224 '
-                      f'--target_snr {snr} '
-                      f'--snr_seed_file {cur_seed_file} '
-                      f'--device {device} & ') #  > /dev/null 2>&1 &
+                      f'--device {device} &') #> /dev/null 2>&1 & ')
 
         while True:
-            if all([os.path.exists(x) for x in block_size_spec_files]):
+            if all([os.path.exists(x) for x in block_size_spec_paths]):
                 break
             else:
                 time.sleep(1)
-        optimal_device = None
-        for device in device_ids:
-            seed = len(device_ids) * seed_group + device
-            block_size_spec_file = block_size_spec_file_format.format(seed=seed)
-            cur_loss = simple_test.get_block_size_spec_loss(block_size_spec_path=block_size_spec_file)
-            print("seed group: ", seed_group, "device: ", device, "loss: ", cur_loss)
-            if cur_loss < loss:
-                loss = cur_loss
-                optimal_device = device
 
-        if optimal_device is not None:
-            seeds_to_use.append(len(device_ids) * seed_group + optimal_device)
+        t1 = time.time()
+        print(f"Knapsack took {t1 - t0} seconds")
+        cur_losses = simple_test.get_block_size_spec_loss(block_size_spec_paths=block_size_spec_paths)
+
+        t2 = time.time()
+        print(f"Loss took {t2 - t1} seconds")
+        print(cur_losses)
+
+        min_loss = np.min(cur_losses)
+        argmin_loss = np.argmin(cur_losses)
+        if min_loss < loss:
+            loss = min_loss
+            optimal_device = argmin_loss
+            seeds_to_use.append(iter_seeds[optimal_device])
+            optimal_channel_distortion_path = os.path.join(noised_channel_distortion_base_path, str(seeds_to_use[-1]))
+
+        all_cur_losses.append(cur_losses)
+        print(loss)
         print(seeds_to_use)
+        all_losses.append(loss)
+        pickle.dump(obj=(seeds_to_use, all_losses, all_cur_losses), file=open(stats_out_path, 'wb'))

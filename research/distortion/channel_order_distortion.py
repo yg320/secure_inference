@@ -21,7 +21,7 @@ class ChannelDistortionHandler:
 
         self.params = params
         self.cfg = cfg
-        self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params, cfg=self.cfg)
+        self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params, cfg=self.cfg, mode="distortion_extraction")
         self.output_path = output_path
 
         self.keys = ["Noise", "Signal", "Distorted Loss", "Baseline Loss"]

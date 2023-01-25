@@ -450,7 +450,7 @@ class IO_Buffer:
 
 
 class MultipleChoiceKnapsack:
-    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, target_snr=None, snr_seeds_file=None, device=0):
+    def __init__(self, params, cost_type, division, ratio, channel_subset_seed, channel_distortion_path, cur_iter, num_iters, max_cost=None, device=0):
         self.params = params
         self.cost_type = cost_type
         self.division = division
@@ -467,6 +467,7 @@ class MultipleChoiceKnapsack:
         self.read_noise_files()
 
         if self.channel_subset_seed:
+            assert False
             _, self.channel_orders = get_channels_subset(self.channel_subset_seed, self.params, self.cur_iter, self.num_iters)
             self.num_channels = len(self.channel_orders)
         else:
@@ -484,12 +485,6 @@ class MultipleChoiceKnapsack:
         else:
             self.max_cost = max_cost
 
-        self.target_snr = target_snr
-
-        if snr_seeds_file is not None:
-            self.snr_seeds = pickle.load(file=open(snr_seeds_file, "rb"))
-        else:
-            self.snr_seeds = None
 
         self.device = device
     @staticmethod
@@ -548,19 +543,6 @@ class MultipleChoiceKnapsack:
         for layer_name in self.params.LAYER_NAMES:
             self.layer_name_to_noise[layer_name] = np.load(os.path.join(self.channel_distortion_path, f"{layer_name}.npy"))
 
-    def add_noise(self, channel_order, P):
-        max_possible_channels = 100000
-        P_shape = P.shape
-        P_std = P.std()
-
-        for seed in self.snr_seeds:
-            if seed > 0:
-                np.random.seed(seed * max_possible_channels + channel_order)
-                noise = np.sqrt(1 / self.target_snr) * np.random.normal(loc=0, scale=P_std, size=P_shape)
-                P = P + noise
-
-        return P
-
     def prepare_matrices(self):
         Ps = []
         Ws = []
@@ -576,9 +558,6 @@ class MultipleChoiceKnapsack:
 
             W = np.array([get_cost(tuple(block_size), layer_dim, self.cost_type, self.division) for block_size in block_sizes])
             P = self.layer_name_to_noise[layer_name][channel_index]
-
-            if self.target_snr is not None:
-                P = self.add_noise(channel_order, P)
 
             block_size_groups = defaultdict(list)
             for block_size_index, block_size in enumerate(block_sizes):
@@ -652,17 +631,15 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/block_size_spec_4x4_algo.pickle")
-    parser.add_argument('--channel_distortion_path', type=str, default="/home/yakir/resnet50_8xb32_in1k_finetune_0.0001_avg_pool_dummy")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py")
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/block_size_spec_4x4_algo_test.pickle")
+    parser.add_argument('--channel_distortion_path', type=str, default="/home/yakir/iter_0_collected")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py")
     parser.add_argument('--ratio', type=float, default=None)
     parser.add_argument('--cost_type', type=str, default="ReLU")
     parser.add_argument('--division', type=int, default=1)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
     parser.add_argument('--max_cost', type=int, default=644224)
-    parser.add_argument('--target_snr', type=float, default=0.0001)
-    parser.add_argument('--snr_seed_file', type=str, default=None)
     parser.add_argument('--device', type=int, default=0)
 
     args = parser.parse_args()
@@ -681,8 +658,6 @@ if __name__ == "__main__":
                                  cur_iter=args.cur_iter,
                                  num_iters=args.num_iters,
                                  max_cost=args.max_cost,
-                                 target_snr=args.target_snr,
-                                 snr_seeds_file=args.snr_seed_file,
                                  device=args.device)
 
     block_size_spec = mck.get_optimal_block_sizes()
