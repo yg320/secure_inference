@@ -1,12 +1,14 @@
 import argparse
 import copy
 import os
+
+import mmcls.apis
 from tqdm import tqdm
 import numpy as np
 from typing import Dict, List
 import pickle
 import mmcv
-
+import torch
 from research.distortion.parameters.factory import param_factory
 from research.distortion.distortion_utils import DistortionUtils
 from research.distortion.utils import get_channels_subset
@@ -15,16 +17,18 @@ from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why
 
 
 class ChannelDistortionHandler:
-    def __init__(self, gpu_id, output_path, params, cfg):
+    def __init__(self, gpu_id, output_path, params, cfg, is_train_mode=False):
 
         self.params = params
         self.cfg = cfg
         self.distortion_utils = DistortionUtils(gpu_id=gpu_id, params=self.params, cfg=self.cfg)
         self.output_path = output_path
 
-        self.keys = ["Noise", "Signal"] #, "Distorted Loss", "Baseline Loss"]
+        self.keys = ["Noise", "Signal", "Distorted Loss", "Baseline Loss"]
 
-        # self.distortion_utils.model.train()
+        if is_train_mode:
+            self.distortion_utils.model.train()
+
     def extract_deformation_channel_ord(self,
                                         batch_index: int,
                                         layer_names: List[str],
@@ -47,8 +51,7 @@ class ChannelDistortionHandler:
             input_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
             output_block_name = self.params.BLOCK_NAMES[-2]  # TODO: Why do we have None in last layer
 
-            layer_assets = {key: np.zeros(shape=(layer_num_channels, len(block_sizes), batch_size)) for key in
-                            self.keys}
+            layer_assets = {key: np.zeros(shape=(layer_num_channels, len(block_sizes))) for key in self.keys}
 
             block_size_spec = copy.deepcopy(baseline_block_size_spec)
 
@@ -85,15 +88,19 @@ if __name__ == "__main__":
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--gpu_id', type=int, default=0)
     parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14.pth")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14_avg_pool.pth")
     parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_6/channel_distortions")
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_7/channel_distortions")
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
+    parser.add_argument('--train_mode', action='store_true', default=False)
 
     args = parser.parse_args()
-
+    seed = 123
+    # mmcls.apis.init_random_seed(seed)
+    # torch.manual_seed(seed)
+    # np.random.seed(seed)
     cfg = mmcv.Config.fromfile(args.config)
     gpu_id = args.gpu_id
     params = param_factory(cfg)
@@ -113,12 +120,13 @@ if __name__ == "__main__":
     chd = ChannelDistortionHandler(gpu_id=gpu_id,
                                    output_path=output_path,
                                    params=params,
-                                   cfg=cfg)
+                                   cfg=cfg,
+                                   is_train_mode=args.train_mode)
 
     chd.extract_deformation_channel_ord(batch_index=args.batch_index,
                                         layer_names=layer_names,
                                         batch_size=args.batch_size,
                                         baseline_block_size_spec=baseline_block_size_spec,
-                                        seed=123,
+                                        seed=seed,
                                         cur_iter=args.cur_iter,
                                         num_iters=args.num_iters)

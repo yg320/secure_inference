@@ -207,10 +207,10 @@ class DistortionUtils:
             block_name_to_activation_distorted=block_name_to_activation_distorted)
 
         assets = {
-            "Baseline Loss": np.array(losses_baseline),
-            "Distorted Loss": np.array(losses_distorted),
-            "Noise": noises[output_block_name],
-            "Signal": signals[output_block_name],
+            "Baseline Loss": float(losses_baseline),
+            "Distorted Loss": float(losses_distorted),
+            "Noise": noises[output_block_name].mean(),
+            "Signal": signals[output_block_name].mean(),
         }
         return assets
 
