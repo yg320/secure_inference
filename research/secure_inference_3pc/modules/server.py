@@ -78,7 +78,7 @@ import numpy as np
 from numba import njit, prange
 
 
-@njit('(int32[:,:])(int32[:,:], int64[:], int8[:,:], int8[:],  uint8,  uint8)', parallel=True, nogil=True,
+@njit('(int8[:,:])(int8[:,:], int64[:], int8[:,:], int8[:],  uint8,  uint8)', parallel=True, nogil=True,
       cache=True)
 def private_compare_numba_server(s, r, x_bits_1, beta, bits, ignore_msb_bits):
     for i in prange(x_bits_1.shape[0]):
@@ -117,6 +117,7 @@ class SecureConv2DServer(SecureModule):
 
     @timer("SecureConv2DServer")
     def forward(self, X_share):
+
         # out_shape = get_output_shape(X_share.shape, self.W_plaintext.shape, self.padding, self.dilation, self.stride)
         # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_12.put(np.arange(10))
@@ -181,7 +182,7 @@ class PrivateCompareServer(SecureModule):
 
     def forward(self, x_bits_1, r, beta):
 
-        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=backend.int32)
+        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=backend.int8)
         d_bits_1 = private_compare_numba_server(s, r, x_bits_1, beta, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS)
 
         # r[backend.astype(beta, backend.bool)] += 1
@@ -407,6 +408,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.padding = padding
 
     def forward(self, shape):
+
         # out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
         # return DummyShapeTensor(out_shape)
 
@@ -427,7 +429,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(**kwargs)
 
     def forward(self, shape):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[shape[0]] + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int32)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67, size=[shape[0]] + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):

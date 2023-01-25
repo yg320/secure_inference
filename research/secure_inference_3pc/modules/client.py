@@ -16,7 +16,7 @@ from research.secure_inference_3pc.modules.base import DummyShapeTensor
 import torch
 import numpy as np
 from numba import njit, prange
-@njit('(int32[:,:])(int32[:,:], int64[:], int8[:,:], int8[:],  uint8, uint8)', parallel=True,  nogil=True, cache=True)
+@njit('(int8[:,:])(int8[:,:], int64[:], int8[:,:], int8[:],  uint8, uint8)', parallel=True,  nogil=True, cache=True)
 def private_compare_numba(s, r, x_bits_0, beta, bits, ignore_msb_bits):
 
     for i in prange(x_bits_0.shape[0]):
@@ -48,6 +48,7 @@ class SecureConv2DClient(SecureModule):
 
     @timer("SecureConv2DClient")
     def forward(self, X_share):
+
         # out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
         # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_01.put(np.arange(10))
@@ -106,7 +107,7 @@ class PrivateCompareClient(SecureModule):
     @timer("PrivateCompareClient")
     def forward(self, x_bits_0, r, beta):
 
-        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int32)
+        s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int8)
         d_bits_0 = private_compare_numba(s, r, x_bits_0, beta, NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS)
         # r[backend.astype(beta, backend.bool)] += 1
         # bits = self.decompose(r)
@@ -126,7 +127,7 @@ class ShareConvertClient(SecureModule):
         super(ShareConvertClient, self).__init__(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
-    # @timer("post_compare")
+    @timer("post_compare")
     def post_compare(self, a_0, eta_pp, delta_0, alpha, beta_0, mu_0):
         eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
         eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
@@ -347,6 +348,7 @@ class PRFFetcherConv2D(PRFFetcherModule):
 
     def forward(self, shape):
         out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+
         # return DummyShapeTensor(out_shape)
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
@@ -362,7 +364,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(**kwars)
 
     def forward(self, shape):
-        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[shape[0]] + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int32)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P, size=[shape[0]] + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
