@@ -126,7 +126,7 @@ class SecureModelSegmentation(SecureModule):
 
 
 def full_inference_classification(cfg, model, num_images, device):
-    dataset = build_data(cfg, train=False)
+    dataset = build_data(cfg, mode="test")
     results_gt = []
     results_pred = []
     model.eval()
