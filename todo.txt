@@ -98,7 +98,7 @@
 - make dummy in base class
 - Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
 - change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
-
+- Draw a bunch of block sizes and try to learng a model that would lead to additivity
 ======================================== Reading  =============================================
 - Benchmark ops
 - FALCON, 2pc, 3pc, OT, HE

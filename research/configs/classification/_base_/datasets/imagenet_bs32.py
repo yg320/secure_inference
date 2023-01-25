@@ -48,11 +48,9 @@ data = dict(
         data_prefix='data/imagenet/val',
         ann_file='data/imagenet/meta/val.txt',
         pipeline=test_pipeline),
-
     distortion_extraction=dict(
         type=dataset_type,
-        data_prefix='data/imagenet/val',
-        ann_file='data/imagenet/meta/val.txt',
+        data_prefix='data/imagenet/train',
         pipeline=distortion_extraction_pipeline)
 )
 evaluation = dict(interval=1, metric='accuracy')

@@ -60,7 +60,7 @@ class SimpleTest:
 
     def get_block_size_spec_loss(self, block_size_spec_paths):
 
-        dataset = build_data(self.cfg, mode="train")
+        dataset = build_data(self.cfg, mode="distortion_extraction")
         data_loader = build_dataloader(dataset, **self.train_loader_cfg)
 
         block_size_specs = [pickle.load(open(block_size_spec_path, 'rb')) for block_size_spec_path in block_size_spec_paths]
@@ -104,18 +104,17 @@ if __name__ == "__main__":
     # export PYTHONPATH=/storage/yakir/secure_inference; python research/knapsack/knapsack_based_simulated_annealing.py
     snr = 100000
 
+    # out_stat_dir = "/storage/yakir/secure_inference/knap_base_dim_annel_100000"
     # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
     # config_path = "/storage/yakir/secure_inference/research/configs/classification/resnet/iterative/iter01_algo4x4_0.005_4.py"
-    # channel_distortion_path = "outputs/distortions/classification/resnet50_8xb32_in1k_iterative/num_iters_1/iter_0_collected/"
+    # optimal_channel_distortion_path = "outputs/distortions/classification/resnet50_8xb32_in1k_iterative/num_iters_1/iter_0_collected/"
     # PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/storage/yakir/secure_inference\"; '
-    # block_size_spec_file_format = "/storage/yakir/secure_inference/relu_spec_files/classification/sim_anneal/specs/{snr}_{seed}.pickle"
     # knap_script = "research/knapsack/multiple_choice_knapsack_v2.py"
     # device_ids = [0, 1, 2, 3, 4, 5]
     # batch_size = 3072
     # num_batches = 12
-    # seeds_to_use_file_path = f"./outputs/seeds_to_use_{snr}.pickle"
-
-    out_stat_dir = "/home/yakir/knap_base_dim_annel"
+    #
+    out_stat_dir = "/home/yakir/knap_base_dim_annel_dis_ext"
     checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
     config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
     optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
