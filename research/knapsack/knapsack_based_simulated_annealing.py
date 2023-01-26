@@ -84,45 +84,47 @@ class SimpleTest:
         return np.array(losses).mean(axis=0)
 
 
-def add_noise_to_distortion(source_dir, target_dir, snr, seed, params):
+def add_noise_to_distortion(source_dir, target_dir, snr_interval, seed, params):
     assert os.path.exists(source_dir)
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
     random_generator = np.random.default_rng(seed=seed)
-
+    snr = random_generator.uniform(low=snr_interval[0], high=snr_interval[1])
+    print(f"snr: {snr}")
     for layer_name in params.LAYER_NAMES:
         distortion = np.load(os.path.join(source_dir, f"{layer_name}.npy"))
-
-        noise = np.sqrt(1 / snr) * random_generator.normal(loc=0,
-                                                           scale=distortion.std(),
-                                                           size=distortion.shape)
-
+        if seed > 0:
+            noise = np.sqrt(1 / snr) * random_generator.normal(loc=0,
+                                                               scale=distortion.std(),
+                                                               size=distortion.shape)
+        else:
+            noise = 0
         np.save(os.path.join(target_dir, layer_name), distortion + noise)
 
 if __name__ == "__main__":
     # export PYTHONPATH=/storage/yakir/secure_inference; python research/knapsack/knapsack_based_simulated_annealing.py
-    snr = 100000
+    snr_interval = [2000, 200000]
 
-    out_stat_dir = "/output_3/knap_base_dim_annel_100000"
-    checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
-    config_path = "/storage/yakir/secure_inference/research/configs/classification/resnet/knapsack.py"
-    optimal_channel_distortion_path = "outputs/distortions/classification/resnet50_8xb32_in1k_iterative/num_iters_1/iter_0_collected/"
-    PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/storage/yakir/secure_inference\"; '
-    knap_script = "research/knapsack/multiple_choice_knapsack_v2.py"
-    device_ids = [0, 1]
-    batch_size = 256
-    num_batches = 64
-    #
-    # out_stat_dir = "/home/yakir/knap_base_dim_annel_dis_ext"
-    # checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
-    # config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
-    # optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
-    # PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/home/yakir/PycharmProjects/secure_inference\"; '
-    # knap_script = "/home/yakir/PycharmProjects/secure_inference/research/knapsack/multiple_choice_knapsack_v2.py"
+    # out_stat_dir = "/output_3/knap_base_dim_annel_100000"
+    # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
+    # config_path = "/storage/yakir/secure_inference/research/configs/classification/resnet/knapsack.py"
+    # optimal_channel_distortion_path = "outputs/distortions/classification/resnet50_8xb32_in1k_iterative/num_iters_1/iter_0_collected/"
+    # PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/storage/yakir/secure_inference\"; '
+    # knap_script = "research/knapsack/multiple_choice_knapsack_v2.py"
     # device_ids = [0, 1]
     # batch_size = 256
     # num_batches = 64
+    #
+    out_stat_dir = "/home/yakir/knap_base_dim_annel_dis_ext_interval"
+    checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
+    config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
+    optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
+    PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/home/yakir/PycharmProjects/secure_inference\"; '
+    knap_script = "/home/yakir/PycharmProjects/secure_inference/research/knapsack/multiple_choice_knapsack_v2.py"
+    device_ids = [0, 1]
+    batch_size = 256
+    num_batches = 64
 
     stats_out_path = os.path.join(out_stat_dir, "stats_out_path.pickle")
     noised_channel_distortion_base_path = os.path.join(out_stat_dir, "iter_0_collected_with_noise")
@@ -154,7 +156,7 @@ if __name__ == "__main__":
             cur_iter_dir = os.path.join(noised_channel_distortion_base_path, str(seed))
             add_noise_to_distortion(source_dir=optimal_channel_distortion_path,
                                     target_dir=cur_iter_dir,
-                                    snr=snr,
+                                    snr_interval=snr_interval,
                                     seed=seed,
                                     params=params)
 

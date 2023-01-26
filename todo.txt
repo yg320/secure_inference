@@ -12,6 +12,8 @@
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consult Shai about codebase and acceptance date
 - More samples in noise estimation
+- What about bandwith? (Instead of ReLU)
+
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!
