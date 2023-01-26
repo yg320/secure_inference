@@ -51,6 +51,10 @@ data = dict(
     distortion_extraction=dict(
         type=dataset_type,
         data_prefix='data/imagenet/train',
+        pipeline=distortion_extraction_pipeline),
+    distortion_extraction_val=dict(
+        type=dataset_type,
+        data_prefix='data/imagenet/val_train_format',
         pipeline=distortion_extraction_pipeline)
 )
 evaluation = dict(interval=1, metric='accuracy')

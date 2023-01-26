@@ -110,3 +110,32 @@ d_bits_0 = module_67(s)
 t1 = time.time()
 
 print(t1 - t0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#
+# eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)  # TODO: Optimize this
+# t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
+# t11 = self.add_mode_L_minus_one(t00, t00)  # TODO: Optimize this
+# eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)  # TODO: Optimize this
+# t00 = self.add_mode_L_minus_one(delta_1, eta_1)  # TODO: Optimize this
+# theta_1 = self.add_mode_L_minus_one(beta_1, t00)  # TODO: Optimize this
+# y_1 = self.sub_mode_L_minus_one(a_1, theta_1)  # TODO: Optimize this
+# y_1 = self.add_mode_L_minus_one(y_1, mu_1)  # TODO: Optimize this
+# return y_1
