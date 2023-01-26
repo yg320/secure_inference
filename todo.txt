@@ -1,5 +1,5 @@
 ============================================= Following days =============================================
-- Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!!
+- Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!! (Do we always send minimal data types?)
 - Finish Methods and Results
 - Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
 
@@ -7,19 +7,18 @@
 - Use loss as distortion measure
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
 - Final Seg/Clss results
-- Channel distortion random seed, and multi-GPUs
 
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consult Shai about codebase and acceptance date
 - More samples in noise estimation
 - What about bandwith? (Instead of ReLU)
 - Make everything deterministic (especially distortion extraction)
+
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!
 - We really need to compare Porthos implementation to ours on the same machine..
 - Have cryptoprovider work with shapes only!
-- random - Have torch do that! (Upgrade if needed)
 - Verify that everything is sent as soon as we have it, and gotten as late as possible
 - AWS!
 - Find optimal stochastic ReLU params
@@ -58,49 +57,38 @@
 - We chose not to decompose to offline/online, but this can be done.
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 - Discarding MSB practically share no information, as weight decay is so common.
-============================================= Minor! =============================================
+- A note about softmax and logits
 
-- Use newer torch version with inplace << and bit_wise and
-- fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
+============================================= Minor! =============================================
+- Channel distortion random seed, and multi-GPUs
+
+- Linearize loss and use it as a distortion measure
 - Try https://github.com/tensorly/tensorly
 - what about this piece of code??! - assert not backend.any(r == backend.iinfo(r.dtype).max):  # HERE (In PrivateCompareClient)
-- Can we add more LUTs?
 - Understand the += issue
-- Do we always send minimal data types?
-- Consider MultiThreaded ReLU
 - Can we optimize beta in P0/P1/P2?
 - Try to make float conv2 with numba. If it works - verify that group conv is optimized
-- Is GLOO slowing us down?
 - Clean up threads
 - Consider to implement PRF fetcher in a different approach
 - Verify L and L-1
 - Major refactoring - Bunch of redundancies
 - Can some ReLU ops be fetched?
 - 2 GPUs 3 parties
-- Finetune iterative (itertaive sub channels (with multiple training))
-- Add quantization noise (to allow for 32bit inference) - QAT
-- Can we fuze mobilenet 1x1 and 3x3 convolutions?
 - Clip TRUNC every k'th conv
 - Why first image is slow
 - Start analysis (Analysis with noise to KnapSack matrix)
-- Detection
-- Further datasets/architectures/models/tasks
-- QAT
-- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties
-- Allow for softmax via maxpool derivative (Or FALCON implementation)
+- Further datasets/architectures/models/tasks (Detection)
 - Use eagerpy
 - Use blocksize [1,0] or discard!
-- Soft start (alpha * relu + (1-alpha) * bReLU)
-- Train with DReLU sign flips..
-- Stochastic sign flips to training (to train stochastic DReLUs)
+- Stochastic sign flips to training (to train stochastic DReLUs) + QAT (Add quantization noise (to allow for 32bit inference) - QAT
 - Compare to EIGEN library
 - Make forward_fetch and forward_regular
-- Consider using batch size > 1 in distortion extraction (and infer few block sizes simultaneously)
 - Reorganize configs (from scratch) as well as models, parametrs and MMLab tools (Just download everything once more)
 - make dummy in base class
 - Some refactoring (All ops should have dummy option in base class) - Server ops should inherit SecureServerModuld class, and forward should have dummy option
 - change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
-- Draw a bunch of block sizes and try to learng a model that would lead to additivity
+- random - Have torch do that! (Upgrade if needed)
+
 ======================================== Reading  =============================================
 - Benchmark ops
 - FALCON, 2pc, 3pc, OT, HE
@@ -114,5 +102,15 @@
 - Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
 
 ============================================= Never =============================================
-
+- Consider MultiThreaded ReLU
+- Draw a bunch of block sizes and try to learn a model that would lead to additivity
 - CRF
+- Use newer torch version with inplace << and bit_wise and
+- fuse with next layer in case np.all(self.block_sizes == [0, 1]) (Can save much..)
+- Is GLOO slowing us down?
+- How to convert to 2-parties? Triangular masking? can our approach be used in 2-parties
+- Allow for softmax via maxpool derivative (Or FALCON implementation)
+- Consider using batch size > 1 in distortion extraction (and infer few block sizes simultaneously)
+- Soft start (alpha * relu + (1-alpha) * bReLU)
+- Can we fuze mobilenet 1x1 and 3x3 convolutions?
+- Finetune iterative (itertaive sub channels (with multiple training))
