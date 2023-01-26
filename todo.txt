@@ -13,7 +13,7 @@
 - Consult Shai about codebase and acceptance date
 - More samples in noise estimation
 - What about bandwith? (Instead of ReLU)
-
+- Make everything deterministic (especially distortion extraction)
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!
