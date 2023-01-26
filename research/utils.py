@@ -9,6 +9,8 @@ def build_data(cfg, mode='train'):
         data_cfg = cfg.data.test
     elif mode == 'distortion_extraction':
         data_cfg = cfg.data.distortion_extraction
+    elif mode == 'distortion_extraction_val':
+        data_cfg = cfg.data.distortion_extraction_val
     else:
         raise ValueError(f'Unknown mode {mode}')
 

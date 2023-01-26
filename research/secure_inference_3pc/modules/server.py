@@ -75,7 +75,7 @@ import numpy as np
 #     out = numba_double_conv2d(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
 #     return out[np.newaxis]
 
-from numba import njit, prange
+from numba import njit, prange, int64, uint64
 
 
 @njit('(int8[:,:])(int8[:,:], int64[:], int8[:,:], int8[:],  uint8,  uint8)', parallel=True, nogil=True,
@@ -196,6 +196,68 @@ class PrivateCompareServer(SecureModule):
         self.network_assets.sender_12.put(d_bits_1)
 
 
+@njit('(int64[:])(int64[:], int8[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
+def post_compare_numba(a_1, eta_pp, delta_1,  beta_1, mu_0, eta_p_1):
+
+    out = a_1
+    for i in prange(a_1.shape[0],):
+        # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+        eta_pp_t = int64(eta_pp[i])
+
+        # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
+        t00 = eta_pp_t * eta_p_1[i]
+
+
+        # t11 = self.add_mode_L_minus_one(t00, t00)
+        t11 = t00 + t00
+        if uint64(t00) > uint64(t11):
+            t11 += 1
+        if t11 == -1:
+            t11 = 0
+
+
+        # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
+        if uint64(t11) > uint64(eta_p_1[i]):
+            eta_1 = eta_p_1[i] - t11 - 1
+        else:
+            eta_1 = eta_p_1[i] - t11
+
+
+
+        # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
+        t00 = delta_1[i] + eta_1
+        if uint64(delta_1[i]) > uint64(t00):
+            t00 += 1
+        if t00 == -1:
+            t00 = 0
+
+
+        # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
+        theta_1 = beta_1[i] + t00
+        if uint64(t00) > uint64(theta_1):
+            theta_1 += 1
+        if theta_1 == -1:
+            theta_1 = 0
+
+
+        # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
+        if uint64(theta_1) > uint64(a_1[i]):
+            y_1 = a_1[i] - theta_1 - 1
+        else:
+            y_1 = a_1[i] - theta_1
+
+
+        # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
+        ret = y_1 - mu_0[i]
+        if uint64(y_1) > uint64(ret):
+            ret += 1
+        if ret == -1:
+            ret = 0
+
+        out[i] = ret
+    return out
+
+
 class ShareConvertServer(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertServer, self).__init__(**kwargs)
@@ -206,8 +268,7 @@ class ShareConvertServer(SecureModule):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=backend.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
-        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
-        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_1.shape, dtype=SIGNED_DTYPE)
 
         r_1 = backend.subtract(r, r_0, out=r_0)
         a_tild_1 = backend.add(a_1, r_1, out=r_1)
@@ -223,16 +284,46 @@ class ShareConvertServer(SecureModule):
         self.private_compare(x_bits_1, r_minus_1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
 
-        eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)  # TODO: Optimize this
-        t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
-        t11 = self.add_mode_L_minus_one(t00, t00)  # TODO: Optimize this
-        eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)  # TODO: Optimize this
-        t00 = self.add_mode_L_minus_one(delta_1, eta_1)  # TODO: Optimize this
-        theta_1 = self.add_mode_L_minus_one(beta_1, t00)  # TODO: Optimize this
-        y_1 = self.sub_mode_L_minus_one(a_1, theta_1)  # TODO: Optimize this
-        y_1 = self.add_mode_L_minus_one(y_1, mu_1)  # TODO: Optimize this
-        return y_1
+        with Timer("post compare server"):
+            return post_compare_numba(a_1, eta_pp, delta_1, beta_1, mu_0, eta_p_1)
+            # mu_1 = backend.multiply(mu_0, -1, out=mu_0)
+            # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+            # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
+            # t11 = self.add_mode_L_minus_one(t00, t00)
+            # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
+            # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
+            # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
+            # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
+            # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
+            # return y_1
 
+@njit('(int64[:])(int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
+def mult_server_flatten(x, y, c, m, e0, e1, f0, f1):
+    for i in prange(x.shape[0],):
+        e = (e0[i] + e1[i])
+        f = (f0[i] + f1[i])
+        f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
+    return f1
+
+@njit('(int64[:, :, :, :])(int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :])', parallel=True,  nogil=True, cache=True)
+def mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1):
+    for i in prange(x.shape[0],):
+        for j in range(x.shape[1]):
+            for k in range(x.shape[2]):
+                for l in range(x.shape[3]):
+                    e = (e0[i, j, k, l] + e1[i, j, k, l])
+                    f = (f0[i, j, k, l] + f1[i, j, k, l])
+                    f1[i, j, k, l] = - e * f + x[i, j, k, l] * f + y[i, j, k, l] * e + c[i, j, k, l] - m[i, j, k, l]
+        # e = (e0[i] + e1[i])
+        # f = (f0[i] + f1[i])
+        # f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
+    return f1
+
+def mult_server_numba(x, y, c, m, e0, e1, f0, f1):
+    if x.ndim == 1:
+        return mult_server_flatten(x, y, c, m, e0, e1, f0, f1)
+    else:
+        return mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1)
 
 class SecureMultiplicationServer(SecureModule):
     def __init__(self, **kwargs):
@@ -243,6 +334,8 @@ class SecureMultiplicationServer(SecureModule):
         A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=X_share.dtype)
+
         E_share = backend.subtract(X_share, A_share, out=A_share)
         F_share = backend.subtract(Y_share, B_share, out=B_share)
 
@@ -251,15 +344,15 @@ class SecureMultiplicationServer(SecureModule):
         self.network_assets.sender_01.put(F_share)
         F_share_client = self.network_assets.receiver_01.get()
 
-        E = backend.add(E_share_client, E_share, out=E_share)
-        F = backend.add(F_share_client, F_share, out=F_share)
+        out = mult_server_numba(X_share, Y_share, C_share, mu_1, E_share, E_share_client, F_share, F_share_client)
 
-        out = - E * F + X_share * F + Y_share * E + C_share  # TODO: Optimize this
+        # E = backend.add(E_share_client, E_share, out=E_share)
+        # F = backend.add(F_share_client, F_share, out=F_share)
+        # out = - E * F + X_share * F + Y_share * E + C_share
+        # mu_1 = backend.multiply(mu_1, -1, out=mu_1)
+        # out = out + mu_1
 
-        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=X_share.dtype)
-        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
-
-        return out + mu_1
+        return out
 
 
 class SecureMSBServer(SecureModule):

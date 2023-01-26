@@ -15,7 +15,7 @@ from research.secure_inference_3pc.modules.base import DummyShapeTensor
 
 import torch
 import numpy as np
-from numba import njit, prange
+from numba import njit, prange, int64, uint64
 @njit('(int8[:,:])(int8[:,:], int64[:], int8[:,:], int8[:],  uint8, uint8)', parallel=True,  nogil=True, cache=True)
 def private_compare_numba(s, r, x_bits_0, beta, bits, ignore_msb_bits):
 
@@ -122,29 +122,118 @@ class PrivateCompareClient(SecureModule):
         return
 
 
+@njit('(int64[:])(int64[:], int8[:], int64[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
+def post_compare_numba(a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0):
+
+    out = a_0
+    for i in prange(a_0.shape[0],):
+
+        eta_pp_t = int64(eta_pp[i])
+        t0 = eta_pp_t * eta_p_0[i]
+
+
+        # t1 = add_mode_L_minus_one(t0, t0)
+        t1 = t0 + t0
+        if uint64(t0) > uint64(t1):
+            t1 += 1
+        if t1 == -1:
+            t1 = 0
+
+
+        # t2 = sub_mode_L_minus_one(eta_pp_t, t1)
+        if uint64(t1) > uint64(eta_pp_t):
+            t2 = eta_pp_t - t1 - 1
+        else:
+            t2 = eta_pp_t - t1
+
+
+
+        # eta_0 = add_mode_L_minus_one(eta_p_0[i], t2)
+        eta_0 = eta_p_0[i] + t2
+        if uint64(eta_p_0[i]) > uint64(eta_0):
+            eta_0 += 1
+        if eta_0 == -1:
+            eta_0 = 0
+
+
+
+        # t0 = add_mode_L_minus_one(delta_0[i], eta_0)
+        t0 = delta_0[i] + eta_0
+        if uint64(delta_0[i]) > uint64(t0):
+            t0 += 1
+        if t0 == -1:
+            t0 = 0
+
+
+
+
+        # t1 = sub_mode_L_minus_one(t0, 1)
+        if uint64(1) > uint64(t0):
+            t1 = t0 - 1 - 1
+        else:
+            t1 = t0 - 1
+
+
+
+        # t2 = sub_mode_L_minus_one(t1, alpha[i])
+        if uint64(alpha[i]) > uint64(t1):
+            t2 = t1 - alpha[i] - 1
+        else:
+            t2 = t1 - alpha[i]
+
+
+
+
+
+        # theta_0 = add_mode_L_minus_one(beta_0[i], t2)
+        theta_0 = beta_0[i] + t2
+        if uint64(beta_0[i]) > uint64(theta_0):
+            theta_0 += 1
+        if theta_0 == -1:
+            theta_0 = 0
+
+
+
+        # y_0 = sub_mode_L_minus_one(a_0, theta_0)
+        if uint64(theta_0) > uint64(a_0[i]):
+            y_0 = a_0[i] - theta_0 - 1
+        else:
+            y_0 = a_0[i] - theta_0
+
+
+        # y_0 = add_mode_L_minus_one(y_0, mu_0[i])
+        ret = y_0 + mu_0[i]
+        if uint64(y_0) > uint64(ret):
+            ret += 1
+        if ret == -1:
+            ret = 0
+
+        out[i] = ret
+    return out
+
 class ShareConvertClient(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertClient, self).__init__(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
     @timer("post_compare")
-    def post_compare(self, a_0, eta_pp, delta_0, alpha, beta_0, mu_0):
-        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
-        eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
-        t0 = eta_pp * eta_p_0
-        t1 = self.add_mode_L_minus_one(t0, t0)
-        t2 = self.sub_mode_L_minus_one(eta_pp, t1)
-        eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
-
-        t0 = self.add_mode_L_minus_one(delta_0, eta_0)
-        t1 = self.sub_mode_L_minus_one(t0, backend.ones_like(t0))
-        t2 = self.sub_mode_L_minus_one(t1, alpha)
-        theta_0 = self.add_mode_L_minus_one(beta_0, t2)
-
-        y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
-        y_0 = self.add_mode_L_minus_one(y_0, mu_0)
-
-        return y_0
+    def post_compare(self, a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0):
+        return post_compare_numba(a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0)
+        # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+        # t0 = eta_pp * eta_p_0
+        # t1 = self.add_mode_L_minus_one(t0, t0)
+        # t2 = self.sub_mode_L_minus_one(eta_pp, t1)
+        # eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
+        #
+        # t0 = self.add_mode_L_minus_one(delta_0, eta_0)
+        # t1 = self.sub_mode_L_minus_one(t0, backend.ones_like(t0))
+        # t2 = self.sub_mode_L_minus_one(t1, alpha)
+        # theta_0 = self.add_mode_L_minus_one(beta_0, t2)
+        #
+        # y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
+        # y_0 = self.add_mode_L_minus_one(y_0, mu_0)
+        #
+        # return y_0
 
     def forward(self, a_0):
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
@@ -162,9 +251,27 @@ class ShareConvertClient(SecureModule):
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
+        eta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
 
-        return self.post_compare(a_0, eta_pp, delta_0, alpha, beta_0, mu_0)
+        return self.post_compare(a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0)
 
+@njit('(int64[:])(int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
+def mult_client_flatten(x, y, c, m, e0, e1, f0, f1):
+    for i in prange(x.shape[0],):
+        f1[i] = (x[i] * (f0[i] + f1[i]) + y[i] * (e0[i] + e1[i]) + c[i]) + m[i]
+    return f1
+
+@njit('(int64[:, :, :, :])(int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :])', parallel=True,  nogil=True, cache=True)
+def mult_client_non_flatten(x, y, c, m, e0, e1, f0, f1):
+    for i in prange(x.shape[0],):
+        f1[i] = (x[i] * (f0[i] + f1[i]) + y[i] * (e0[i] + e1[i]) + c[i]) + m[i]
+    return f1
+
+def mult_client_numba(x, y, c, m, e0, e1, f0, f1):
+    if x.ndim == 1:
+        return mult_client_flatten(x, y, c, m, e0, e1, f0, f1)
+    else:
+        return mult_client_non_flatten(x, y, c, m, e0, e1, f0, f1)
 
 class SecureMultiplicationClient(SecureModule):
     def __init__(self, **kwargs):
@@ -184,19 +291,19 @@ class SecureMultiplicationClient(SecureModule):
         A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         C_share = self.network_assets.receiver_02.get()
+        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
 
         E_share = X_share - A_share
         F_share = Y_share - B_share
 
         E_share_server, F_share_server = self.exchange_shares(E_share, F_share)
-
-        E = E_share_server + E_share
-        F = F_share_server + F_share
-
-        out = X_share * F + Y_share * E + C_share
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
-
-        return out + mu_0
+        out = mult_client_numba(X_share, Y_share, C_share, mu_0, E_share, E_share_server, F_share, F_share_server)
+        # E = E_share_server + E_share
+        # F = F_share_server + F_share
+        #
+        # out = X_share * F + Y_share * E + C_share
+        # out = out + mu_0
+        return out
 
 
 class SecureSelectShareClient(SecureModule):

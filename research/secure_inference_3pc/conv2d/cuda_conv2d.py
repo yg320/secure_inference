@@ -44,9 +44,6 @@ class Conv2DHandler:
 
     def conv2d_torch_4_type_1(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
         kwargs = dict(stride=stride, padding=padding, dilation=dilation)
-        if not IS_TORCH_BACKEND:
-            a = torch.from_numpy(a).to(self.device)
-            b = torch.from_numpy(b).to(self.device)
 
         x = (a & self.mask4_x) >> self.shift_x
         y = (b.unsqueeze(0) & self.mask4_y) >> self.shift_y
@@ -122,10 +119,6 @@ class Conv2DHandler:
     def conv2d_torch_4(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
 
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
-
-        if not IS_TORCH_BACKEND:
-            a = torch.from_numpy(a).to(self.device)
-            b = torch.from_numpy(b).to(self.device)
 
         x0 = ((a & self.mask0_4) >> 0).to(dtype)
         x1 = ((a & self.mask1_4) >> 4).to(dtype)
@@ -321,9 +314,6 @@ class Conv2DHandler:
     def conv2d_torch_8(self, a, b, stride, padding, dilation, groups, dtype):
         kwargs = {'stride': stride, 'padding': padding, 'dilation': dilation, 'groups': groups}
 
-        if not IS_TORCH_BACKEND:
-            a = torch.from_numpy(a).to(self.device)
-            b = torch.from_numpy(b).to(self.device)
 
         x0 = ((a & self.mask0_8) >> 0).to(dtype)
         x1 = ((a & self.mask1_8) >> 8).to(dtype)
@@ -406,16 +396,26 @@ class Conv2DHandler:
         else:
             out = self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
 
-        if IS_TORCH_BACKEND:
-            return out
-        else:
-            return out.cpu().numpy()
-
+        return out
     def conv2d(self, A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1):
+
+        if type(A) is np.ndarray:
+            is_numpy = True
+        else:
+            is_numpy = False
+
+        if is_numpy:
+            A = torch.from_numpy(A).to(self.device)
+            B = torch.from_numpy(B).to(self.device)
+            if C is not None:
+                C = torch.from_numpy(C).to(self.device)
+                D = torch.from_numpy(D).to(self.device)
 
         ret = self.single_conv2d(A, B, stride, padding, dilation, groups)
         if C is not None:
             ret += self.single_conv2d(C, D, stride, padding, dilation, groups)
 
+        if is_numpy:
+            return ret.cpu().numpy()
         return ret
 
