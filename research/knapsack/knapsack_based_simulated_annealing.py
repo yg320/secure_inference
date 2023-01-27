@@ -28,6 +28,13 @@ class SimpleTest:
             checkpoint_path=checkpoint_path
         )
 
+        self.baseline_model = get_model(
+            config=self.cfg,
+            gpu_id=None,
+            checkpoint_path=checkpoint_path
+        )
+
+
         self.train_loader_cfg = {
             'num_gpus': len(self.device_ids),
             'dist': True,
@@ -41,22 +48,35 @@ class SimpleTest:
 
         self.arch_utils = arch_utils_factory(self.cfg)
 
+        self.baseline_model.head.loss = lambda x, y: {"last_activation_layer": x}
+        self.model.head.loss = lambda x, y: {"last_activation_layer": x}
+
+        self.baseline_model.train()
+        self.baseline_model.cuda()
+
         self.model.train()
         self.model.cuda()
 
         self.replicas = torch.nn.parallel.replicate(self.model, self.device_ids)
+        self.replicas_baseline = torch.nn.parallel.replicate(self.baseline_model, self.device_ids)
 
     def get_loss(self, batch, kwargs_tup, block_size_spec):
         for replica in self.replicas:
             self.arch_utils.set_bReLU_layers(replica, block_size_spec)
+
+        outputs_baseline = torch.nn.parallel.parallel_apply(modules=self.replicas_baseline,
+                                                            inputs=batch,
+                                                            kwargs_tup=kwargs_tup,
+                                                            devices=self.device_ids)
+        torch.cuda.empty_cache()
         outputs = torch.nn.parallel.parallel_apply(modules=self.replicas,
                                                    inputs=batch,
                                                    kwargs_tup=kwargs_tup,
                                                    devices=self.device_ids)
-
-        loss = sum([float(x['loss'].cpu()) for x in outputs]) / len(self.device_ids)
-
-        return loss
+        outputs = np.stack([x['last_activation_layer'].cpu().detach().numpy() for x in outputs]).reshape(len(self.device_ids), -1)
+        outputs_baseline = np.stack([x['last_activation_layer'].cpu().detach().numpy() for x in outputs_baseline]).reshape(len(self.device_ids), -1)
+        distortion = ((outputs - outputs_baseline) ** 2).mean()
+        return distortion
 
     def get_block_size_spec_loss(self, block_size_spec_paths):
 
@@ -104,7 +124,7 @@ def add_noise_to_distortion(source_dir, target_dir, snr_interval, seed, params):
 
 if __name__ == "__main__":
     # export PYTHONPATH=/storage/yakir/secure_inference; python research/knapsack/knapsack_based_simulated_annealing.py
-    snr_interval = [2000, 200000]
+    snr_interval = [150000, 200000]
 
     # out_stat_dir = "/output_3/knap_base_dim_annel_100000"
     # checkpoint_path = "./outputs/classification/resnet50_8xb32_in1k/finetune_0.0001_avg_pool/epoch_14.pth"
@@ -116,15 +136,15 @@ if __name__ == "__main__":
     # batch_size = 256
     # num_batches = 64
     #
-    out_stat_dir = "/home/yakir/knap_base_dim_annel_dis_ext_interval"
+    out_stat_dir = "/home/yakir/knapsack_with_distortion_based_simulated_annealing_high"
     checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
     config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
     optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
     PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:/home/yakir/PycharmProjects/secure_inference\"; '
     knap_script = "/home/yakir/PycharmProjects/secure_inference/research/knapsack/multiple_choice_knapsack_v2.py"
     device_ids = [0, 1]
-    batch_size = 256
-    num_batches = 64
+    batch_size = 128
+    num_batches = 128
 
     stats_out_path = os.path.join(out_stat_dir, "stats_out_path.pickle")
     noised_channel_distortion_base_path = os.path.join(out_stat_dir, "iter_0_collected_with_noise")
@@ -190,10 +210,10 @@ if __name__ == "__main__":
 
         min_loss = np.min(cur_losses)
         argmin_loss = np.argmin(cur_losses)
+        # if 50*(min_loss-loss) < np.abs(np.random.normal()):
         if min_loss < loss:
             loss = min_loss
-            optimal_device = argmin_loss
-            seeds_to_use.append(iter_seeds[optimal_device])
+            seeds_to_use.append(iter_seeds[argmin_loss])
             optimal_channel_distortion_path = os.path.join(noised_channel_distortion_base_path, str(seeds_to_use[-1]))
 
         all_cur_losses.append(cur_losses)
