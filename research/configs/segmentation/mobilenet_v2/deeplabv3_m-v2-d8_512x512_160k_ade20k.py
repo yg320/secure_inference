@@ -8,6 +8,7 @@ model = dict(
         strides=(1, 2, 2, 1, 1, 1, 1),
         dilations=(1, 1, 1, 2, 2, 4, 4),
         out_indices=(1, 2, 4, 6),
+        act_cfg=dict(type='ReLU'),
         norm_cfg=dict(type='SyncBN', requires_grad=True)),
     decode_head=dict(in_channels=320),
     auxiliary_head=dict(in_channels=96))
