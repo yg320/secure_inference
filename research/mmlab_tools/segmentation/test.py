@@ -19,6 +19,8 @@ from mmseg.datasets import build_dataloader, build_dataset
 from mmseg.models import build_segmentor
 from mmseg.utils import build_ddp, build_dp, get_device, setup_multi_processes
 
+from research.distortion.arch_utils.factory import arch_utils_factory
+import pickle
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -260,6 +262,13 @@ def main():
         tmpdir = None
 
     cfg.device = get_device()
+
+    if hasattr(cfg, "relu_spec_file") and cfg.relu_spec_file is not None:
+        layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
+        arch_utils = arch_utils_factory(cfg)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
+
+
     if not distributed:
         warnings.warn(
             'SyncBN is only supported with DDP. To be compatible with DP, '

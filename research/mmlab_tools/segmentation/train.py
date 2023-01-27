@@ -21,6 +21,9 @@ from mmseg.utils import (collect_env, get_device, get_root_logger,
                          setup_multi_processes)
 
 
+from research.distortion.arch_utils.factory import arch_utils_factory
+import pickle
+
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a segmentor')
     parser.add_argument('config', help='train config file path')
@@ -200,6 +203,11 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
+
+    if hasattr(cfg, "relu_spec_file") and cfg.relu_spec_file is not None:
+        layer_name_to_block_sizes = pickle.load(open(cfg.relu_spec_file, 'rb'))
+        arch_utils = arch_utils_factory(cfg)
+        arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
     # SyncBN is not support for DP
     if not distributed:
