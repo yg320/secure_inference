@@ -105,13 +105,12 @@ class DistortionUtils:
         np.random.shuffle(self.shuffled_indices)
 
     def get_loss(self, out, ground_truth):
-        return self.model.head.loss(out, ground_truth.to(torch.long))['loss'].cpu().numpy()
-        loss_ce_list = []
-        for sample_id in range(out.shape[0]):
-            loss_ce_list.append(
-                self.model.decode_head.losses(out[sample_id:sample_id + 1], ground_truth[sample_id:sample_id + 1])[
-                    'loss_ce'].cpu().numpy())
-        return loss_ce_list
+        if self.cfg.model.type == 'ImageClassifier':
+            return self.model.head.loss(out, ground_truth.to(torch.long))['loss'].cpu().numpy()
+        elif self.cfg.model.type == 'EncoderDecoder':
+            return self.model.decode_head.losses(out, ground_truth)['loss_ce'].cpu().numpy()
+        else:
+            raise NotImplementedError
 
     def get_samples(self, batch_index, batch_size):
 

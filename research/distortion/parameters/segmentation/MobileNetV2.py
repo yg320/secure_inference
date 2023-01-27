@@ -1,7 +1,7 @@
 from research.distortion.parameters.block_sizes import BLOCK_SIZES_256x256, BLOCK_SIZES_128x128, BLOCK_SIZES_64x64, BLOCK_SIZES_1x1
 
 
-class MobileNetV2:
+class Params:
     def __init__(self):
 
         self.BLOCK_NAMES = \
