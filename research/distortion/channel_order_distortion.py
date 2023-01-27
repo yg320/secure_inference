@@ -87,14 +87,14 @@ if __name__ == "__main__":
 
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--gpu_id', type=int, default=0)
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k_finetune_0.0001_avg_pool.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14_avg_pool.pth")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth")
     parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_7/channel_distortions")
-    parser.add_argument('--batch_size', type=int, default=64)
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_8/channel_distortions")
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
-    parser.add_argument('--train_mode', action='store_true', default=False)
+    parser.add_argument('--train_mode', action='store_true', default=True)
 
     args = parser.parse_args()
     seed = 123
