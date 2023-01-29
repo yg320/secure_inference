@@ -103,6 +103,32 @@ class SimpleTest:
 
         return np.array(losses).mean(axis=0)
 
+# from research.distortion.utils import get_channel_order_statistics
+#
+# def add_noise_to_distortion(source_dir, target_dir, snr_interval, seed, params):
+#     assert os.path.exists(source_dir)
+#     if not os.path.exists(target_dir):
+#         os.makedirs(target_dir)
+#     channel_order_to_layer, channel_order_to_channel, channel_order_to_dim = get_channel_order_statistics(params)
+#     num_channels = len(channel_order_to_dim)
+#
+#
+#     random_generator = np.random.default_rng(seed=seed)
+#     channels = random_generator.choice(num_channels, size=5)
+#     # snr = random_generator.uniform(low=snr_interval[0], high=snr_interval[1])
+#     # print(f"snr: {snr}")
+#     for layer_name in params.LAYER_NAMES:
+#         distortion = np.load(os.path.join(source_dir, f"{layer_name}.npy"))
+#
+#         channels_to_use = [channel_order_to_channel[channel] for channel in channels if channel_order_to_layer[channel] == layer_name]
+#         for channel in channels_to_use:
+#             if seed > 0:
+#                 noise = random_generator.uniform(low=0.7, high=1.3)
+#             else:
+#                 noise = 1
+#             distortion[channel] = distortion[channel] * noise
+#
+#         np.save(os.path.join(target_dir, layer_name), distortion)
 
 def add_noise_to_distortion(source_dir, target_dir, snr_interval, seed, params):
     assert os.path.exists(source_dir)
@@ -110,17 +136,18 @@ def add_noise_to_distortion(source_dir, target_dir, snr_interval, seed, params):
         os.makedirs(target_dir)
 
     random_generator = np.random.default_rng(seed=seed)
-    snr = random_generator.uniform(low=snr_interval[0], high=snr_interval[1])
-    print(f"snr: {snr}")
+    # snr = random_generator.uniform(low=snr_interval[0], high=snr_interval[1])
+    # print(f"snr: {snr}")
     for layer_name in params.LAYER_NAMES:
         distortion = np.load(os.path.join(source_dir, f"{layer_name}.npy"))
         if seed > 0:
-            noise = np.sqrt(1 / snr) * random_generator.normal(loc=0,
-                                                               scale=distortion.std(),
-                                                               size=distortion.shape)
+            noise = random_generator.normal(loc=0,
+                                            scale=0.001,
+                                            size=distortion.shape)
         else:
             noise = 0
         np.save(os.path.join(target_dir, layer_name), distortion + noise)
+
 
 if __name__ == "__main__":
     # export PYTHONPATH=/storage/yakir/secure_inference; python research/knapsack/knapsack_based_simulated_annealing.py
@@ -136,7 +163,7 @@ if __name__ == "__main__":
     # batch_size = 256
     # num_batches = 64
     #
-    out_stat_dir = "/home/yakir/knapsack_with_distortion_based_simulated_annealing_high"
+    out_stat_dir = "/home/yakir/simulated_annealing_knapsack/v0"
     checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
     config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
     optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
