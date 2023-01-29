@@ -142,7 +142,7 @@ def add_noise_to_distortion(source_dir, target_dir, snr_interval, seed, params):
         distortion = np.load(os.path.join(source_dir, f"{layer_name}.npy"))
         if seed > 0:
             noise = random_generator.normal(loc=0,
-                                            scale=0.1,
+                                            scale=1.0,
                                             size=distortion.shape)
         else:
             noise = 0
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     # batch_size = 256
     # num_batches = 64
     #
-    out_stat_dir = "/home/yakir/simulated_annealing_knapsack/v2"
+    out_stat_dir = "/home/yakir/simulated_annealing_knapsack/v3"
     checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
     config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
     optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
