@@ -34,6 +34,7 @@ class ChannelDistortionHandler:
                                         layer_names: List[str],
                                         batch_size: int,
                                         baseline_block_size_spec: Dict[str, np.array],
+                                        clean_block_size_spec: Dict[str, np.array],
                                         seed: int,
                                         cur_iter: int,
                                         num_iters: int):
@@ -65,6 +66,7 @@ class ChannelDistortionHandler:
                     block_size_spec[layer_name][channel] = block_size
 
                     cur_assets = self.distortion_utils.get_batch_distortion(
+                        clean_block_size_spec=clean_block_size_spec,
                         baseline_block_size_spec=baseline_block_size_spec,
                         block_size_spec=block_size_spec,
                         batch_index=batch_index,
@@ -87,11 +89,12 @@ if __name__ == "__main__":
 
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--gpu_id', type=int, default=0)
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth")
-    parser.add_argument('--block_size_spec_file_name', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_8/channel_distortions")
-    parser.add_argument('--batch_size', type=int, default=4)
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14.pth")
+    parser.add_argument('--baseline_block_size_spec', type=str, default=None)
+    parser.add_argument('--clean_block_size_spec', type=str, default=None)
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_14/channel_distortions")
+    parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
     parser.add_argument('--train_mode', action='store_true', default=True)
@@ -112,10 +115,15 @@ if __name__ == "__main__":
 
     layer_names = params.LAYER_NAMES
 
-    if args.block_size_spec_file_name and os.path.exists(args.block_size_spec_file_name):
-        baseline_block_size_spec = pickle.load(open(args.block_size_spec_file_name, 'rb'))
+    if args.baseline_block_size_spec and os.path.exists(args.baseline_block_size_spec):
+        baseline_block_size_spec = pickle.load(open(args.baseline_block_size_spec, 'rb'))
     else:
         baseline_block_size_spec = dict()
+
+    if args.clean_block_size_spec and os.path.exists(args.clean_block_size_spec):
+        clean_block_size_spec = pickle.load(open(args.clean_block_size_spec, 'rb'))
+    else:
+        clean_block_size_spec = dict()
 
     chd = ChannelDistortionHandler(gpu_id=gpu_id,
                                    output_path=output_path,
@@ -127,6 +135,7 @@ if __name__ == "__main__":
                                         layer_names=layer_names,
                                         batch_size=args.batch_size,
                                         baseline_block_size_spec=baseline_block_size_spec,
+                                        clean_block_size_spec=clean_block_size_spec,
                                         seed=seed,
                                         cur_iter=args.cur_iter,
                                         num_iters=args.num_iters)

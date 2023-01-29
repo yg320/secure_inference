@@ -172,7 +172,7 @@ class DistortionUtils:
 
                 return block_name_to_activation, losses
 
-    @lru_cache(maxsize=1)
+    @lru_cache(maxsize=2)
     def get_batch_data(self, batch_index, batch_size, block_size_spec_id):
         block_size_spec = ctypes.cast(block_size_spec_id, ctypes.py_object).value
         input_images, ground_truth = self.get_samples(batch_index, batch_size=batch_size)
@@ -186,10 +186,19 @@ class DistortionUtils:
         block_name_to_activation["input_images"] = input_images
         return block_name_to_activation, ground_truth, losses
 
-    def get_batch_distortion(self, baseline_block_size_spec, block_size_spec, batch_index, batch_size, input_block_name,
+    def get_batch_distortion(self,
+                             clean_block_size_spec,
+                             baseline_block_size_spec,
+                             block_size_spec,
+                             batch_index,
+                             batch_size,
+                             input_block_name,
                              output_block_name):
 
-        block_name_to_activation_baseline, ground_truth, losses_baseline = \
+        block_name_to_activation_clean, ground_truth_clean, losses_clean = \
+            self.get_batch_data(batch_index, batch_size, id(clean_block_size_spec))
+
+        block_name_to_activation_baseline, _, losses_baseline = \
             self.get_batch_data(batch_index, batch_size, id(baseline_block_size_spec))
 
         input_tensor = block_name_to_activation_baseline[self.params.BLOCK_INPUT_DICT[input_block_name]]
@@ -199,14 +208,14 @@ class DistortionUtils:
                                  input_block_name=input_block_name,
                                  input_tensor=input_tensor,
                                  output_block_names=[output_block_name],
-                                 ground_truth=ground_truth)
+                                 ground_truth=ground_truth_clean)
 
         noises, signals = self.get_distortion(
-            block_name_to_activation_baseline=block_name_to_activation_baseline,
+            block_name_to_activation_baseline=block_name_to_activation_clean,
             block_name_to_activation_distorted=block_name_to_activation_distorted)
 
         assets = {
-            "Baseline Loss": float(losses_baseline),
+            "Baseline Loss": float(losses_clean),
             "Distorted Loss": float(losses_distorted),
             "Noise": noises[output_block_name].mean(),
             "Signal": signals[output_block_name].mean(),
