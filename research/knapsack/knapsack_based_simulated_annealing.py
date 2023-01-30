@@ -163,7 +163,7 @@ if __name__ == "__main__":
     # batch_size = 256
     # num_batches = 64
     #
-    out_stat_dir = "/home/yakir/simulated_annealing_knapsack/v5"
+    out_stat_dir = "/home/yakir/simulated_annealing_knapsack/v5_tst2s2"
     checkpoint_path = "/home/yakir/epoch_14_avg_pool.pth"
     config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
     optimal_channel_distortion_path = "/home/yakir/iter_0_collected"
@@ -197,38 +197,39 @@ if __name__ == "__main__":
 
         t0 = time.time()
 
-        for device in device_ids:
-            seed = len(device_ids) * seed_group + device
-            iter_seeds.append(seed)
-            cur_iter_dir = os.path.join(noised_channel_distortion_base_path, str(seed))
-            add_noise_to_distortion(source_dir=optimal_channel_distortion_path,
-                                    target_dir=cur_iter_dir,
-                                    snr_interval=snr_interval,
-                                    seed=seed,
-                                    params=params)
-
-            block_size_spec_file = os.path.join(block_size_spec_files_dir, f"{seed}.pickle")
-            block_size_spec_paths.append(block_size_spec_file)
-            os.system(PYTHON_PATH_EXPORT +
-                      f'python {knap_script} '
-                      f'--block_size_spec_file_name {block_size_spec_file} '
-                      f'--channel_distortion_path {cur_iter_dir} '
-                      f'--config {config_path} '
-                      '--cost_type ReLU '
-                      '--division 1 '
-                      '--cur_iter 0 '
-                      '--num_iters 1 '
-                      '--max_cost 644224 '
-                      f'--device {device} > /dev/null 2>&1 & ')
-
-        while True:
-            if all([os.path.exists(x) for x in block_size_spec_paths]):
-                break
-            else:
-                time.sleep(1)
+        # for device in device_ids:
+        #     seed = len(device_ids) * seed_group + device
+        #     iter_seeds.append(seed)
+        #     cur_iter_dir = os.path.join(noised_channel_distortion_base_path, str(seed))
+        #     add_noise_to_distortion(source_dir=optimal_channel_distortion_path,
+        #                             target_dir=cur_iter_dir,
+        #                             snr_interval=snr_interval,
+        #                             seed=seed,
+        #                             params=params)
+        #
+        #     block_size_spec_file = os.path.join(block_size_spec_files_dir, f"{seed}.pickle")
+        #     block_size_spec_paths.append(block_size_spec_file)
+        #     os.system(PYTHON_PATH_EXPORT +
+        #               f'python {knap_script} '
+        #               f'--block_size_spec_file_name {block_size_spec_file} '
+        #               f'--channel_distortion_path {cur_iter_dir} '
+        #               f'--config {config_path} '
+        #               '--cost_type ReLU '
+        #               '--division 1 '
+        #               '--cur_iter 0 '
+        #               '--num_iters 1 '
+        #               '--max_cost 644224 '
+        #               f'--device {device} > /dev/null 2>&1 & ')
+        #
+        # while True:
+        #     if all([os.path.exists(x) for x in block_size_spec_paths]):
+        #         break
+        #     else:
+        #         time.sleep(1)
 
         t1 = time.time()
         print(f"Knapsack took {t1 - t0} seconds")
+        block_size_spec_paths = ["/home/yakir/3x3_naive.pickle", "/home/yakir/3x3.pickle"]
         cur_losses = simple_test.get_block_size_spec_loss(block_size_spec_paths=block_size_spec_paths)
 
         t2 = time.time()
