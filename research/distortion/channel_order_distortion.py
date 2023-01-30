@@ -2,13 +2,12 @@ import argparse
 import copy
 import os
 
-import mmcls.apis
 from tqdm import tqdm
 import numpy as np
 from typing import Dict, List
 import pickle
 import mmcv
-import torch
+
 from research.distortion.parameters.factory import param_factory
 from research.distortion.distortion_utils import DistortionUtils
 from research.distortion.utils import get_channels_subset
@@ -97,13 +96,10 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
-    parser.add_argument('--train_mode', action='store_true', default=False)
 
     args = parser.parse_args()
     seed = None
-    # mmcls.apis.init_random_seed(seed)
-    # torch.manual_seed(seed)
-    # np.random.seed(seed)
+
     cfg = mmcv.Config.fromfile(args.config)
     gpu_id = args.gpu_id
     params = param_factory(cfg)
@@ -129,7 +125,7 @@ if __name__ == "__main__":
                                    output_path=output_path,
                                    params=params,
                                    cfg=cfg,
-                                   is_train_mode=args.train_mode)
+                                   is_train_mode=False)
 
     chd.extract_deformation_channel_ord(batch_index=args.batch_index,
                                         layer_names=layer_names,
