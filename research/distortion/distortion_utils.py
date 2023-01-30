@@ -117,14 +117,16 @@ class DistortionUtils:
         batch_indices = np.arange(batch_index * batch_size, batch_index * batch_size + batch_size)
         batch_indices = self.shuffled_indices[batch_indices]
         # TODO: just use normal training datastream.. no need to center crop then
-        batch = torch.stack([self.dataset[sample_id]['img'].data for sample_id in batch_indices]).to(self.device)
 
         # TODO: find a more elegant way to do this
         if self.cfg.model.type == 'ImageClassifier':
+            batch = torch.stack([self.dataset[sample_id]['img'].data for sample_id in batch_indices]).to(self.device)
             ground_truth = torch.Tensor([self.dataset[sample_id]["gt_label"] for sample_id in batch_indices]).to(self.device)
         elif self.cfg.model.type == 'EncoderDecoder':
-            ground_truth = torch.stack([self.dataset[sample_id]['gt_semantic_seg'].data for sample_id in batch_indices]).to(self.device)
+            batch = torch.stack([self.dataset[sample_id]['img'][0].data for sample_id in batch_indices]).to(self.device)
+            ground_truth = torch.stack([self.dataset[sample_id]['gt_semantic_seg'][0].to(torch.int64) for sample_id in batch_indices]).to(self.device)
         elif self.cfg.model.type == 'SingleStageDetector':
+            batch = torch.stack([self.dataset[sample_id]['img'][0].data for sample_id in batch_indices]).to(self.device)
             ground_truth = [self.dataset[sample_id]['gt_labels'].data.to(self.device) for sample_id in batch_indices]
 
         return batch, ground_truth

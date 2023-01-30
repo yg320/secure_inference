@@ -14,7 +14,7 @@ from research.distortion.distortion_utils import DistortionUtils
 from research.distortion.utils import get_channels_subset
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
-
+from research.mmlab_extension.transforms import CenterCrop
 
 class ChannelDistortionHandler:
     def __init__(self, gpu_id, output_path, params, cfg, is_train_mode=False):
@@ -87,20 +87,20 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--batch_index', type=int, default=0)
-    parser.add_argument('--gpu_id', type=int, default=0)
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14.pth")
+    parser.add_argument('--batch_index', type=int, default=1)
+    parser.add_argument('--gpu_id', type=int, default=1)
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth")
     parser.add_argument('--baseline_block_size_spec', type=str, default=None)
     parser.add_argument('--clean_block_size_spec', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_14/channel_distortions")
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_11/channel_distortions")
+    parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
-    parser.add_argument('--train_mode', action='store_true', default=True)
+    parser.add_argument('--train_mode', action='store_true', default=False)
 
     args = parser.parse_args()
-    seed = 123
+    seed = None
     # mmcls.apis.init_random_seed(seed)
     # torch.manual_seed(seed)
     # np.random.seed(seed)

@@ -218,7 +218,6 @@ def get_channels_component(params, group=None, group_size=None, seed=123, shuffl
 
 
 def get_channels_subset(seed, params, cur_iter, num_iters):
-    np.random.seed(seed)
 
     layer_names = params.LAYER_NAMES
     total_num_channels = get_num_of_channels(params)
@@ -235,7 +234,10 @@ def get_channels_subset(seed, params, cur_iter, num_iters):
     assert np.all(channel_order_to_layer == channel_order_to_layer_)
 
     all_channels = np.arange(total_num_channels)
-    np.random.shuffle(all_channels)
+
+    if seed is not None:
+        np.random.seed(seed)
+        np.random.shuffle(all_channels)
     channels_to_use = np.array_split(all_channels, num_iters)[cur_iter]
 
     channels_to_run = {layer_name: [] for layer_name in params.LAYER_NAMES}
@@ -249,11 +251,3 @@ def get_channels_subset(seed, params, cur_iter, num_iters):
 
     return channels_to_run, channels_to_use
 
-#
-# def center_crop(tensor, size):
-#     if tensor.shape[1] < size or tensor.shape[2] < size:
-#         raise ValueError
-#     h = (tensor.shape[1] - size) // 2
-#     w = (tensor.shape[2] - size) // 2
-#     return tensor[:, h:h + size, w:w + size]
-#
