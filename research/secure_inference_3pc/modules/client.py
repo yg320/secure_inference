@@ -47,7 +47,6 @@ class SecureConv2DClient(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
 
-    @timer("SecureConv2DClient")
     def forward(self, X_share):
         if self.is_dummy:
             out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
@@ -109,7 +108,6 @@ class PrivateCompareClient(SecureModule):
         super(PrivateCompareClient, self).__init__(**kwargs)
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
-    @timer("PrivateCompareClient")
     def forward(self, x_bits_0, r, beta):
 
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int8)
@@ -221,7 +219,6 @@ class ShareConvertClient(SecureModule):
         super(ShareConvertClient, self).__init__(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
-    @timer("post_compare")
     def post_compare(self, a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0):
         return post_compare_numba(a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0)
         # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
@@ -282,7 +279,6 @@ class SecureMultiplicationClient(SecureModule):
     def __init__(self, **kwargs):
         super(SecureMultiplicationClient, self).__init__(**kwargs)
 
-    # @timer("SecureMultiplicationClient - exchange shares")
     def exchange_shares(self, E_share, F_share):
         E_share_server = self.network_assets.receiver_01.get()
         self.network_assets.sender_01.put(E_share)
@@ -290,7 +286,6 @@ class SecureMultiplicationClient(SecureModule):
         self.network_assets.sender_01.put(F_share)
         return E_share_server, F_share_server
 
-    # @timer("SecureMultiplicationClient")
     def forward(self, X_share, Y_share):
 
         A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -333,7 +328,6 @@ class SecureMSBClient(SecureModule):
         self.mult = SecureMultiplicationClient(**kwargs)
         self.private_compare = PrivateCompareClient(**kwargs)
 
-    # @timer("SecureMSBClient - post_compare")
     def post_compare(self, beta, x_bit_0_0, r_mode_2, mu_0):
         beta = backend.astype(beta, SIGNED_DTYPE)
         beta_p_0 = self.network_assets.receiver_02.get()
@@ -368,8 +362,6 @@ class SecureMSBClient(SecureModule):
         return x_bits_0, r, beta, x_bit_0_0, r_mode_2, mu_0
 
 
-
-    # @timer("SecureMSBClient")
     def forward(self, a_0):
         x_bits_0, r, beta, x_bit_0_0, r_mode_2, mu_0 = self.pre_compare(a_0)
 
@@ -385,7 +377,6 @@ class SecureDReLUClient(SecureModule):
         self.share_convert = ShareConvertClient(**kwargs)
         self.msb = SecureMSBClient(**kwargs)
 
-    # @timer("SecureDReLUClient")
     def forward(self, X_share):
 
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -404,7 +395,6 @@ class SecureReLUClient(SecureModule):
         self.mult = SecureMultiplicationClient(**kwargs)
         self.dummy_relu = dummy_relu
 
-    # @timer("SecureReLUClient")
     def forward(self, X_share):
         if self.dummy_relu:
             self.network_assets.sender_01.put(X_share)

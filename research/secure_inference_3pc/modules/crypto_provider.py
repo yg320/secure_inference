@@ -83,7 +83,6 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         return out
 
-    @timer("SecureConv2DCryptoProvider")
     def forward_(self, X_share):
 
         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -124,7 +123,6 @@ class ShareConvertCryptoProvider(SecureModule):
         self.private_compare = PrivateCompareCryptoProvider(**kwargs)
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
-    # @timer("ShareConvertCryptoProvider")
     def forward(self, size):
         # with Timer("ShareConvertCryptoProvider: prf... "):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS,), dtype=backend.int8)

@@ -51,7 +51,7 @@ class Params:
     RELU_SPEC_FILE = "/home/yakir/4x4.pickle"
     IMAGE_SHAPE = (1, 3, 224, 224)
 
-    NUM_IMAGES = 50
+    NUM_IMAGES = 3
     CLIENT_DEVICE = {"cuda":"cuda:0", "cpu":"cpu"}[DEVICE]
     SERVER_DEVICE = {"cuda":"cuda:1", "cpu":"cpu"}[DEVICE]
     CRYPTO_PROVIDER_DEVICE = {"cuda":"cuda:0", "cpu":"cpu"}[DEVICE]

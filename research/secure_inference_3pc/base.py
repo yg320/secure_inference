@@ -120,7 +120,6 @@ min_org_shit = -283206
 max_org_shit = 287469
 org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, backend.int8)
 
-# @timer("module_67")
 def module_67(xxx):
     if IS_TORCH_BACKEND:
     # TODO: fix this
@@ -194,7 +193,6 @@ def fuse_conv_bn(conv_module, batch_norm_module):
 
     return W, B
 
-# @timer("get_c_party_0")
 def get_c_party_0(x_bits, multiplexer_bits, beta):
     beta = backend.unsqueeze(beta, -1)
     beta = 2 * beta  # Not allowed to change beta inplace

@@ -16,7 +16,6 @@ class SecureModule(torch.nn.Module):
         self.device = device
 
 
-    # @timer("add_mode_L_minus_one")
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
         # ret[backend.unsigned_gt(a, ret)] += 1

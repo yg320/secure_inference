@@ -116,7 +116,6 @@ class SecureConv2DServer(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
 
-    @timer("SecureConv2DServer")
     def forward(self, X_share):
         if self.is_dummy:
             X_share_client = self.network_assets.receiver_01.get()
