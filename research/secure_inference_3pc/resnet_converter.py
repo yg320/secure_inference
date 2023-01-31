@@ -109,12 +109,25 @@ class PRFPrefetchSecureGlobalAveragePooling2d(nn.Module):
     def forward(self, x):
         return DummyShapeTensor((x[0], x[1], 1, 1))
 
-
+class MyAvgPoolFetcher(nn.Module):
+    def __init__(self):
+        super(MyAvgPoolFetcher, self).__init__()
+    # TODO: is this the best way to do this?)
+    def forward(self, x):
+        return DummyShapeTensor((x[0], x[1], x[2]//2, x[3]//2))
+class MyAvgPool(nn.Module):
+    def __init__(self):
+        super(MyAvgPool, self).__init__()
+        self.r = torch.nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
+    # TODO: is this the best way to do this?)
+    def forward(self, x):
+        return self.r(torch.from_numpy(x)).numpy()
 def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
     model.backbone.bn1 = torch.nn.Identity()
     model.backbone.relu = build_secure_relu()
-    model.backbone.maxpool = max_pool(kernel_size=3, stride=2, padding=1)
+
+    model.backbone.maxpool = max_pool()
 
     for layer in [1, 2, 3, 4]:
         cur_res_layer = getattr(model.backbone, f"layer{layer}")
@@ -165,7 +178,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
         securify_resnet_cifar(model, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet"]:
-        securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+        securify_resnet_cifar(model, MyAvgPool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
     else:
         raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
     if relu_spec_file:
@@ -198,7 +211,7 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
 
     securify_resnet_cifar(
         model=prf_fetcher_model,
-        max_pool=max_pool,
+        max_pool=MyAvgPoolFetcher,
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
         build_secure_fully_connected=build_secure_fully_connected,

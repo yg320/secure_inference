@@ -13,6 +13,8 @@
 - More samples in noise estimation
 - What about bandwith? (Instead of ReLU)
 - Make everything deterministic (especially distortion extraction)
+- Discuss formats of plots and tables
+- Understand high l2 distance
 
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
@@ -46,6 +48,8 @@
 
 
 ============================================= Paper notes =============================================
+- Ablation on loss?
+- shuffled based knapsack?
 - Table: benchmark Conv2d on Cuda
 - Analysis - Maybe will help in KnapSack separation (due to proper additivity)
 - A paragraph on information leakage

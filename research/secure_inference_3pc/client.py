@@ -140,7 +140,7 @@ def full_inference_classification(cfg, model, num_images, device):
         out = model(img)
         results_gt.append(gt)
         results_pred.append(out)
-    print((backend.array(results_gt) == backend.array(results_pred)).mean())
+        print((backend.array(results_gt) == backend.array(results_pred)).mean())
 
 
 def full_inference(cfg, model, num_images):
