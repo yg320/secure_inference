@@ -71,7 +71,7 @@ class SecureModelClassification(SecureModule):
         super(SecureModelClassification, self).__init__(**kwargs)
         self.model = model
 
-    @timer("Inference")
+    @timer(name="Inference", avg=False)
     def forward(self, img):
         I = TypeConverter.f2i(img)
         I1 = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
@@ -170,8 +170,7 @@ def full_inference(cfg, model, num_images):
         # seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
         # img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
 
-        with Timer("Inference"):
-            seg_pred = model(img.numpy(), img_meta)
+        seg_pred = model(img.numpy(), img_meta)
 
         results.append(
             intersect_and_union(
