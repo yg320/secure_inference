@@ -114,10 +114,21 @@ class SecureConv2DServer(SecureModule):
         self.padding = padding
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
+        self.is_dummy = False
 
     @timer("SecureConv2DServer")
     def forward(self, X_share):
-
+        if self.is_dummy:
+            X_share_client = self.network_assets.receiver_01.get()
+            X = X_share_client + X_share
+            out = self.conv2d_handler.conv2d(X, self.W_plaintext, None, None, self.padding, self.stride, self.dilation, self.groups)
+            out = backend.right_shift(out, TRUNC_BITS, out=out)
+            # a = torch.conv2d(torch.from_numpy(X / 2 ** TRUNC_BITS), torch.from_numpy(self.W_plaintext / 2 ** TRUNC_BITS), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
+            # print(np.abs(out / 2 ** TRUNC_BITS - a).max())
+            if self.bias is not None:
+                out = backend.add(out, self.bias, out=out)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out.shape, dtype=SIGNED_DTYPE)
+            return out - mu_0
         # out_shape = get_output_shape(X_share.shape, self.W_plaintext.shape, self.padding, self.dilation, self.stride)
         # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_12.put(np.arange(10))
@@ -429,7 +440,8 @@ class SecureReLUServer(SecureModule):
             share_client = self.network_assets.receiver_01.get()
             recon = share_client + X_share
             value = recon * (backend.astype(recon > 0, recon.dtype))
-            return value
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=value.shape, dtype=SIGNED_DTYPE)
+            return value - mu_0
         else:
 
             shape = X_share.shape
@@ -499,9 +511,12 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
-
+        self.is_dummy = False
     def forward(self, shape):
-
+        if self.is_dummy:
+            out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+            self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=out_shape, dtype=SIGNED_DTYPE)
+            return DummyShapeTensor(out_shape)
         # out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
         # return DummyShapeTensor(out_shape)
 
@@ -616,6 +631,9 @@ class PRFFetcherReLU(PRFFetcherModule):
 
             self.DReLU((shape[0] * shape[1] * shape[2] * shape[3], ))
             self.mult((shape[0] * shape[1] * shape[2] * shape[3], ))
+        else:
+            self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+
         return shape
 
 
@@ -630,7 +648,7 @@ class PRFFetcherMaxPool(PRFFetcherModule):
 
     def forward(self, shape):
         if self.dummy_max_pool:
-            print(shape, shape, shape)
+            # print(shape, shape, shape)
             return DummyShapeTensor((shape[0], shape[1], shape[2] // 2, shape[3] // 2))
 
         assert activation.shape[2] == 112

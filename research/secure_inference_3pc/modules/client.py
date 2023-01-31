@@ -45,10 +45,15 @@ class SecureConv2DClient(SecureModule):
         self.padding = padding
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
+        self.is_dummy = False
 
     @timer("SecureConv2DClient")
     def forward(self, X_share):
-
+        if self.is_dummy:
+            out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
+            self.network_assets.sender_01.put(X_share)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out_shape, dtype=SIGNED_DTYPE)
+            return mu_0
         # out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
         # return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_01.put(np.arange(10))
@@ -403,7 +408,8 @@ class SecureReLUClient(SecureModule):
     def forward(self, X_share):
         if self.dummy_relu:
             self.network_assets.sender_01.put(X_share)
-            return backend.zeros_like(X_share)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+            return mu_0
         else:
 
             shape = X_share.shape
@@ -452,8 +458,13 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
+        self.is_dummy = False
 
     def forward(self, shape):
+        if self.is_dummy:
+            out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+            self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=out_shape, dtype=SIGNED_DTYPE)
+            return DummyShapeTensor(out_shape)
         out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
 
         # return DummyShapeTensor(out_shape)
@@ -569,6 +580,9 @@ class PRFFetcherReLU(PRFFetcherModule):
 
             self.DReLU((shape[0] * shape[1] * shape[2] * shape[3], ))
             self.mult((shape[0] * shape[1] * shape[2] * shape[3], ))
+        else:
+            self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+
         return shape
 
 

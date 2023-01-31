@@ -68,11 +68,12 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.groups = groups
 
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
-
+        self.is_dummy = False
     def forward(self, X_share):
+        if self.is_dummy:
 
-        # out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
-        # return backend.zeros(out_shape, dtype=X_share.dtype)
+            out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
+            return backend.zeros(out_shape, dtype=X_share.dtype)
         # self.network_assets.sender_02.put(np.arange(10))
         # self.network_assets.receiver_12.get()
         out = self.forward_(X_share)
@@ -307,10 +308,13 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
-
+        self.is_dummy = False
     def forward(self, shape):
-
         out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
+
+        if self.is_dummy:
+            return DummyShapeTensor(out_shape)
+
 
         # return DummyShapeTensor(out_shape)
 
