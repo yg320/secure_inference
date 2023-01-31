@@ -11,15 +11,21 @@ class TimerError(Exception):
 @dataclass
 class Timer:
     timers: ClassVar[Dict[str, float]] = {}
+    counter: ClassVar[Dict[str, int]] = {}
+    is_avg: ClassVar[Dict[str, bool]] = {}
+
+    avg: bool = False
     name: Optional[str] = None
     text: str = "Elapsed time: {:0.4f} seconds. Total elapsed time: {:0.4f} seconds. "
-    logger: Optional[Callable[[str], None]] = print
     _start_time: Optional[float] = field(default=None, init=False, repr=False)
+
 
     def __post_init__(self) -> None:
         """Add timer to dict of timers after initialization"""
         if self.name is not None:
             self.timers.setdefault(self.name, 0)
+            self.counter.setdefault(self.name, 0)
+            self.is_avg[self.name] = self.avg
 
     def start(self) -> None:
         """Start a new timer"""
@@ -41,9 +47,8 @@ class Timer:
 
         if self.name:
             self.timers[self.name] += elapsed_time
+            self.counter[self.name] += 1
 
-        # if self.logger:
-        #     self.logger(self.name + " " + self.text.format(elapsed_time, self.timers[self.name]))
         return elapsed_time
 
     def __enter__(self):
@@ -56,16 +61,20 @@ class Timer:
         self.stop()
 
 
-def timer(name):
+def timer(name, avg=False):
     def inner_timer(func):
         def wrapper(*args, **kwargs):
-            with Timer(name):
+            with Timer(name=name, avg=avg):
                 return func(*args, **kwargs)
         return wrapper
     return inner_timer
 #
 def print_timers():
     for name, elapsed in Timer.timers.items():
+        counter = Timer.counter[name]
+        is_avg = Timer.is_avg[name]
+        if is_avg:
+            elapsed = elapsed / counter
         print(f"{name} Elapsed time: {elapsed:0.4f} seconds")
 
 import atexit

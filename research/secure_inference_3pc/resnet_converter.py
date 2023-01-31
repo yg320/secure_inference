@@ -6,7 +6,7 @@ from functools import partial
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
-
+from research.secure_inference_3pc.timer import timer
 def securify_resnet18_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=None, relu_spec_file=None):
     model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
     model.backbone.stem[1] = torch.nn.Identity()
@@ -115,11 +115,13 @@ class MyAvgPoolFetcher(nn.Module):
     # TODO: is this the best way to do this?)
     def forward(self, x):
         return DummyShapeTensor((x[0], x[1], x[2]//2, x[3]//2))
+
 class MyAvgPool(nn.Module):
     def __init__(self):
         super(MyAvgPool, self).__init__()
         self.r = torch.nn.AvgPool2d(kernel_size=3, stride=2, padding=1)
     # TODO: is this the best way to do this?)
+
     def forward(self, x):
         return self.r(torch.from_numpy(x)).numpy()
 def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):

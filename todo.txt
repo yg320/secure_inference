@@ -15,7 +15,7 @@
 - Make everything deterministic (especially distortion extraction)
 - Discuss formats of plots and tables
 - Understand high l2 distance
-
+- activate fetcher each and every time
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!

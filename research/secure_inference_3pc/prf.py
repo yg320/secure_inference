@@ -48,7 +48,7 @@ class PRFWrapper:
 
     def integers(self, low, high, size, dtype):
         if self.fetch:
-            # with Timer("Integers - fetch"):
+
             ret = self.queue.get()
             assert ret.shape == tuple(size), f"{ret.shape} , {tuple(size)}"
             assert dtype_converted[ret.dtype] == dtype_converted[dtype], f"{ret.dtype} , {dtype}"

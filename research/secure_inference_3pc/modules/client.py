@@ -64,9 +64,9 @@ class SecureConv2DClient(SecureModule):
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=W_share.shape, dtype=SIGNED_DTYPE)
 
         E_share = backend.subtract(X_share, A_share, out=A_share)
-        F_share = backend.subtract(W_share, B_share, out=B_share)
-
         self.network_assets.sender_01.put(E_share)
+
+        F_share = backend.subtract(W_share, B_share, out=B_share)
         self.network_assets.sender_01.put(F_share)
 
         E_share_server = self.network_assets.receiver_01.get()
@@ -85,7 +85,6 @@ class SecureConv2DClient(SecureModule):
                                          groups=self.groups)
 
         C_share = self.network_assets.receiver_02.get()
-
         out = backend.add(out, C_share, out=out)
         out = backend.right_shift(out, TRUNC_BITS, out=out)
 
@@ -207,6 +206,7 @@ def post_compare_numba(a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0):
         out[i] = ret
     return out
 
+
 class ShareConvertClient(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertClient, self).__init__(**kwargs)
@@ -238,11 +238,10 @@ class ShareConvertClient(SecureModule):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
 
         alpha = backend.astype(0 < r_0 - r, SIGNED_DTYPE)
-
         a_tild_0 = a_0 + r_0
-        beta_0 = backend.astype(0 < a_0 - a_tild_0, SIGNED_DTYPE)
         self.network_assets.sender_02.put(a_tild_0)
 
+        beta_0 = backend.astype(0 < a_0 - a_tild_0, SIGNED_DTYPE)
         delta_0 = self.network_assets.receiver_02.get()
 
         self.private_compare(x_bits_0, r - 1, eta_pp)
@@ -273,23 +272,27 @@ class SecureMultiplicationClient(SecureModule):
         super(SecureMultiplicationClient, self).__init__(**kwargs)
 
     def exchange_shares(self, E_share, F_share):
-        E_share_server = self.network_assets.receiver_01.get()
+
         self.network_assets.sender_01.put(E_share)
-        F_share_server = self.network_assets.receiver_01.get()
+        E_share_server = self.network_assets.receiver_01.get()
+
         self.network_assets.sender_01.put(F_share)
+        F_share_server = self.network_assets.receiver_01.get()
+
         return E_share_server, F_share_server
 
     def forward(self, X_share, Y_share):
 
         A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
-        C_share = self.network_assets.receiver_02.get()
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
 
         E_share = X_share - A_share
         F_share = Y_share - B_share
 
         E_share_server, F_share_server = self.exchange_shares(E_share, F_share)
+
+        C_share = self.network_assets.receiver_02.get()
         out = mult_client_numba(X_share, Y_share, C_share, mu_0, E_share, E_share_server, F_share, F_share_server)
         # E = E_share_server + E_share
         # F = F_share_server + F_share
@@ -322,6 +325,7 @@ class SecureMSBClient(SecureModule):
         self.private_compare = PrivateCompareClient(**kwargs)
 
     def post_compare(self, beta, x_bit_0_0, r_mode_2, mu_0):
+
         beta = backend.astype(beta, SIGNED_DTYPE)
         beta_p_0 = self.network_assets.receiver_02.get()
 
@@ -329,6 +333,7 @@ class SecureMSBClient(SecureModule):
         delta_0 = x_bit_0_0 - (2 * r_mode_2 * x_bit_0_0)
 
         theta_0 = self.mult(gamma_0, delta_0)
+
         alpha_0 = gamma_0 + delta_0 - 2 * theta_0
         alpha_0 = alpha_0 + mu_0
 
@@ -337,13 +342,13 @@ class SecureMSBClient(SecureModule):
     def pre_compare(self, a_0):
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
-
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=a_0.dtype)
 
         x_0 = self.network_assets.receiver_02.get()
         x_bit_0_0 = self.network_assets.receiver_02.get()
         r_1 = self.network_assets.receiver_01.get()
+
 
         y_0 = self.add_mode_L_minus_one(a_0, a_0)
         r_0 = self.add_mode_L_minus_one(x_0, y_0)
