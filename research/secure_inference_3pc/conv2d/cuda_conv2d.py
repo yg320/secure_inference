@@ -34,8 +34,9 @@ class Conv2DHandler:
              self.mask8_4, self.mask7_4, self.mask6_4, self.mask5_4, self.mask4_4, self.mask3_4, self.mask2_4,
              self.mask1_4, self.mask0_4]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).unsqueeze_(1)
 
-        self.shift_x = torch.arange(0, 64, 4).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device)
-        self.shift_y = torch.arange(60, -4, -4).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device).unsqueeze(1)
+        self.shift4_x = torch.arange(0, 64, 4).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device)
+        self.shift4_y = torch.arange(60, -4, -4).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device).unsqueeze(1)
+
         self.mask0_8 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(0, 8))]).astype(np.int64))[0].to(device)
         self.mask1_8 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(8, 16))]).astype(np.int64))[0].to(device)
         self.mask2_8 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(16, 24))]).astype(np.int64))[0].to(device)
@@ -45,11 +46,17 @@ class Conv2DHandler:
         self.mask6_8 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(48, 56))]).astype(np.int64))[0].to(device)
         self.mask7_8 = torch.from_numpy(np.uint64([sum(2 ** i for i in range(56, 64))]).astype(np.int64))[0].to(device)
 
+        # self.mask8_x = torch.stack([self.mask0_8, self.mask1_8, self.mask2_8, self.mask3_8, self.mask4_8, self.mask5_8, self.mask6_8, self.mask7_8]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3)
+        # self.mask8_y = torch.stack([self.mask7_8, self.mask6_8, self.mask5_8, self.mask4_8, self.mask3_8, self.mask2_8, self.mask1_8, self.mask0_8]).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).unsqueeze_(1)
+        #
+        # self.shift8_x = torch.arange(0, 64, 8).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device)
+        # self.shift8_y = torch.arange(56, -8, -8).unsqueeze_(1).unsqueeze_(2).unsqueeze_(3).to(self.device).unsqueeze(1)
+
     def conv2d_torch_4_type_1(self, a, b, stride, padding, dilation, groups, dtype=torch.float32):
         kwargs = dict(stride=stride, padding=padding, dilation=dilation)
 
-        x = (a & self.mask4_x) >> self.shift_x
-        y = (b.unsqueeze(0) & self.mask4_y) >> self.shift_y
+        x = (a & self.mask4_x) >> self.shift4_x
+        y = (b.unsqueeze(0) & self.mask4_y) >> self.shift4_y
 
         x = x.reshape(1, x.shape[0] * x.shape[1], x.shape[2], x.shape[3]).to(dtype)
         y = y.reshape(y.shape[0] * y.shape[1], y.shape[2], y.shape[3], y.shape[4]).to(dtype)
@@ -289,19 +296,6 @@ class Conv2DHandler:
         y6 = ((b & self.mask6_8) >> 48).to(dtype)
         y7 = ((b & self.mask7_8) >> 56).to(dtype)
 
-        # x = torch.cat([x0, x1, x2, x3, x4, x5, x6, x7], dim=0)
-        # res_float = \
-        # (torch.conv2d(x0, y0, **kwargs).round().to(torch.int64) << 0) + \
-        # ((torch.conv2d(x0, y1, **kwargs) + torch.conv2d(x1, y0, **kwargs)).round().to(torch.int64) << 8) + \
-        # ((torch.conv2d(x0, y2, **kwargs) + torch.conv2d(x1, y1, **kwargs) + torch.conv2d(x2, y0, **kwargs)).round().to(torch.int64) << 16) + \
-        # ((torch.conv2d(x0, y3, **kwargs) + torch.conv2d(x1, y2, **kwargs) + torch.conv2d(x2, y1, **kwargs) + torch.conv2d(x3, y0, **kwargs)).round().to(torch.int64) << 24) + \
-        # ((torch.conv2d(x0, y4, **kwargs) + torch.conv2d(x1, y3, **kwargs) + torch.conv2d(x2, y2, **kwargs) + torch.conv2d(x3, y1, **kwargs) + torch.conv2d(x4, y0, **kwargs)).round().to(torch.int64) << 32) + \
-        # ((torch.conv2d(x0, y5, **kwargs) + torch.conv2d(x1, y4, **kwargs) + torch.conv2d(x2, y3, **kwargs) + torch.conv2d(x3, y2, **kwargs) + torch.conv2d(x4, y1, **kwargs) + torch.conv2d(x5, y0, **kwargs)).round().to(torch.int64) << 40) + \
-        # ((torch.conv2d(x0, y6, **kwargs) + torch.conv2d(x1, y5, **kwargs) + torch.conv2d(x2, y4, **kwargs) + torch.conv2d(x3, y3, **kwargs) + torch.conv2d(x4, y2, **kwargs) + torch.conv2d(x5, y1, **kwargs) + torch.conv2d(x6, y0, **kwargs)).round().to(torch.int64) << 48) + \
-        # ((torch.conv2d(x0, y7, **kwargs) + torch.conv2d(x1, y6, **kwargs) + torch.conv2d(x2, y5, **kwargs) + torch.conv2d(x3, y4, **kwargs) + torch.conv2d(x4, y3, **kwargs) + torch.conv2d(x5, y2, **kwargs) + torch.conv2d(x6, y1, **kwargs) + torch.conv2d(x7, y0, **kwargs)).round().to(torch.int64) << 56)
-        #
-        # return None
-
         res_float = (torch.conv2d(x0, y0, **kwargs).to(torch.int64) << 0)
         res_float += (torch.conv2d(x0, y1, **kwargs).to(torch.int64) << 8)
         res_float += (torch.conv2d(x0, y2, **kwargs).to(torch.int64) << 16)
@@ -347,7 +341,7 @@ class Conv2DHandler:
         if groups > 1:
             out = self.conv2d_torch_8(a, b, stride, padding, dilation, groups, dtype=torch.float32)
         elif num_mult >= 4096:
-            out = self.conv2d_torch_4(a, b, stride, padding, dilation, groups, dtype=torch.float32)
+            out = self.conv2d_torch_4_type_1(a, b, stride, padding, dilation, groups, dtype=torch.float32)
         elif num_mult >= 256:
             out = self.conv2d_torch_4_type_1(a, b, stride, padding, dilation, groups, dtype=torch.float32)
         else:
