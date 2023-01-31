@@ -16,6 +16,7 @@ from research.secure_inference_3pc.modules.base import DummyShapeTensor
 import torch
 import numpy as np
 from numba import njit, prange, int64, uint64
+
 @njit('(int8[:,:])(int8[:,:], int64[:], int8[:,:], int8[:],  uint8, uint8)', parallel=True,  nogil=True, cache=True)
 def private_compare_numba(s, r, x_bits_0, beta, bits, ignore_msb_bits):
 
@@ -47,36 +48,29 @@ class SecureConv2DClient(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
 
+    @timer(name="SecureConv2DClient", avg=False)
     def forward(self, X_share):
         if self.is_dummy:
             out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
             self.network_assets.sender_01.put(X_share)
             mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out_shape, dtype=SIGNED_DTYPE)
             return mu_0
-        # out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
-        # return backend.zeros(out_shape, dtype=X_share.dtype)
-        # self.network_assets.sender_01.put(np.arange(10))
-        # self.network_assets.receiver_02.get()
 
         assert self.W_shape[2] == self.W_shape[3]
         assert (self.W_shape[1] == X_share.shape[1]) or self.groups > 1
 
-        with Timer("SecureConv2DClient: preprocessing..."):
-            W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
-            A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
-            B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=W_share.shape, dtype=SIGNED_DTYPE)
+        W_share = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
+        A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
+        B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=W_share.shape, dtype=SIGNED_DTYPE)
 
-            with Timer("SecureConv2DClient: subtractions..."):
-                E_share = backend.subtract(X_share, A_share, out=A_share)
-                F_share = backend.subtract(W_share, B_share, out=B_share)
+        E_share = backend.subtract(X_share, A_share, out=A_share)
+        F_share = backend.subtract(W_share, B_share, out=B_share)
 
-            self.network_assets.sender_01.put(E_share)
-            self.network_assets.sender_01.put(F_share)
+        self.network_assets.sender_01.put(E_share)
+        self.network_assets.sender_01.put(F_share)
 
         E_share_server = self.network_assets.receiver_01.get()
         F_share_server = self.network_assets.receiver_01.get()
-
-        # E_share_server, F_share_server = share_server[:backend.size(E_share)].reshape(E_share.shape), share_server[backend.size(E_share):].reshape(F_share.shape)
 
         E = backend.add(E_share_server, E_share, out=E_share)
         F = backend.add(F_share_server, F_share, out=F_share)
@@ -89,6 +83,7 @@ class SecureConv2DClient(SecureModule):
                                          stride=self.stride,
                                          dilation=self.dilation,
                                          groups=self.groups)
+
         C_share = self.network_assets.receiver_02.get()
 
         out = backend.add(out, C_share, out=out)
@@ -97,8 +92,6 @@ class SecureConv2DClient(SecureModule):
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         out = backend.add(out, mu_0, out=out)
-        # self.network_assets.sender_01.put(np.arange(10))
-        # self.network_assets.receiver_02.get()
 
         return out
 

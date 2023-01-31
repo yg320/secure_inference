@@ -17,64 +17,6 @@ from research.secure_inference_3pc.timer import Timer, timer
 import torch
 import numpy as np
 
-# from numba import njit, prange, int64, int32
-# from research.secure_inference_3pc.const import SIGNED_DTYPE, NUM_BITS
-# NUMBA_DTYPE = int64 if NUM_BITS == 64 else int32
-#
-# @njit(NUMBA_DTYPE[:, :, :](NUMBA_DTYPE[:, :, :, :],
-#                            NUMBA_DTYPE[:, :, :, :],
-#                            NUMBA_DTYPE[:, :, :, :],
-#                            NUMBA_DTYPE[:, :, :, :],
-#                            int32,
-#                            int32,
-#                            int32[:],
-#                            int32[:]), parallel=True, nogil=True, cache=True)
-# def numba_double_conv2d(A, B, C, D, nb_rows_out, nb_cols_out, stride, dilation):
-#     stride_row, stride_col = stride
-#     dilation_row, dilation_col = dilation
-#     res = np.zeros((B.shape[0], nb_rows_out, nb_cols_out), dtype=SIGNED_DTYPE)
-#
-#     for out_channel in prange(B.shape[0]):
-#         for in_channel in range(A.shape[1]):
-#             for i in range(res.shape[1]):
-#                 for j in range(res.shape[2]):
-#                     for k_0 in range(B.shape[2]):
-#                         for k_1 in range(B.shape[3]):
-#                             x = stride_row * i + k_0 * dilation_row
-#                             y = stride_col * j + k_1 * dilation_col
-#
-#                             res[out_channel, i, j] += \
-#                                 B[out_channel, in_channel, k_0, k_1] * \
-#                                 A[0, in_channel, x, y]
-#
-#                             res[out_channel, i, j] += \
-#                                 D[out_channel, in_channel, k_0, k_1] * \
-#                                 C[0, in_channel, x, y]
-#
-#     return res
-#
-#
-# def double_conv_2d(A, B, C, D, padding, stride, dilation, groups=1):
-#     with Timer("conv2d - preprocessing"):
-#
-#         nb_rows_in = A.shape[2]
-#         nb_cols_in = A.shape[3]
-#         nb_rows_kernel = B.shape[2]
-#         nb_cols_kernel = B.shape[3]
-#         nb_rows_out = np.int32(
-#             ((nb_rows_in + 2 * padding[0] - dilation[0] * (nb_rows_kernel - 1) - 1) / stride[0]) + 1
-#         )
-#         nb_cols_out = np.int32(
-#             ((nb_cols_in + 2 * padding[1] - dilation[1] * (nb_cols_kernel - 1) - 1) / stride[1]) + 1
-#         )
-#         A_ = np.pad(A, ((0, 0), (0, 0), padding, padding), mode='constant')
-#         C_ = np.pad(C, ((0, 0), (0, 0), padding, padding), mode='constant')
-#         stride = np.int32(stride)
-#     dilation = np.int32(dilation)
-#
-#     out = numba_double_conv2d(A_, B, C_, D, nb_rows_out, nb_cols_out, stride, dilation)
-#     return out[np.newaxis]
-
 from numba import njit, prange, int64, uint64
 
 
@@ -100,6 +42,7 @@ def private_compare_numba_server(s, r, x_bits_1, beta, bits, ignore_msb_bits):
             s[i, j] = (s[i, j] * w_cumsum) % 67
     return s
 
+
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DServer, self).__init__(**kwargs)
@@ -116,71 +59,54 @@ class SecureConv2DServer(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
 
+    @timer(name="SecureConv2DServer", avg=False)
     def forward(self, X_share):
         if self.is_dummy:
             X_share_client = self.network_assets.receiver_01.get()
             X = X_share_client + X_share
             out = self.conv2d_handler.conv2d(X, self.W_plaintext, None, None, self.padding, self.stride, self.dilation, self.groups)
             out = backend.right_shift(out, TRUNC_BITS, out=out)
-            # a = torch.conv2d(torch.from_numpy(X / 2 ** TRUNC_BITS), torch.from_numpy(self.W_plaintext / 2 ** TRUNC_BITS), padding=self.padding, stride=self.stride, dilation=self.dilation, groups=self.groups).numpy()
-            # print(np.abs(out / 2 ** TRUNC_BITS - a).max())
             if self.bias is not None:
                 out = backend.add(out, self.bias, out=out)
             mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out.shape, dtype=SIGNED_DTYPE)
             return out - mu_0
-        # out_shape = get_output_shape(X_share.shape, self.W_plaintext.shape, self.padding, self.dilation, self.stride)
-        # return backend.zeros(out_shape, dtype=X_share.dtype)
-        # self.network_assets.sender_12.put(np.arange(10))
-        # self.network_assets.receiver_01.get()
 
-        with Timer("conv2d - preprocessing"):
-            assert self.W_plaintext.shape[2] == self.W_plaintext.shape[3]
-            assert (self.W_plaintext.shape[1] == X_share.shape[1]) or self.groups > 1
-            assert self.stride[0] == self.stride[1]
-            with Timer("conv2d - preprocessing - prf"):
+        assert self.W_plaintext.shape[2] == self.W_plaintext.shape[3]
+        assert (self.W_plaintext.shape[1] == X_share.shape[1]) or self.groups > 1
+        assert self.stride[0] == self.stride[1]
 
-                W_client = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, size=self.W_plaintext.shape, dtype=SIGNED_DTYPE)
-                A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
-                B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_plaintext.shape, dtype=SIGNED_DTYPE)
+        W_client = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, size=self.W_plaintext.shape, dtype=SIGNED_DTYPE)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_plaintext.shape, dtype=SIGNED_DTYPE)
 
-            with Timer("conv2d - preprocessing - subtract"):
+        W_share = backend.subtract(self.W_plaintext, W_client, out=W_client)
+        E_share = backend.subtract(X_share, A_share, out=A_share)
+        F_share = backend.subtract(W_share, B_share, out=B_share)
 
-                W_share = backend.subtract(self.W_plaintext, W_client, out=W_client)
-                E_share = backend.subtract(X_share, A_share, out=A_share)
-                F_share = backend.subtract(W_share, B_share, out=B_share)
-            with Timer("conv2d - preprocessing -put"):
-                self.network_assets.sender_01.put(E_share)
-                self.network_assets.sender_01.put(F_share)
+        self.network_assets.sender_01.put(E_share)
+        self.network_assets.sender_01.put(F_share)
 
-            with Timer("conv2d - preprocessing -get"):
+        E_share_client = self.network_assets.receiver_01.get()
+        F_share_client = self.network_assets.receiver_01.get()
 
-                E_share_client = self.network_assets.receiver_01.get()
-                F_share_client = self.network_assets.receiver_01.get()
+        E = backend.add(E_share_client, E_share, out=E_share)
+        F = backend.add(F_share_client, F_share, out=F_share)
 
-            with Timer("conv2d - preprocessing -add"):
-                E = backend.add(E_share_client, E_share, out=E_share)
-                F = backend.add(F_share_client, F_share, out=F_share)
+        W_share = backend.subtract(W_share, F, out=W_share)
 
-                W_share = backend.subtract(W_share, F, out=W_share)
+        out = self.conv2d_handler.conv2d(E, W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
-        with Timer("conv2d - main"):
-            out = self.conv2d_handler.conv2d(E, W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
-        with Timer("conv2d - post"):
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
-            C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
+        out = backend.add(out, C_share, out=out)
+        out = backend.right_shift(out, TRUNC_BITS, out=out)
 
-            out = backend.add(out, C_share, out=out)
-            out = backend.right_shift(out, TRUNC_BITS, out=out)
+        if self.bias is not None:
+            out = backend.add(out, self.bias, out=out)
 
-            if self.bias is not None:
-                out = backend.add(out, self.bias, out=out)
-
-            mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
-            mu_1 = backend.multiply(mu_1, -1, out=mu_1)
-            out = backend.add(out, mu_1, out=out)
-
-        # self.network_assets.sender_12.put(np.arange(10))
-        # self.network_assets.receiver_01.get()
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
+        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
+        out = backend.add(out, mu_1, out=out)
 
         return out
 
@@ -274,7 +200,7 @@ class ShareConvertServer(SecureModule):
         self.private_compare = PrivateCompareServer(**kwargs)
 
     def forward(self, a_1):
-        # with Timer("ShareConvertServer - processing..."):
+
         eta_pp = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_1.shape, dtype=backend.int8)
         r = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_1.shape, dtype=SIGNED_DTYPE)
@@ -294,18 +220,17 @@ class ShareConvertServer(SecureModule):
         self.private_compare(x_bits_1, r_minus_1, eta_pp)
         eta_p_1 = self.network_assets.receiver_12.get()
 
-        with Timer("post compare server"):
-            return post_compare_numba(a_1, eta_pp, delta_1, beta_1, mu_0, eta_p_1)
-            # mu_1 = backend.multiply(mu_0, -1, out=mu_0)
-            # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
-            # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
-            # t11 = self.add_mode_L_minus_one(t00, t00)
-            # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
-            # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
-            # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
-            # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-            # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
-            # return y_1
+        return post_compare_numba(a_1, eta_pp, delta_1, beta_1, mu_0, eta_p_1)
+        # mu_1 = backend.multiply(mu_0, -1, out=mu_0)
+        # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+        # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
+        # t11 = self.add_mode_L_minus_one(t00, t00)
+        # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
+        # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
+        # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
+        # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
+        # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
+        # return y_1
 
 @njit('(int64[:])(int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
 def mult_server_flatten(x, y, c, m, e0, e1, f0, f1):

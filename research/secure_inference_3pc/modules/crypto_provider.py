@@ -124,16 +124,13 @@ class ShareConvertCryptoProvider(SecureModule):
         self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, size):
-        # with Timer("ShareConvertCryptoProvider: prf... "):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size+(NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS,), dtype=backend.int8)
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
 
-        # with Timer("ShareConvertCryptoProvider: get... "):
 
         a_tild_0 = self.network_assets.receiver_02.get()
         a_tild_1 = self.network_assets.receiver_12.get()
 
-        # with Timer("ShareConvertCryptoProvider: Processing - 0 "):
         x = backend.add(a_tild_0, a_tild_1, out=a_tild_1)
         x_bits = self.decompose(x)
         x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
