@@ -81,12 +81,13 @@ class SecureConv2DServer(SecureModule):
         W_share = backend.subtract(self.W_plaintext, W_client, out=W_client)
         E_share = backend.subtract(X_share, A_share, out=A_share)
         F_share = backend.subtract(W_share, B_share, out=B_share)
+        with Timer(name="Reconstruct"):
 
-        self.network_assets.sender_01.put(E_share)
-        self.network_assets.sender_01.put(F_share)
+            self.network_assets.sender_01.put(E_share)
+            self.network_assets.sender_01.put(F_share)
 
-        E_share_client = self.network_assets.receiver_01.get()
-        F_share_client = self.network_assets.receiver_01.get()
+            E_share_client = self.network_assets.receiver_01.get()
+            F_share_client = self.network_assets.receiver_01.get()
 
         E = backend.add(E_share_client, E_share, out=E_share)
         F = backend.add(F_share_client, F_share, out=F_share)

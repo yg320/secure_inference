@@ -64,13 +64,14 @@ class SecureConv2DClient(SecureModule):
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=W_share.shape, dtype=SIGNED_DTYPE)
 
         E_share = backend.subtract(X_share, A_share, out=A_share)
-        self.network_assets.sender_01.put(E_share)
-
         F_share = backend.subtract(W_share, B_share, out=B_share)
-        self.network_assets.sender_01.put(F_share)
 
-        E_share_server = self.network_assets.receiver_01.get()
-        F_share_server = self.network_assets.receiver_01.get()
+        with Timer(name="Reconstruct"):
+            self.network_assets.sender_01.put(E_share)
+            self.network_assets.sender_01.put(F_share)
+
+            E_share_server = self.network_assets.receiver_01.get()
+            F_share_server = self.network_assets.receiver_01.get()
 
         E = backend.add(E_share_server, E_share, out=E_share)
         F = backend.add(F_share_server, F_share, out=F_share)
