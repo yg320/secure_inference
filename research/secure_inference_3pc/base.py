@@ -12,7 +12,7 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2225
+        self.base_port = 2230
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2
@@ -20,10 +20,9 @@ class Addresses:
         self.port_12 = 10 * self.base_port + 4
         self.port_21 = 10 * self.base_port + 5
 
-        self.ip_client = "localhost"
-        self.ip_server = "localhost"
-        self.ip_cryptoprovider = "localhost"
-
+        self.ip_client = "172.31.40.100"
+        self.ip_server = "172.31.46.207"
+        self.ip_cryptoprovider = "172.31.46.47"
 
 
 class NetworkAssets:
