@@ -88,14 +88,15 @@ if __name__ == "__main__":
 
     parser.add_argument('--batch_index', type=int, default=1)
     parser.add_argument('--gpu_id', type=int, default=1)
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
-    parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth")
-    parser.add_argument('--baseline_block_size_spec', type=str, default=None)
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py")
+    parser.add_argument('--checkpoint', type=str, default="/home/yakir/epoch_14.pth")
+    parser.add_argument('--baseline_block_size_spec', type=str, default="/home/yakir/4x4.pickle")
     parser.add_argument('--clean_block_size_spec', type=str, default=None)
-    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_11/channel_distortions")
+    parser.add_argument('--output_path', type=str, default="/home/yakir/Data2/assets_v4/distortions/tmp_12/channel_distortions")
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--cur_iter', type=int, default=0)
     parser.add_argument('--num_iters', type=int, default=1)
+    parser.add_argument('--train_mode', action='store_true', default=False)
 
     args = parser.parse_args()
     seed = None
@@ -109,7 +110,7 @@ if __name__ == "__main__":
     output_path = args.output_path
     os.makedirs(output_path, exist_ok=True)
 
-    layer_names = params.LAYER_NAMES
+    layer_names = params.LAYER_NAMES[::-1]
 
     if args.baseline_block_size_spec and os.path.exists(args.baseline_block_size_spec):
         baseline_block_size_spec = pickle.load(open(args.baseline_block_size_spec, 'rb'))
@@ -125,7 +126,7 @@ if __name__ == "__main__":
                                    output_path=output_path,
                                    params=params,
                                    cfg=cfg,
-                                   is_train_mode=False)
+                                   is_train_mode=args.train_mode)
 
     chd.extract_deformation_channel_ord(batch_index=args.batch_index,
                                         layer_names=layer_names,

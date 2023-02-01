@@ -19,10 +19,10 @@ from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why
 import numpy as np
 
 config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
-# model_path = "/home/yakir/epoch_14_avg_pool.pth"
-# relu_spec_file = None #"/home/yakir/3x4.pickle"
-model_path = "/home/yakir/epoch_50.pth"
-relu_spec_file = "/home/yakir/4x4.pickle"
+model_path = "/home/yakir/epoch_14_avg_pool.pth"
+relu_spec_file = None #"/home/yakir/3x4.pickle"
+# model_path = "/home/yakir/epoch_50.pth"
+# relu_spec_file = "/home/yakir/4x4.pickle"
 cfg = mmcv.Config.fromfile(config_path)
 params = param_factory(cfg)
 
@@ -38,7 +38,7 @@ if relu_spec_file is not None:
     arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
 results = []
-for sample_id in tqdm(range(50)):
+for sample_id in tqdm(range(500)):
     img = dataset[sample_id]['img'].data.unsqueeze(0)
     gt = dataset.get_gt_labels()[sample_id]
     out = model.forward_test(img)

@@ -157,7 +157,7 @@ class SecureOptimizedBlockReLU(Module):
         padder = self.pad_handler_class(cur_input.shape[2:], block_size)
         cur_input = padder.pad(cur_input)
         reshaped_input = SpaceToDepth(block_size)(cur_input)
-        mean_tensor = backend.sum(reshaped_input, axis=-1, keepdims=True)
+        mean_tensor = backend.sum(reshaped_input, axis=-1, keepdims=True) // reshaped_input.shape[-1]
         mean_tensors[index] = mean_tensor.flatten()
         pad_handlers[index] = padder
         return

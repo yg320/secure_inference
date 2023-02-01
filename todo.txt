@@ -16,6 +16,9 @@
 - Discuss formats of plots and tables
 - Understand high l2 distance
 - activate fetcher each and every time
+- ResNet101 with SNR?
+- Should I further verify .train() vs .eval()?
+- What about competitions?!
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!
