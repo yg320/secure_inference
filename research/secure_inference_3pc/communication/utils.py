@@ -1,7 +1,7 @@
 import threading
 
 from research.secure_inference_3pc.communication.numpy_socket.numpysocket.numpysocket import TorchSocket, NumpySocket
-from research.secure_inference_3pc.timer import timer
+from research.secure_inference_3pc.timer import timer, Timer
 import time
 from threading import Thread
 import torch
@@ -102,7 +102,8 @@ class Sender(Thread):
                     s.recv()
                     Sender.lock.release()
                 else:
-                    s.sendall(data)
+                    with Timer(name="s.sendall(data)"):
+                        s.sendall(data)
                     s.recv()
 
     def put(self, arr):
