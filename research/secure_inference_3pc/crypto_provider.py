@@ -128,6 +128,7 @@ if __name__ == "__main__":
                                             image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
 
     for _ in range(Params.NUM_IMAGES):
+        network_assets.sender_02.put(network_assets.receiver_02.get())
         out = model(Params.IMAGE_SHAPE)
 
     network_assets.done()

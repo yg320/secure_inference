@@ -12,13 +12,18 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2221
+        self.base_port = 2224
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2
         self.port_20 = 10 * self.base_port + 3
         self.port_12 = 10 * self.base_port + 4
         self.port_21 = 10 * self.base_port + 5
+
+        self.ip_client = "localhost"
+        self.ip_server = "localhost"
+        self.ip_cryptoprovider = "localhost"
+
 
 
 class NetworkAssets:
@@ -68,11 +73,11 @@ def get_assets(party, device, simulated_bandwidth=None):
                 # CRYPTO_PROVIDER: None,
             })
         network_assets = NetworkAssets(
-            sender_01=Sender(addresses.port_01, simulated_bandwidth=simulated_bandwidth),
-            sender_02=Sender(addresses.port_02, simulated_bandwidth=simulated_bandwidth),
+            sender_01=Sender(ip=addresses.ip_server, port=addresses.port_01, simulated_bandwidth=simulated_bandwidth),
+            sender_02=Sender(ip=addresses.ip_cryptoprovider, port=addresses.port_02, simulated_bandwidth=simulated_bandwidth),
             sender_12=None,
-            receiver_01=Receiver(addresses.port_10, device=device),
-            receiver_02=Receiver(addresses.port_20, device=device),
+            receiver_01=Receiver(ip=addresses.ip_server, port=addresses.port_10, device=device),
+            receiver_02=Receiver(ip=addresses.ip_cryptoprovider, port=addresses.port_20, device=device),
             receiver_12=None
         )
 
@@ -87,12 +92,12 @@ def get_assets(party, device, simulated_bandwidth=None):
                 # CRYPTO_PROVIDER: None,
             })
         network_assets = NetworkAssets(
-            sender_01=Sender(addresses.port_10, simulated_bandwidth=simulated_bandwidth),
+            sender_01=Sender(ip=addresses.ip_client, port=addresses.port_10, simulated_bandwidth=simulated_bandwidth),
             sender_02=None,
-            sender_12=Sender(addresses.port_12, simulated_bandwidth=simulated_bandwidth),
-            receiver_01=Receiver(addresses.port_01, device=device),
+            sender_12=Sender(ip=addresses.ip_cryptoprovider, port=addresses.port_12, simulated_bandwidth=simulated_bandwidth),
+            receiver_01=Receiver(ip=addresses.ip_client, port=addresses.port_01, device=device),
             receiver_02=None,
-            receiver_12=Receiver(addresses.port_21, device=device),
+            receiver_12=Receiver(ip=addresses.ip_cryptoprovider, port=addresses.port_21, device=device),
         )
 
     if party == 2:
@@ -108,11 +113,11 @@ def get_assets(party, device, simulated_bandwidth=None):
 
         network_assets = NetworkAssets(
             sender_01=None,
-            sender_02=Sender(addresses.port_20, simulated_bandwidth=simulated_bandwidth),
-            sender_12=Sender(addresses.port_21, simulated_bandwidth=simulated_bandwidth),
+            sender_02=Sender(ip=addresses.ip_client, port=addresses.port_20, simulated_bandwidth=simulated_bandwidth),
+            sender_12=Sender(ip=addresses.ip_server, port=addresses.port_21, simulated_bandwidth=simulated_bandwidth),
             receiver_01=None,
-            receiver_02=Receiver(addresses.port_02, device=device),
-            receiver_12=Receiver(addresses.port_12, device=device),
+            receiver_02=Receiver(ip=addresses.ip_client, port=addresses.port_02, device=device),
+            receiver_12=Receiver(ip=addresses.ip_server, port=addresses.port_12, device=device),
         )
 
     return crypto_assets, network_assets

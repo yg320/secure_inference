@@ -7,6 +7,7 @@ from threading import Thread
 import torch
 import queue
 import numpy as np
+import socket
 
 NUMPY_ARR_QUEUE_SIZE = 10
 
@@ -17,9 +18,10 @@ if IS_TORCH_BACKEND:
 else:
     empty_arr = np.array([], dtype=np.int8)
 class Receiver(Thread):
-    def __init__(self, port, device):
+    def __init__(self, ip, port, device):
         super(Receiver, self).__init__()
         self.numpy_arr_queue = queue.Queue(maxsize=NUMPY_ARR_QUEUE_SIZE)
+        self.ip = ip
         self.port = port
 
         self.lock = threading.Lock()
@@ -27,9 +29,11 @@ class Receiver(Thread):
         self.device = device
 
     def run(self):
+        host = "localhost" if self.ip == "localhost" else socket.gethostbyaddr(self.ip)[0]
+
         SocketClass = TorchSocket if IS_TORCH_BACKEND else NumpySocket
         with SocketClass() as s:
-            s.bind(('', self.port))
+            s.bind((host, self.port))
             s.listen()
             conn, addr = s.accept()
 
@@ -50,9 +54,10 @@ class Receiver(Thread):
 class Sender(Thread):
     lock = threading.Lock()
 
-    def __init__(self, port, simulated_bandwidth=None):
+    def __init__(self, ip, port, simulated_bandwidth=None):
         super(Sender, self).__init__()
         self.numpy_arr_queue = queue.Queue()
+        self.ip = ip
         self.port = port
         self.simulated_bandwidth = simulated_bandwidth #100000000  #bits/second
         self.num_of_bytes_sent = 0
@@ -60,14 +65,14 @@ class Sender(Thread):
     def run(self):
 
         total_sleep_time = 0
-
+        host = "localhost" if self.ip == "localhost" else socket.gethostbyaddr(self.ip)[0]
         SocketClass = TorchSocket if IS_TORCH_BACKEND else NumpySocket
         with SocketClass() as s:
 
             connected = False
             while not connected:
                 try:
-                    s.connect(("localhost", self.port))
+                    s.connect((host, self.port))
                     connected = True
                 except ConnectionRefusedError:
                     time.sleep(0.01)
@@ -83,7 +88,7 @@ class Sender(Thread):
                 else:
 
                     arr_size_bytes = data.size * data.itemsize
-                assert arr_size_bytes >= 64
+                # assert arr_size_bytes >= 64
                 self.num_of_bytes_sent += arr_size_bytes
 
                 if self.simulated_bandwidth:

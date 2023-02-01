@@ -22,6 +22,8 @@ from research.pipeline.backbones.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 from research.secure_inference_3pc.timer import timer
+import numpy as np
+
 def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
     shape = tuple(conv_module.weight.shape) + (1, 1)
@@ -125,18 +127,30 @@ class SecureModelSegmentation(SecureModule):
         return seg_pred
 
 
-def full_inference_classification(cfg, model, num_images, device):
-    dataset = build_data(cfg, mode="test")
+def full_inference_classification(cfg, model, num_images, device, network_assets, dummy=False):
+
+    if not dummy:
+        dataset = build_data(cfg, mode="test")
     results_gt = []
     results_pred = []
     model.eval()
     if model.prf_fetcher:
-        model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher,
-                                            image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
+        model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher, image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
     for sample_id in tqdm(range(num_images)):
-        img = dataset[sample_id]['img'].data
+        if dummy:
+            img = np.zeros((3, 224, 224), dtype=np.float32)
+            gt = 0
+        else:
+            img = dataset[sample_id]['img'].data
+            gt = dataset.get_gt_labels()[sample_id]
         img = backend.put_on_device(img.reshape((1,) + img.shape), device)
-        gt = dataset.get_gt_labels()[sample_id]
+
+        # Handshake
+        network_assets.sender_01.put(np.array(img.shape))
+        network_assets.sender_02.put(np.array(img.shape))
+        network_assets.receiver_01.get()
+        network_assets.receiver_02.get()
+
         out = model(img)
         results_gt.append(gt)
         results_pred.append(out)
@@ -235,7 +249,7 @@ if __name__ == "__main__":
     if cfg.model.type == "EncoderDecoder":
         full_inference(cfg, model, Params.NUM_IMAGES)
     else:
-        full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE)
+        full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets, Params.AWS_DUMMY)
 
     network_assets.done()
 
