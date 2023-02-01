@@ -195,7 +195,6 @@ class SecureOptimizedBlockReLU(Module):
             relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
         return relu_map
 
-    @timer(name="blockReLU", avg=False)
     def forward(self, activation):
 
         if np.all(self.block_sizes == [0, 1]):

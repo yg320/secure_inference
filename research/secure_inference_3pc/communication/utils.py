@@ -46,6 +46,7 @@ class Receiver(Thread):
                     frame = frame.to(self.device)  # NUMPY_CONVERSION
                 self.numpy_arr_queue.put(frame)
 
+    @timer(name="Receiver.get")
     def get(self):
         arr = self.numpy_arr_queue.get()
         return arr

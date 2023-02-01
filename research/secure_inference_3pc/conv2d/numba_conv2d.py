@@ -4,6 +4,7 @@ import time
 from research.secure_inference_3pc.timer import Timer
 from numba import njit, prange, int64, int32
 from research.secure_inference_3pc.const import SIGNED_DTYPE, NUM_BITS
+from research.secure_inference_3pc.timer import timer
 NUMBA_MATMUL = "NUMBA_MATMUL"
 NUMBA_CONV = "NUMBA_CONV"
 NUMBA_DTYPE = int64 if NUM_BITS == 64 else int32
@@ -265,6 +266,7 @@ class Conv2DHandler:
     def __init__(self):
         pass
 
+    @timer(name="Conv2DHandler.conv2d")
     def conv2d(self, A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1, method=NUMBA_CONV):
         if type(padding) is int:
             padding = (padding, padding)
