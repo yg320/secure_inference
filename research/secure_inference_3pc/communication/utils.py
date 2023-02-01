@@ -47,7 +47,7 @@ class Receiver(Thread):
                     frame = frame.to(self.device)  # NUMPY_CONVERSION
                 self.numpy_arr_queue.put(frame)
 
-    @timer(name="Receiver.get")
+    # @timer(name="Receiver.get")
     def get(self):
         arr = self.numpy_arr_queue.get()
         return arr
@@ -105,7 +105,7 @@ class Sender(Thread):
                 else:
                     with Timer(name="s.sendall(data)"):
                         s.sendall(data)
-                    s.recv()
+                        s.recv()
 
     def put(self, arr):
         # TODO: why is this copy needed (related to the monster threading bug)

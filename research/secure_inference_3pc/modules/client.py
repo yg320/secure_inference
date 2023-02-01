@@ -436,7 +436,10 @@ class SecureBlockReLUClient(SecureModule, SecureOptimizedBlockReLU):
         self.DReLU = SecureDReLUClient(**kwargs)
         self.mult = SecureMultiplicationClient(**kwargs)
 
+        self.dummy_relu = dummy_relu
     def forward(self, activation):
+        if self.dummy_relu:
+            return activation
         return SecureOptimizedBlockReLU.forward(self, activation)
 
 class PRFFetcherConv2D(PRFFetcherModule):

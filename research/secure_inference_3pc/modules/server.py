@@ -385,8 +385,12 @@ class SecureBlockReLUServer(SecureModule, SecureOptimizedBlockReLU):
         SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.DReLU = SecureDReLUServer(**kwargs)
         self.mult = SecureMultiplicationServer(**kwargs)
+        self.dummy_relu = dummy_relu
 
-
+    def forward(self, activation):
+        if self.dummy_relu:
+            return activation
+        return SecureOptimizedBlockReLU.forward(self, activation)
 class SecureSelectShareServer(SecureModule):
     def __init__(self, **kwargs):
         super(SecureSelectShareServer, self).__init__(**kwargs)
