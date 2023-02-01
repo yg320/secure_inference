@@ -17,6 +17,7 @@ if IS_TORCH_BACKEND:
     empty_arr = torch.Tensor([])
 else:
     empty_arr = np.array([], dtype=np.int8)
+
 class Receiver(Thread):
     def __init__(self, ip, port, device):
         super(Receiver, self).__init__()

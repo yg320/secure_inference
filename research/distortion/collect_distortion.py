@@ -2,11 +2,11 @@ import pickle
 import os
 import glob
 import numpy as np
+from tqdm import tqdm
 
-input_path = "/storage/yakir/secure_inference/outputs_v2/distortions/classification/resnet50_8xb32_in1k/train_mode"
-out_path = "/storage/yakir/secure_inference/outputs_v2/distortions/classification/resnet50_8xb32_in1k/train_mode_collected"
-os.makedirs(os.path.join(out_path, "loss"))
-os.makedirs(os.path.join(out_path, "distortion"))
+input_path = "/storage/yakir/secure_inference/outputs_v2/distortions/classification/resnet50_8xb32_in1k/iterative_knapsack_0_4x4/"
+out_path = "/storage/yakir/secure_inference/outputs_v2/distortions/classification/resnet50_8xb32_in1k/iterative_knapsack_0_4x4_collected/"
+os.makedirs(out_path)
 layer_names = [
                 "stem",
                 'layer1_0_1',
@@ -60,20 +60,20 @@ layer_names = [
 
             ]
 
-for layer_name in layer_names:
+for layer_name in tqdm(layer_names):
     glob_pattern = os.path.join(input_path, f"{layer_name}_*.pickle")
     files = glob.glob(glob_pattern)
-    assert len(files) == 8, glob_pattern
+    assert len(files) == 4, glob_pattern
 
     distortion = np.stack([pickle.load(open(f, 'rb'))["Noise"] for f in files])
     distortion = distortion.mean(axis=0).T
     distortion = distortion[:-1]
     distortion = np.array(distortion).T
-
-    loss = np.stack([pickle.load(open(f, 'rb'))["Distorted Loss"] for f in files])
-    loss = loss.mean(axis=0).T
-    loss = loss[:-1].T
-
-    np.save(os.path.join(out_path, "loss", f"{layer_name}.npy"), -loss)
-    np.save(os.path.join(out_path, "distortion", f"{layer_name}.npy"), -distortion)
+    #
+    # loss = np.stack([pickle.load(open(f, 'rb'))["Distorted Loss"] for f in files])
+    # loss = loss.mean(axis=0).T
+    # loss = loss[:-1].T
+    #
+    # np.save(os.path.join(out_path, "loss", f"{layer_name}.npy"), -loss)
+    np.save(os.path.join(out_path,  f"{layer_name}.npy"), -distortion)
 
