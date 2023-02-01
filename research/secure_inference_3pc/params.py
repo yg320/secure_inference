@@ -16,7 +16,7 @@ class Params:
     PUBLIC_IP_CRYPTO_PROVIDER = ""
     AWS_DUMMY = True #False
     IMAGE_SHAPE = (1, 3, 224, 224)
-    NUM_IMAGES = 1
+    NUM_IMAGES = 10
     CLIENT_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
     SERVER_DEVICE = {"cuda": "cuda:1", "cpu": "cpu"}[DEVICE]
     CRYPTO_PROVIDER_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
