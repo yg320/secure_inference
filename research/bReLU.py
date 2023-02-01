@@ -135,7 +135,7 @@ class PadHandler:
     def unpad(self, x):
         return x[:, :, self.pad_x_l:x.shape[2] - self.pad_x_r, self.pad_y_l:x.shape[3] - self.pad_y_r]
 
-from research.secure_inference_3pc.timer import timer
+from research.secure_inference_3pc.timer import timer, Timer
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 class SecureOptimizedBlockReLU(Module):
 
@@ -195,20 +195,22 @@ class SecureOptimizedBlockReLU(Module):
             relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
         return relu_map
 
+    @timer(name="bReLU")
     def forward(self, activation):
 
         if np.all(self.block_sizes == [0, 1]):
             return activation
         mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
 
-        sign_tensors = self.DReLU(mean_tensors)
+        with Timer(name="DReLU"):
+            sign_tensors = self.DReLU(mean_tensors)
 
         relu_map = self.post(activation, sign_tensors, cumsum_shapes,  pad_handlers)
         self.final_mult(activation, relu_map)
 
         return activation
 
-    # @timer("final_mult")
+    @timer(name="final_mult")
     def final_mult(self, activation, relu_map):
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
                                                               activation[:, ~self.is_identity_channels])
