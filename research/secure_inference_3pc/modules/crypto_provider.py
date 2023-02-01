@@ -69,6 +69,7 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
+    @timer(name='provider_conv2d')
     def forward(self, X_share):
         if self.is_dummy:
 

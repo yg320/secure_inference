@@ -48,6 +48,7 @@ class SecureConv2DClient(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
 
+    @timer(name='client_conv2d')
     def forward(self, X_share):
         if self.is_dummy:
             out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
