@@ -151,15 +151,19 @@ if __name__ == "__main__":
         device=Params.SERVER_DEVICE
 
     )
-    if model.prf_fetcher:
-        model.prf_fetcher.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=model.prf_fetcher,
-                                            image=backend.zeros(shape=(1, 3, 512, 683), dtype=SIGNED_DTYPE))
+
+    model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
     for _ in range(Params.NUM_IMAGES):
+
         image_size = network_assets.receiver_01.get()
         network_assets.sender_01.put(image_size)
+
+        model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=image_size, dtype=SIGNED_DTYPE))
+
         out = model(image_size)
 
+    model.prf_fetcher.prf_handler.done()
     network_assets.done()
 
     print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)

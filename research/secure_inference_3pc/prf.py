@@ -1,7 +1,9 @@
 import numpy as np
 import torch
 from threading import Thread
+import threading
 import queue
+import time
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 from research.secure_inference_3pc.timer import timer
 # TODO: https://towardsdatascience.com/six-levels-of-python-decorators-1f12c9067b23
@@ -39,6 +41,7 @@ class PRFWrapper:
         self.torch_prf = torch.Generator().manual_seed(self.seed)
         self.queue = queue
         self.fetch = False
+        self.lock = threading.Lock()
 
     def integers_fetch(self, low, high, size, dtype):
         out = self.prf.integers(low=low, high=high, size=size, dtype=dtype_converted[dtype])
@@ -77,16 +80,24 @@ class MultiPartyPRFHandler(Thread):
         self.random_tensor_queue = queue.Queue(maxsize=20)
         self.device = device
         self.prfs = {parties: PRFWrapper(seed=seed, queue=self.random_tensor_queue, device=self.device) for parties, seed in seeds.items()}
+        self.lock = threading.Lock()
 
-    def fetch(self, repeat, model, image):
-        self.repeat = repeat
+        self.image = None
+        self.stop = False
+    def fetch(self, model):
         self.model = model
-        self.image = image
 
         for v in self.prfs.values():
             v.fetch = True
 
         self.start()
+
+    def fetch_image(self, image):
+        # TODO: use with
+        self.lock.acquire()
+        self.image = image
+        self.lock.release()
+
 
     def __getitem__(self, parties):
         if parties in self.prfs.keys():
@@ -94,7 +105,28 @@ class MultiPartyPRFHandler(Thread):
         else:
             return self.prfs[parties[::-1]]
 
+    def done(self):
+        self.lock.acquire()
+        self.stop = True
+        self.lock.release()
     def run(self):
-        for _ in range(self.repeat):
-            self.model(self.image)
+
+        while True:
+            self.lock.acquire()
+            stop = self.stop
+            self.lock.release()
+
+            if stop:
+                break
+
+            self.lock.acquire()
+            image = self.image
+            self.image = None
+            self.lock.release()
+            if image is None:
+                time.sleep(0.1)
+            else:
+
+                self.model(image)
+
 

@@ -134,9 +134,10 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
     results_gt = []
     results_pred = []
     model.eval()
-    if model.prf_fetcher:
-        model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher, image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
+    model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
+
     for sample_id in tqdm(range(num_images)):
+
         if dummy:
             img = np.zeros((3, 224, 224), dtype=np.float32)
             gt = 0
@@ -144,6 +145,7 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
             img = dataset[sample_id]['img'].data
             gt = dataset.get_gt_labels()[sample_id]
         img = backend.put_on_device(img.reshape((1,) + img.shape), device)
+        model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
         # Handshake
         network_assets.sender_01.put(np.array(img.shape))
@@ -155,6 +157,7 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
         results_gt.append(gt)
         results_pred.append(out)
         print((backend.array(results_gt) == backend.array(results_pred)).mean())
+    model.prf_fetcher.prf_handler.done()
 
 
 def full_inference_segmentation(cfg, model, num_images, device, network_assets, dummy=False):
