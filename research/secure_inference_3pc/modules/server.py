@@ -141,6 +141,90 @@ class SecureConv2DServer(SecureModule):
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
+
+        self.num_split_in_channels = 1
+        self.num_split_out_channels = 1
+
+        self.out_channels, self.in_channels = self.W_plaintext.shape[:2]
+
+        self.in_channel_group_size = self.in_channels // self.num_split_in_channels
+        self.out_channel_group_size = self.out_channels // self.num_split_out_channels
+
+        self.in_channel_s = [self.in_channel_group_size * i for i in range(self.num_split_in_channels)]
+        self.in_channel_e = self.in_channel_s[1:] + [None]
+
+        self.out_channel_s = [self.out_channel_group_size * i for i in range(self.num_split_out_channels)]
+        self.out_channel_e = self.out_channel_s[1:] + [None]
+
+
+    def split_conv(self, E_share, F_share, W_share, X_share):
+
+        E_share_splits = [E_share[:, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)]
+        F_share_splits = [[F_share[s_out:e_out, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)] for s_out, e_out in zip(self.out_channel_s, self.out_channel_e)]
+        X_share_splits = [X_share[:, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)]
+        W_share_splits = [[W_share[s_out:e_out, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)] for s_out, e_out in zip(self.out_channel_s, self.out_channel_e)]
+
+        for i in range(self.num_split_in_channels):
+            self.network_assets.sender_01.put(E_share_splits[i])
+            for j in range(self.num_split_out_channels):
+                self.network_assets.sender_01.put(F_share_splits[j][i])
+
+        outs_all = []
+        for i in range(self.num_split_in_channels):
+            E_share_server = self.network_assets.receiver_01.get()
+            E = E_share_server + E_share_splits[i]
+            outs = []
+            for j in range(self.num_split_out_channels):
+                F_share_server = self.network_assets.receiver_01.get()
+                F = F_share_server + F_share_splits[j][i]
+                cur_W_share = W_share_splits[j][i] - F
+                outs.append(self.conv2d_handler.conv2d(X_share_splits[i],
+                                                       F,
+                                                       E,
+                                                       cur_W_share,
+                                                       padding=self.padding,
+                                                       stride=self.stride,
+                                                       dilation=self.dilation,
+                                                       groups=self.groups))
+            outs_all.append(np.concatenate(outs, axis=1))
+        outs_all = np.stack(outs_all).sum(axis=0)
+        return outs_all
+        # div = self.num_split_weights
+        # mid = W_share.shape[0] // div
+        # self.network_assets.sender_01.put(E_share)
+        # E_share_client = self.network_assets.receiver_01.get()
+        # E = backend.add(E_share_client, E_share, out=E_share)
+        #
+        # for i in range(div):
+        #
+        #     start = i * mid
+        #     end = (i + 1) * mid if i < div else None
+        #     self.network_assets.sender_01.put(F_share[start:end])
+        #
+        # outs = []
+        # for i in range(div):
+        #
+        #     start = i * mid
+        #     end = (i + 1) * mid if i < div else None
+        #
+        #     F_share_client = self.network_assets.receiver_01.get()
+        #
+        #     F = F_share_client + F_share[start:end]
+        #
+        #     W_share_cur = W_share[start:end] - F
+        #
+        #
+        #     outs.append(self.conv2d_handler.conv2d(E,
+        #                                            W_share_cur,
+        #                                            X_share,
+        #                                            F,
+        #                                            padding=self.padding,
+        #                                            stride=self.stride,
+        #                                            dilation=self.dilation,
+        #                                            groups=self.groups))
+        # out = np.concatenate(outs, axis=1)
+        # return out
+
     @timer(name='server_conv2d')
     def forward(self, X_share):
         if self.is_dummy:
@@ -164,20 +248,26 @@ class SecureConv2DServer(SecureModule):
         W_share = backend.subtract(self.W_plaintext, W_client, out=W_client)
         E_share = backend.subtract(X_share, A_share, out=A_share)
         F_share = backend.subtract(W_share, B_share, out=B_share)
-        with Timer(name="Reconstruct"):
 
-            self.network_assets.sender_01.put(E_share)
-            self.network_assets.sender_01.put(F_share)
 
-            E_share_client = self.network_assets.receiver_01.get()
-            F_share_client = self.network_assets.receiver_01.get()
+        if self.num_split_out_channels == 1 and self.num_split_in_channels == 1:
+            with Timer(name="Reconstruct"):
 
-        E = backend.add(E_share_client, E_share, out=E_share)
-        F = backend.add(F_share_client, F_share, out=F_share)
+                self.network_assets.sender_01.put(E_share)
+                self.network_assets.sender_01.put(F_share)
 
-        W_share = backend.subtract(W_share, F, out=W_share)
+                E_share_client = self.network_assets.receiver_01.get()
+                F_share_client = self.network_assets.receiver_01.get()
 
-        out = self.conv2d_handler.conv2d(E, W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
+            E = backend.add(E_share_client, E_share, out=E_share)
+            F = backend.add(F_share_client, F_share, out=F_share)
+
+            W_share = backend.subtract(W_share, F, out=W_share)
+
+            out = self.conv2d_handler.conv2d(E, W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
+
+        else:
+            out = self.split_conv(E_share, F_share, W_share, X_share)
 
         C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
