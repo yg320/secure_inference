@@ -166,9 +166,18 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
 
     results = []
     for sample_id in tqdm(range(num_images)):
-        img = dataset[sample_id]['img'][0].data.unsqueeze(0)
-        img_meta = dataset[sample_id]['img_metas'][0].data
-        seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
+
+        if dummy:
+            img = np.zeros((1, 3, 512, 683), dtype=np.float32)
+            img_meta = {'filename': 'data/ade/ADEChallengeData2016/images/validation/ADE_val_00000001.jpg', 'ori_filename': 'ADE_val_00000001.jpg',
+                        'ori_shape': (512, 683, 3), 'img_shape': (512, 683, 3), 'pad_shape': (512, 683, 3), 'scale_factor': np.array([1., 1., 1., 1.], dtype=np.float32),
+                        'flip': False, 'flip_direction': 'horizontal', 'img_norm_cfg':
+                {'mean': np.array([123.675, 116.28 , 103.53 ], dtype=np.float32), 'std': np.array([58.395, 57.12 , 57.375], dtype=np.float32), 'to_rgb': True}}
+            seg_map = np.zeros((512, 683), dtype=np.uint8)
+        else:
+            img = dataset[sample_id]['img'][0].data.unsqueeze(0)
+            img_meta = dataset[sample_id]['img_metas'][0].data
+            seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
 
         # img_meta['img_shape'] = (256, 256, 3)
         # img = img[:, :, :256, :256]
@@ -180,7 +189,7 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
         network_assets.receiver_01.get()
         network_assets.receiver_02.get()
 
-        seg_pred = model(img.numpy(), img_meta)
+        seg_pred = model(img, img_meta)
 
         results.append(
             intersect_and_union(
