@@ -8,18 +8,22 @@ from research.secure_inference_3pc.timer import timer, Timer
 from research.secure_inference_3pc.base import P, module_67
 from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, UNSIGNED_DTYPE
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
-
+from research.secure_inference_3pc.const import NUM_BITS
 import numpy as np
 import torch
 
-from numba import njit, prange
-@njit('Tuple((int8[:, :], int64[:], int64[:]))(int64[:], int64[:], int64[:], int8[:,:], uint64[:], uint64[:], uint8, uint8)', parallel=True,  nogil=True, cache=True)
+from numba import njit, prange, int64, uint64, int8, uint8, int32, uint32
+
+NUMBA_INT_DTYPE = int64 if NUM_BITS == 64 else int32
+NUMBA_UINT_DTYPE = uint64 if NUM_BITS == 64 else uint32
+
+@njit((NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], int8[:,:], NUMBA_UINT_DTYPE[:], NUMBA_UINT_DTYPE[:], uint8, uint8), parallel=True,  nogil=True, cache=True)
 def processing_numba(x, x_1, x_bit_0_0, x_bits_0, x_uint64, x_1_uint64, bits, ignore_msb_bits):
     x_bits_1 = x_bits_0
     x_0 = x_1
@@ -42,11 +46,10 @@ def processing_numba(x, x_1, x_bit_0_0, x_bits_0, x_uint64, x_1_uint64, bits, ig
         x_bit0 = x[i] % 2
         x_bit_0_1[i] = x_bit0 - x_bit_0_0[i]
 
-    return x_bits_1, x_0, x_bit_0_1
 
-@njit('(int64[:])(int8[:,:], int8[:,:])', parallel=True,  nogil=True, cache=True)
+@njit((NUMBA_INT_DTYPE[:])(int8[:, :], int8[:, :]), parallel=True,  nogil=True, cache=True)
 def numba_private_compare(d_bits_0, d_bits_1):
-    out = np.zeros(shape=(d_bits_0.shape[0],), dtype=np.int64)
+    out = np.zeros(shape=(d_bits_0.shape[0],), dtype=SIGNED_DTYPE)
     for i in prange(d_bits_0.shape[0]):
         for j in range(d_bits_0.shape[1]):
             a = (d_bits_0[i, j] + d_bits_1[i, j])
@@ -188,12 +191,14 @@ class SecureMSBCryptoProvider(SecureModule):
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
 
-        x_bits_1, x_0, x_bit_0_1 = processing_numba(x, x_1, x_bit_0_0, x_bits_0,
-                                                    x.astype(np.uint64, copy=False),
-                                                    x_1.astype(np.uint64, copy=False),
-                                                    NUM_OF_COMPARE_BITS,
-                                                    IGNORE_MSB_BITS)
-
+        processing_numba(x, x_1, x_bit_0_0, x_bits_0,
+                         x.astype(UNSIGNED_DTYPE, copy=False),
+                         x_1.astype(UNSIGNED_DTYPE, copy=False),
+                         NUM_OF_COMPARE_BITS,
+                         IGNORE_MSB_BITS)
+        x_bits_1 = x_bits_0
+        x_0 = x_1
+        x_bit_0_1 = x
         # x_bits = self.decompose(x)
         # x_bits_1 = backend.subtract_module(x_bits, x_bits_0, P)
         # x_0 = self.sub_mode_L_minus_one(x, x_1)

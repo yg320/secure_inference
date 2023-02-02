@@ -195,22 +195,22 @@ class SecureOptimizedBlockReLU(Module):
             relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
         return relu_map
 
-    @timer(name="bReLU")
+    # @timer(name="bReLU")
     def forward(self, activation):
 
         if np.all(self.block_sizes == [0, 1]):
             return activation
         mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
 
-        with Timer(name="DReLU"):
-            sign_tensors = self.DReLU(mean_tensors)
+        # with Timer(name="DReLU"):
+        sign_tensors = self.DReLU(mean_tensors)
 
         relu_map = self.post(activation, sign_tensors, cumsum_shapes,  pad_handlers)
         self.final_mult(activation, relu_map)
 
         return activation
 
-    @timer(name="final_mult")
+    # @timer(name="final_mult")
     def final_mult(self, activation, relu_map):
         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
                                                               activation[:, ~self.is_identity_channels])

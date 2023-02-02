@@ -201,7 +201,7 @@ def full_inference(cfg, model, num_images):
 
 if __name__ == "__main__":
     party = 0
-    assert (Params.RELU_SPEC_FILE is None) or (Params.DUMMY_RELU is False)
+    # assert (Params.RELU_SPEC_FILE is None) or (Params.DUMMY_RELU is False)
     cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
     crypto_assets, network_assets = get_assets(party, device=Params.CLIENT_DEVICE, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)

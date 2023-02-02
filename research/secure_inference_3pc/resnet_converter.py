@@ -115,7 +115,7 @@ class MyAvgPoolFetcher(nn.Module):
     # TODO: is this the best way to do this?)
     def forward(self, x):
         return DummyShapeTensor((x[0], x[1], x[2]//2, x[3]//2))
-
+import numpy as np
 class MyAvgPool(nn.Module):
     def __init__(self):
         super(MyAvgPool, self).__init__()
@@ -123,7 +123,7 @@ class MyAvgPool(nn.Module):
     # TODO: is this the best way to do this?)
 
     def forward(self, x):
-        return self.r(torch.from_numpy(x)).numpy()
+        return self.r(torch.from_numpy(x.astype(np.int64))).numpy().astype(x.dtype)
 def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
     model.backbone.bn1 = torch.nn.Identity()

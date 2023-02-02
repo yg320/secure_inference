@@ -103,9 +103,9 @@ class Sender(Thread):
                     s.recv()
                     Sender.lock.release()
                 else:
-                    with Timer(name="s.sendall(data)"):
-                        s.sendall(data)
-                        s.recv()
+                    # with Timer(name="s.sendall(data)"):
+                    s.sendall(data)
+                    s.recv()
 
     def put(self, arr):
         # TODO: why is this copy needed (related to the monster threading bug)

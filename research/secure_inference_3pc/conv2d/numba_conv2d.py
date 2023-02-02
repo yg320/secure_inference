@@ -8,7 +8,7 @@ from research.secure_inference_3pc.timer import timer
 NUMBA_MATMUL = "NUMBA_MATMUL"
 NUMBA_CONV = "NUMBA_CONV"
 NUMBA_DTYPE = int64 if NUM_BITS == 64 else int32
-from research.secure_inference_3pc.conv2d.numba_functions import numba_functions
+# from research.secure_inference_3pc.conv2d.numba_functions import numba_functions
 
 
 @njit(NUMBA_DTYPE[:, :, :](NUMBA_DTYPE[:, :, :, :], NUMBA_DTYPE[:, :, :, :], NUMBA_DTYPE[:, :, :, :], NUMBA_DTYPE[:, :, :, :], int32, int32, int32[:], int32[:]), parallel=True,  nogil=True, cache=True)

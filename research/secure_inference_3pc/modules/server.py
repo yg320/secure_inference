@@ -13,15 +13,16 @@ from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 from research.secure_inference_3pc.timer import Timer, timer
-
+from research.secure_inference_3pc.const import NUM_BITS
 import torch
 import numpy as np
 
-from numba import njit, prange, int64, uint64
+from numba import njit, prange, int64, uint64, int8, uint8, int32, uint32
 
+NUMBA_INT_DTYPE = int64 if NUM_BITS == 64 else int32
+NUMBA_UINT_DTYPE = uint64 if NUM_BITS == 64 else uint32
 
-@njit('(int8[:,:])(int8[:,:], int64[:], int8[:,:], int8[:],  uint8,  uint8)', parallel=True, nogil=True,
-      cache=True)
+@njit((int8[:,:])(int8[:,:], NUMBA_INT_DTYPE[:], int8[:,:], int8[:],  uint8,  uint8), parallel=True, nogil=True, cache=True)
 def private_compare_numba_server(s, r, x_bits_1, beta, bits, ignore_msb_bits):
     for i in prange(x_bits_1.shape[0]):
         r[i] = r[i] + beta[i]
@@ -42,6 +43,88 @@ def private_compare_numba_server(s, r, x_bits_1, beta, bits, ignore_msb_bits):
             s[i, j] = (s[i, j] * w_cumsum) % 67
     return s
 
+@njit((NUMBA_INT_DTYPE[:])(NUMBA_INT_DTYPE[:], int8[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:]), parallel=True,  nogil=True, cache=True)
+def post_compare_numba(a_1, eta_pp, delta_1,  beta_1, mu_0, eta_p_1):
+
+    out = a_1
+    for i in prange(a_1.shape[0],):
+        # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+        eta_pp_t = NUMBA_INT_DTYPE(eta_pp[i])
+
+        # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
+        t00 = eta_pp_t * eta_p_1[i]
+
+
+        # t11 = self.add_mode_L_minus_one(t00, t00)
+        t11 = t00 + t00
+        if NUMBA_UINT_DTYPE(t00) > NUMBA_UINT_DTYPE(t11):
+            t11 += 1
+        if t11 == -1:
+            t11 = 0
+
+
+        # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
+        if NUMBA_UINT_DTYPE(t11) > NUMBA_UINT_DTYPE(eta_p_1[i]):
+            eta_1 = eta_p_1[i] - t11 - 1
+        else:
+            eta_1 = eta_p_1[i] - t11
+
+
+
+        # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
+        t00 = delta_1[i] + eta_1
+        if NUMBA_UINT_DTYPE(delta_1[i]) > NUMBA_UINT_DTYPE(t00):
+            t00 += 1
+        if t00 == -1:
+            t00 = 0
+
+
+        # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
+        theta_1 = beta_1[i] + t00
+        if NUMBA_UINT_DTYPE(t00) > NUMBA_UINT_DTYPE(theta_1):
+            theta_1 += 1
+        if theta_1 == -1:
+            theta_1 = 0
+
+
+        # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
+        if NUMBA_UINT_DTYPE(theta_1) > NUMBA_UINT_DTYPE(a_1[i]):
+            y_1 = a_1[i] - theta_1 - 1
+        else:
+            y_1 = a_1[i] - theta_1
+
+
+        # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
+        ret = y_1 - mu_0[i]
+        if NUMBA_UINT_DTYPE(y_1) > NUMBA_UINT_DTYPE(ret):
+            ret += 1
+        if ret == -1:
+            ret = 0
+
+        out[i] = ret
+    return out
+
+@njit((NUMBA_INT_DTYPE[:])(NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:]), parallel=True,  nogil=True, cache=True)
+def mult_server_flatten(x, y, c, m, e0, e1, f0, f1):
+    for i in prange(x.shape[0],):
+        e = (e0[i] + e1[i])
+        f = (f0[i] + f1[i])
+        f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
+    return f1
+
+@njit((NUMBA_INT_DTYPE[:, :, :, :])(NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :], NUMBA_INT_DTYPE[:, :, :, :]), parallel=True,  nogil=True, cache=True)
+def mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1):
+    for i in prange(x.shape[0],):
+        for j in range(x.shape[1]):
+            for k in range(x.shape[2]):
+                for l in range(x.shape[3]):
+                    e = (e0[i, j, k, l] + e1[i, j, k, l])
+                    f = (f0[i, j, k, l] + f1[i, j, k, l])
+                    f1[i, j, k, l] = - e * f + x[i, j, k, l] * f + y[i, j, k, l] * e + c[i, j, k, l] - m[i, j, k, l]
+        # e = (e0[i] + e1[i])
+        # f = (f0[i] + f1[i])
+        # f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
+    return f1
 
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups,  **kwargs):
@@ -132,67 +215,6 @@ class PrivateCompareServer(SecureModule):
         self.network_assets.sender_12.put(d_bits_1)
 
 
-@njit('(int64[:])(int64[:], int8[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
-def post_compare_numba(a_1, eta_pp, delta_1,  beta_1, mu_0, eta_p_1):
-
-    out = a_1
-    for i in prange(a_1.shape[0],):
-        # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
-        eta_pp_t = int64(eta_pp[i])
-
-        # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
-        t00 = eta_pp_t * eta_p_1[i]
-
-
-        # t11 = self.add_mode_L_minus_one(t00, t00)
-        t11 = t00 + t00
-        if uint64(t00) > uint64(t11):
-            t11 += 1
-        if t11 == -1:
-            t11 = 0
-
-
-        # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
-        if uint64(t11) > uint64(eta_p_1[i]):
-            eta_1 = eta_p_1[i] - t11 - 1
-        else:
-            eta_1 = eta_p_1[i] - t11
-
-
-
-        # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
-        t00 = delta_1[i] + eta_1
-        if uint64(delta_1[i]) > uint64(t00):
-            t00 += 1
-        if t00 == -1:
-            t00 = 0
-
-
-        # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
-        theta_1 = beta_1[i] + t00
-        if uint64(t00) > uint64(theta_1):
-            theta_1 += 1
-        if theta_1 == -1:
-            theta_1 = 0
-
-
-        # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-        if uint64(theta_1) > uint64(a_1[i]):
-            y_1 = a_1[i] - theta_1 - 1
-        else:
-            y_1 = a_1[i] - theta_1
-
-
-        # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
-        ret = y_1 - mu_0[i]
-        if uint64(y_1) > uint64(ret):
-            ret += 1
-        if ret == -1:
-            ret = 0
-
-        out[i] = ret
-    return out
-
 
 class ShareConvertServer(SecureModule):
     def __init__(self, **kwargs):
@@ -232,27 +254,6 @@ class ShareConvertServer(SecureModule):
         # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
         # return y_1
 
-@njit('(int64[:])(int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:], int64[:])', parallel=True,  nogil=True, cache=True)
-def mult_server_flatten(x, y, c, m, e0, e1, f0, f1):
-    for i in prange(x.shape[0],):
-        e = (e0[i] + e1[i])
-        f = (f0[i] + f1[i])
-        f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
-    return f1
-
-@njit('(int64[:, :, :, :])(int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :], int64[:, :, :, :])', parallel=True,  nogil=True, cache=True)
-def mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1):
-    for i in prange(x.shape[0],):
-        for j in range(x.shape[1]):
-            for k in range(x.shape[2]):
-                for l in range(x.shape[3]):
-                    e = (e0[i, j, k, l] + e1[i, j, k, l])
-                    f = (f0[i, j, k, l] + f1[i, j, k, l])
-                    f1[i, j, k, l] = - e * f + x[i, j, k, l] * f + y[i, j, k, l] * e + c[i, j, k, l] - m[i, j, k, l]
-        # e = (e0[i] + e1[i])
-        # f = (f0[i] + f1[i])
-        # f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
-    return f1
 
 def mult_server_numba(x, y, c, m, e0, e1, f0, f1):
     if x.ndim == 1:

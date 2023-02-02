@@ -80,7 +80,7 @@ class NumpyBackend:
         return np.sum(data, axis=axis, keepdims=keepdims, dtype=dtype) // size
 
     def sum(self, data, axis, keepdims=False):
-        out = np.sum(data, axis=axis, keepdims=keepdims)
+        out = np.sum(data, axis=axis, keepdims=keepdims, dtype=data.dtype)
         return out
 
     def ones_like(self, data):
