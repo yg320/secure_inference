@@ -2,6 +2,7 @@
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!! (Do we always send minimal data types?)
 - Finish Methods and Results
 - Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
+- Continue optimizing
 
 - Divide by block size in block ReLU (in order not to exceed MSB dummy bits)
 - Use loss as distortion measure
@@ -20,6 +21,11 @@
 - Should I further verify .train() vs .eval()?
 - What about competitions?!
 - Crypto Provider work with shapes, maybe all crypto-tensors consume too much space?
+- Remove conv in CUDA?
+- Given another try to conv decomposition! (What about the queue)
+- Add noise to training for DReLU (Understand mean vs sum)
+- Competition!
+- Measurements with bandwidth = infinity (zeros-like)
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!
@@ -52,6 +58,8 @@
 
 
 ============================================= Paper notes =============================================
+- Think about best ways to tell the story - probably bReLU to ~15% or so... and then stochastic DReLU (as it reveals no information)
+- Do we want to add bandwidth graph
 - Ablation on loss?
 - shuffled based knapsack?
 - Table: benchmark Conv2d on Cuda

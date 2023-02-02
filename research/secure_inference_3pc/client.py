@@ -164,8 +164,7 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
     if not dummy:
         dataset = build_data(cfg, mode="test")
 
-    if model.prf_fetcher:
-        model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher, image=backend.zeros(shape=(1, 3, 512, 683), dtype=SIGNED_DTYPE))
+    model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
     results = []
     for sample_id in tqdm(range(num_images)):
@@ -181,6 +180,7 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
             img = dataset[sample_id]['img'][0].data.unsqueeze(0)
             img_meta = dataset[sample_id]['img_metas'][0].data
             seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
+        model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
         # img_meta['img_shape'] = (256, 256, 3)
         # img = img[:, :, :256, :256]
@@ -206,6 +206,7 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
             )
             if sample_id % 10 == 0:
                 print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+    model.prf_fetcher.prf_handler.done()
 
 
 if __name__ == "__main__":
