@@ -17,8 +17,8 @@ from research.secure_inference_3pc.params import Params
 import mmcv
 from research.utils import build_data
 from research.secure_inference_3pc.modules.client import SecureConv2DClient, SecureReLUClient, SecureMaxPoolClient, SecureBlockReLUClient
-from research.pipeline.backbones.secure_resnet import AvgPoolResNet
-from research.pipeline.backbones.secure_aspphead import SecureASPPHead
+
+from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 from research.secure_inference_3pc.timer import timer
@@ -157,22 +157,13 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
         print((backend.array(results_gt) == backend.array(results_pred)).mean())
 
 
-def full_inference(cfg, model, num_images):
-    dataset = build_data(cfg, train=False)
+def full_inference_segmentation(cfg, model, num_images, device, network_assets, dummy=False):
+    if not dummy:
+        dataset = build_data(cfg, mode="test")
 
-    # dataset = build_dataset({'type': 'ADE20KDataset',
-    #        'data_root': 'data/ade/ADEChallengeData2016',
-    #        'img_dir': 'images/validation',
-    #        'ann_dir': 'annotations/validation',
-    #        'pipeline': [
-    #            {'type': 'LoadImageFromFile'},
-    #            {'type': 'LoadAnnotations', 'reduce_zero_label': True},
-    #            {'type': 'Resize', 'img_scale': (1024, 256), 'keep_ratio': True},
-    #            {'type': 'RandomFlip', 'prob': 0.0},
-    #            {'type': 'Normalize', 'mean': [123.675, 116.28, 103.53], 'std': [58.395, 57.12, 57.375], 'to_rgb': True},
-    #            {'type': 'DefaultFormatBundle'},
-    #            {'type': 'Collect', 'keys': ['img', 'gt_semantic_seg']}]
-    #        })
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.fetch(repeat=num_images, model=model.prf_fetcher, image=backend.zeros(shape=(1, 3, 512, 683), dtype=SIGNED_DTYPE))
+
     results = []
     for sample_id in tqdm(range(num_images)):
         img = dataset[sample_id]['img'][0].data.unsqueeze(0)
@@ -183,6 +174,11 @@ def full_inference(cfg, model, num_images):
         # img = img[:, :, :256, :256]
         # seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
         # img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
+        # Handshake
+        network_assets.sender_01.put(np.array(img.shape))
+        network_assets.sender_02.put(np.array(img.shape))
+        network_assets.receiver_01.get()
+        network_assets.receiver_02.get()
 
         seg_pred = model(img.numpy(), img_meta)
 
@@ -247,7 +243,7 @@ if __name__ == "__main__":
 
 
     if cfg.model.type == "EncoderDecoder":
-        full_inference(cfg, model, Params.NUM_IMAGES)
+        full_inference_segmentation(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets, Params.AWS_DUMMY)
     else:
         full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets, Params.AWS_DUMMY)
 

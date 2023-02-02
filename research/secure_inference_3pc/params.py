@@ -7,20 +7,21 @@ else:
     DEVICE = "cpu"
 
 class Params:
-
-    SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
-    MODEL_PATH = None #"/home/yakir/epoch_50.pth"
-    RELU_SPEC_FILE = "/home/yakir/4x4.pickle"
+    # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
+    SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
+    # MODEL_PATH = "/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth" #None #"/home/yakir/epoch_50.pth"
+    MODEL_PATH = "/home/yakir/iter_128000.pth" #None #"/home/yakir/epoch_50.pth"
+    RELU_SPEC_FILE = "/home/yakir/block_size_spec_0.05.pickle"
     PUBLIC_IP_SERVER = ""
     PUBLIC_IP_CLIENT = ""
     PUBLIC_IP_CRYPTO_PROVIDER = ""
     AWS_DUMMY = False
     IMAGE_SHAPE = (1, 3, 224, 224)
-    NUM_IMAGES = 10
+    NUM_IMAGES = 1
     CLIENT_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
     SERVER_DEVICE = {"cuda": "cuda:1", "cpu": "cpu"}[DEVICE]
     CRYPTO_PROVIDER_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
-    DUMMY_RELU = True
+    DUMMY_RELU = False
     DUMMY_MAX_POOL = True
-    PRF_PREFETCH = True
+    PRF_PREFETCH = False
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

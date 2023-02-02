@@ -19,6 +19,7 @@
 - ResNet101 with SNR?
 - Should I further verify .train() vs .eval()?
 - What about competitions?!
+- Crypto Provider work with shapes, maybe all crypto-tensors consume too much space?
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!

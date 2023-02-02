@@ -498,10 +498,10 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
         self.model = model
 
     def forward(self, img):
-        shape = img.shape
-        assert False
+        shape = DummyShapeTensor(img.shape)
+
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
-        out_0 = self.model.decode_head(self.model.backbone(backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE)))
+        out_0 = self.model.decode_head(self.model.backbone(shape))
 
 
 class PRFFetcherSecureModelClassification(SecureModule):

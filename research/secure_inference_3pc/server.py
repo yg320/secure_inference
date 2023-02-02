@@ -10,6 +10,7 @@ from research.secure_inference_3pc.resnet_converter import get_secure_model, ini
 from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.server import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
 
+from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 from research.secure_inference_3pc.modules.server import SecureConv2DServer, SecureReLUServer, SecureMaxPoolServer, SecureBlockReLUServer
@@ -26,9 +27,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
 
     else:
         W = conv_module.weight
-        assert conv_module.bias is None
+        # assert conv_module.bias is None
         W = TypeConverter.f2i(W)
-        B = None
+        B = TypeConverter.f2i(conv_module.bias)
 
     return conv_class(
         W=W,
@@ -152,11 +153,12 @@ if __name__ == "__main__":
     )
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(repeat=Params.NUM_IMAGES, model=model.prf_fetcher,
-                                            image=backend.zeros(shape=Params.IMAGE_SHAPE, dtype=SIGNED_DTYPE))
+                                            image=backend.zeros(shape=(1, 3, 512, 683), dtype=SIGNED_DTYPE))
 
     for _ in range(Params.NUM_IMAGES):
-        network_assets.sender_01.put(network_assets.receiver_01.get())
-        out = model(Params.IMAGE_SHAPE)
+        image_size = network_assets.receiver_01.get()
+        network_assets.sender_01.put(image_size)
+        out = model(image_size)
 
     network_assets.done()
 

@@ -7,6 +7,9 @@ from research.distortion.utils import get_model
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 from research.secure_inference_3pc.timer import timer
+import numpy as np
+import torch.nn as nn
+
 def securify_resnet18_model(model, build_secure_conv, build_secure_relu, crypto_assets, network_assets, block_relu=None, relu_spec_file=None):
     model.backbone.stem[0] = build_secure_conv(crypto_assets, network_assets, model.backbone.stem[0], model.backbone.stem[1])
     model.backbone.stem[1] = torch.nn.Identity()
@@ -62,7 +65,7 @@ def convert_conv_module(module, build_secure_conv, build_secure_relu):
     if hasattr(module, "activate"):
         module.activate = build_secure_relu()
 
-def convert_decoder(decoder, build_secure_conv, build_secure_relu):
+def convert_decoder(decoder, build_secure_conv, build_secure_relu, prf_prefetch):
     convert_conv_module(decoder.image_pool[1], build_secure_conv, build_secure_relu)
 
     for i in range(4):
@@ -72,12 +75,16 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu):
     decoder.conv_seg = build_secure_conv(conv_module=decoder.conv_seg, bn_module=None)
     def foo(x):
         return (x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])).astype(x.dtype)  # TODO: is this the best way to do this?)
+    # decoder.image_pool[0] = SecureGlobalAveragePooling2dWithResize()
+    # if prf_prefetch:
+    #     decoder.image_pool[0] = torch.nn.Identity()
+    # else:
+    #     decoder.image_pool[0] = SecureGlobalAveragePooling2dWithResize()
 
     # TODO: replace with SecureGlobalAveragePooling2d
     decoder.image_pool[0].forward = foo
 
-
-def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None):
+def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
 
     convert_conv_module(model.backbone.conv1, build_secure_conv, build_secure_relu)
 
@@ -87,11 +94,10 @@ def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, 
             for conv_module in block.conv:
                 convert_conv_module(conv_module, build_secure_conv, build_secure_relu)
 
-    convert_decoder(model.decode_head, build_secure_conv, build_secure_relu)
+    convert_decoder(model.decode_head, build_secure_conv, build_secure_relu, prf_prefetch)
 
 
     return model
-import torch.nn as nn
 
 class SecureGlobalAveragePooling2d(nn.Module):
     def __init__(self):
@@ -100,6 +106,17 @@ class SecureGlobalAveragePooling2d(nn.Module):
     # TODO: is this the best way to do this?)
     def forward(self, x):
         return backend.mean(x, axis=(2, 3), keepdims=True, dtype=x.dtype)
+
+class SecureGlobalAveragePooling2dWithResize(nn.Module):
+    def __init__(self):
+        super(SecureGlobalAveragePooling2dWithResize, self).__init__()
+
+    # TODO: is this the best way to do this?)
+    def forward(self, x):
+        t =  backend.mean(x, axis=(2, 3), keepdims=True, dtype=x.dtype)
+
+        return t.repeat(x.shape[2], axis=2).repeat(x.shape[3], axis=3)
+
 
 class PRFPrefetchSecureGlobalAveragePooling2d(nn.Module):
     def __init__(self):
@@ -115,7 +132,7 @@ class MyAvgPoolFetcher(nn.Module):
     # TODO: is this the best way to do this?)
     def forward(self, x):
         return DummyShapeTensor((x[0], x[1], x[2]//2, x[3]//2))
-import numpy as np
+
 class MyAvgPool(nn.Module):
     def __init__(self):
         super(MyAvgPool, self).__init__()
@@ -124,6 +141,7 @@ class MyAvgPool(nn.Module):
 
     def forward(self, x):
         return self.r(torch.from_numpy(x.astype(np.int64))).numpy().astype(x.dtype)
+
 def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
     model.backbone.bn1 = torch.nn.Identity()
@@ -211,19 +229,40 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
         checkpoint_path=None
     )
 
-    securify_resnet_cifar(
-        model=prf_fetcher_model,
-        max_pool=MyAvgPoolFetcher,
-        build_secure_conv=build_secure_conv,
-        build_secure_relu=build_secure_relu,
-        build_secure_fully_connected=build_secure_fully_connected,
-        secure_model_class=prf_fetcher_secure_model,
-        crypto_assets=crypto_assets,
-        network_assets=network_assets,
-        dummy_relu=dummy_relu,
-        block_relu=secure_block_relu,
-        relu_spec_file=relu_spec_file,
-        prf_prefetch=True)
+    if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "MobileNetV2":
+        securify_deeplabv3_mobilenetv2(
+            model=prf_fetcher_model,
+            build_secure_conv=build_secure_conv,
+            build_secure_relu=build_secure_relu,
+            secure_model_class=prf_fetcher_secure_model,
+            crypto_assets=crypto_assets,
+            network_assets=network_assets,
+            dummy_relu=dummy_relu,
+            block_relu=secure_block_relu,
+            relu_spec_file=relu_spec_file,
+            prf_prefetch=True
+        )
+    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
+        raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
+    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet"]:
+        securify_resnet_cifar(
+            model=prf_fetcher_model,
+            max_pool=MyAvgPoolFetcher,
+            build_secure_conv=build_secure_conv,
+            build_secure_relu=build_secure_relu,
+            build_secure_fully_connected=build_secure_fully_connected,
+            secure_model_class=prf_fetcher_secure_model,
+            crypto_assets=crypto_assets,
+            network_assets=network_assets,
+            dummy_relu=dummy_relu,
+            block_relu=secure_block_relu,
+            relu_spec_file=relu_spec_file,
+            prf_prefetch=True
+        )
+    else:
+        raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
+
+
 
     if relu_spec_file:
         secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu)

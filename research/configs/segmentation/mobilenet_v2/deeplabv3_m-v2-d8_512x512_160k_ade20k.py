@@ -10,5 +10,5 @@ model = dict(
         out_indices=(1, 2, 4, 6),
         act_cfg=dict(type='ReLU'),
         norm_cfg=dict(type='SyncBN', requires_grad=True)),
-    decode_head=dict(in_channels=320),
+    decode_head=dict(type='SecureASPPHead', in_channels=320),
     auxiliary_head=dict(in_channels=96))
