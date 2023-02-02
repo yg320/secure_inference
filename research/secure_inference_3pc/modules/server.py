@@ -13,7 +13,7 @@ from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 from research.secure_inference_3pc.timer import Timer, timer
-from research.secure_inference_3pc.const import NUM_BITS
+from research.secure_inference_3pc.const import NUM_BITS, NUM_SPLIT_CONV_IN_CHANNEL, NUM_SPLIT_CONV_OUT_CHANNEL
 import torch
 import numpy as np
 
@@ -142,8 +142,8 @@ class SecureConv2DServer(SecureModule):
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
         self.is_dummy = False
 
-        self.num_split_in_channels = 1
-        self.num_split_out_channels = 1
+        self.num_split_in_channels = NUM_SPLIT_CONV_IN_CHANNEL
+        self.num_split_out_channels = NUM_SPLIT_CONV_OUT_CHANNEL
 
         self.out_channels, self.in_channels = self.W_plaintext.shape[:2]
 
