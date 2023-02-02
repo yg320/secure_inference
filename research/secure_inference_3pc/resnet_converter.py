@@ -82,7 +82,10 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu, prf_prefetch)
     #     decoder.image_pool[0] = SecureGlobalAveragePooling2dWithResize()
 
     # TODO: replace with SecureGlobalAveragePooling2d
-    decoder.image_pool[0].forward = foo
+    if prf_prefetch:
+        decoder.image_pool[0].forward = lambda x: DummyShapeTensor((x[0], x[1], 1, 1))
+    else:
+        decoder.image_pool[0].forward = foo
 
 def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
 

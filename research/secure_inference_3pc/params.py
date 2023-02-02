@@ -23,5 +23,5 @@ class Params:
     CRYPTO_PROVIDER_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
     DUMMY_RELU = False
     DUMMY_MAX_POOL = True
-    PRF_PREFETCH = False
+    PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

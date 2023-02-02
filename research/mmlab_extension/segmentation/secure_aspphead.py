@@ -39,12 +39,20 @@ class SecureASPPHead(ASPPHead):
         tmp = self.image_pool(x)
 
         # tmp = np.mean(x, axis=(2, 3), keepdims=True, dtype=x.dtype)  # TODO: use gloval_average which was already implemented
-        aspp_outs = [
-            tmp.repeat(x.shape[2], axis=2).repeat(x.shape[3], axis=3) # TODO: check if there is a better way to do this
-        ]
+        if type(tmp) == DummyShapeTensor:
+            aspp_outs = [
+                DummyShapeTensor((tmp[0], tmp[1], x[2], x[3]))
+            ]
+        else:
+            aspp_outs = [
+                tmp.repeat(x.shape[2], axis=2).repeat(x.shape[3], axis=3) # TODO: check if there is a better way to do this
+            ]
         aspp_outs.extend(self.aspp_modules(x))
         # aspp_outs = torch.cat(aspp_outs, dim=1)
-        aspp_outs = np.concatenate(aspp_outs, axis=1)
+        if type(aspp_outs[0]) == DummyShapeTensor:
+            aspp_outs = DummyShapeTensor((aspp_outs[0][0], sum(x[1] for x in aspp_outs), aspp_outs[0][2], aspp_outs[0][3]))
+        else:
+            aspp_outs = np.concatenate(aspp_outs, axis=1)
         feats = self.bottleneck(aspp_outs)
         return feats
     # def _forward_feature(self, inputs):
