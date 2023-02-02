@@ -191,17 +191,18 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
 
         seg_pred = model(img, img_meta)
 
-        results.append(
-            intersect_and_union(
-                seg_pred,
-                seg_map,
-                len(dataset.CLASSES),
-                dataset.ignore_index,
-                label_map=dict(),
-                reduce_zero_label=dataset.reduce_zero_label)
-        )
-        if sample_id % 10 == 0:
-            print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+        if not dummy:
+            results.append(
+                intersect_and_union(
+                    seg_pred,
+                    seg_map,
+                    len(dataset.CLASSES),
+                    dataset.ignore_index,
+                    label_map=dict(),
+                    reduce_zero_label=dataset.reduce_zero_label)
+            )
+            if sample_id % 10 == 0:
+                print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
 
 
 if __name__ == "__main__":
