@@ -9,7 +9,7 @@ else:
 class Params:
     SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py")
     MODEL_PATH = None #"/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth" #None #"/home/yakir/epoch_50.pth"
-    RELU_SPEC_FILE = "/home/ubuntu/specs/seg_specs/4x5.pickle"
+    RELU_SPEC_FILE = "/home/ubuntu/specs/seg_specs/6x6.pickle"
 
     # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
     # MODEL_PATH = "/home/yakir/epoch_50.pth"
