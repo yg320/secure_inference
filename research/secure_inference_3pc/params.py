@@ -17,7 +17,7 @@ class Params:
 
     SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
     MODEL_PATH = None #"/home/yakir/epoch_14_avg_pool.pth"
-    RELU_SPEC_FILE = "/home/ubuntu/specs/cls_specs/3x3.pickle"
+    RELU_SPEC_FILE = "/home/ubuntu/specs/cls_specs/4x3.pickle"
 
     # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k_maxpool.py")
     # MODEL_PATH = None #"/home/yakir/PycharmProjects/secure_inference/mmlab_models/classification/resnet50_8xb32_in1k_20210831-ea4938fc.pth"
