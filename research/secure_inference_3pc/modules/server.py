@@ -225,7 +225,7 @@ class SecureConv2DServer(SecureModule):
         # out = np.concatenate(outs, axis=1)
         # return out
 
-    @timer(name='server_conv2d')
+    # @timer(name='server_conv2d')
     def forward(self, X_share):
         if self.is_dummy:
             X_share_client = self.network_assets.receiver_01.get()
@@ -251,13 +251,12 @@ class SecureConv2DServer(SecureModule):
 
 
         if self.num_split_out_channels == 1 and self.num_split_in_channels == 1:
-            with Timer(name="Reconstruct"):
 
-                self.network_assets.sender_01.put(E_share)
-                self.network_assets.sender_01.put(F_share)
+            self.network_assets.sender_01.put(E_share)
+            self.network_assets.sender_01.put(F_share)
 
-                E_share_client = self.network_assets.receiver_01.get()
-                F_share_client = self.network_assets.receiver_01.get()
+            E_share_client = self.network_assets.receiver_01.get()
+            F_share_client = self.network_assets.receiver_01.get()
 
             E = backend.add(E_share_client, E_share, out=E_share)
             F = backend.add(F_share_client, F_share, out=F_share)
