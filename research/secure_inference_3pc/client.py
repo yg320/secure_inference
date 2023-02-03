@@ -134,7 +134,8 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
     results_gt = []
     results_pred = []
     model.eval()
-    model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
     for sample_id in tqdm(range(num_images)):
 
@@ -145,7 +146,8 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
             img = dataset[sample_id]['img'].data
             gt = dataset.get_gt_labels()[sample_id]
         img = backend.put_on_device(img.reshape((1,) + img.shape), device)
-        model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+        if model.prf_fetcher:
+            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
         # Handshake
         network_assets.sender_01.put(np.array(img.shape))
@@ -157,14 +159,15 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
         results_gt.append(gt)
         results_pred.append(out)
         print((backend.array(results_gt) == backend.array(results_pred)).mean())
-    model.prf_fetcher.prf_handler.done()
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.done()
 
 
 def full_inference_segmentation(cfg, model, num_images, device, network_assets, dummy=False):
     if not dummy:
         dataset = build_data(cfg, mode="test")
-
-    model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
     results = []
     for sample_id in tqdm(range(num_images)):
@@ -180,7 +183,8 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
             img = dataset[sample_id]['img'][0].data.unsqueeze(0)
             img_meta = dataset[sample_id]['img_metas'][0].data
             seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
-        model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+        if model.prf_fetcher:
+            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
         # img_meta['img_shape'] = (256, 256, 3)
         # img = img[:, :, :256, :256]
@@ -206,7 +210,8 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
             )
             if sample_id % 10 == 0:
                 print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
-    model.prf_fetcher.prf_handler.done()
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.done()
 
 
 if __name__ == "__main__":
@@ -230,7 +235,6 @@ if __name__ == "__main__":
             crypto_assets=crypto_assets,
             network_assets=network_assets,
             dummy_relu=Params.DUMMY_RELU,
-            dummy_max_pool=Params.DUMMY_MAX_POOL,
             device=Params.CLIENT_DEVICE,
         )
     else:
@@ -249,7 +253,6 @@ if __name__ == "__main__":
         crypto_assets=crypto_assets,
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
-        dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher,
         device=Params.CLIENT_DEVICE
     )
@@ -263,8 +266,9 @@ if __name__ == "__main__":
 
     network_assets.done()
 
-    print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
-    print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)
+    # print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
+    # print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)
+    print("Num of bytes sent 0 ", network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)
 
 # sudo apt-get update
 # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh

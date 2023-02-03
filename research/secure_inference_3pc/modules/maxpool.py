@@ -3,9 +3,8 @@ from research.secure_inference_3pc.modules.base import SecureModule
 
 
 class SecureMaxPool(SecureModule):
-    def __init__(self, kernel_size, stride, padding, dummy_max_pool, **kwargs):
+    def __init__(self, kernel_size, stride, padding,  **kwargs):
         super(SecureMaxPool, self).__init__(**kwargs)
-        self.dummy_max_pool = dummy_max_pool
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding

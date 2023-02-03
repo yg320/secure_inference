@@ -152,6 +152,9 @@ def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu,
 
     model.backbone.maxpool = max_pool()
 
+    if type(model.backbone.maxpool) is not [MyAvgPool, MyAvgPoolFetcher]:
+        model.backbone.relu, model.backbone.maxpool = model.backbone.maxpool, model.backbone.relu
+
     for layer in [1, 2, 3, 4]:
         cur_res_layer = getattr(model.backbone, f"layer{layer}")
         for block in cur_res_layer:
@@ -179,12 +182,12 @@ def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu,
     else:
         model.neck = SecureGlobalAveragePooling2d()
 
-def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, max_pool, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, dummy_max_pool=False, prf_fetcher=None, device="cpu"):
+def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu, build_secure_fully_connected, max_pool, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_fetcher=None, device="cpu"):
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, device=device)
-    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool, device=device)
+    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets,  device=device)
     block_relu = partial(block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, device=device)
 
     secure_model_class = partial(secure_model_class, crypto_assets=crypto_assets, network_assets=network_assets, device=device)
@@ -198,10 +201,9 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     # print(model.head.fc(model.neck(arr)).argmax())
     if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "MobileNetV2":
         securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
-    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
-        securify_resnet_cifar(model, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet"]:
-        securify_resnet_cifar(model, MyAvgPool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+        max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
+        securify_resnet_cifar(model, max_pool_layer, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
     else:
         raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
     if relu_spec_file:
@@ -216,13 +218,13 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     return ret
 
 
-def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, dummy_max_pool, device):
+def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets, dummy_relu, device):
 
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, device=device)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, device=device)
     build_secure_relu = partial(build_secure_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True, device=device)
 
-    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets, dummy_max_pool=dummy_max_pool, is_prf_fetcher=True, device=device)
+    max_pool = partial(max_pool, crypto_assets=crypto_assets, network_assets=network_assets,  is_prf_fetcher=True, device=device)
     secure_block_relu = partial(secure_block_relu, crypto_assets=crypto_assets, network_assets=network_assets, dummy_relu=dummy_relu, is_prf_fetcher=True, device=device)
     prf_fetcher_secure_model = partial(prf_fetcher_secure_model, crypto_assets=crypto_assets, network_assets=network_assets, is_prf_fetcher=True, device=device)
 
@@ -248,9 +250,11 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type == "ResNet_CIFAR_V2":
         raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet"]:
+        max_pool_layer = MyAvgPoolFetcher if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
+
         securify_resnet_cifar(
             model=prf_fetcher_model,
-            max_pool=MyAvgPoolFetcher,
+            max_pool=max_pool_layer,
             build_secure_conv=build_secure_conv,
             build_secure_relu=build_secure_relu,
             build_secure_fully_connected=build_secure_fully_connected,

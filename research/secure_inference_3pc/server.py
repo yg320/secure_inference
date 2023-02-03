@@ -127,7 +127,6 @@ if __name__ == "__main__":
             crypto_assets=crypto_assets,
             network_assets=network_assets,
             dummy_relu=Params.DUMMY_RELU,
-            dummy_max_pool=Params.DUMMY_MAX_POOL,
             device=Params.SERVER_DEVICE,
         )
     else:
@@ -146,25 +145,28 @@ if __name__ == "__main__":
         crypto_assets=crypto_assets,
         network_assets=network_assets,
         dummy_relu=Params.DUMMY_RELU,
-        dummy_max_pool=Params.DUMMY_MAX_POOL,
         prf_fetcher=prf_fetcher,
         device=Params.SERVER_DEVICE
 
     )
 
-    model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
     for _ in range(Params.NUM_IMAGES):
 
         image_size = network_assets.receiver_01.get()
         network_assets.sender_01.put(image_size)
 
-        model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=image_size, dtype=SIGNED_DTYPE))
+        if model.prf_fetcher:
+            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=image_size, dtype=SIGNED_DTYPE))
 
         out = model(image_size)
 
-    model.prf_fetcher.prf_handler.done()
+    if model.prf_fetcher:
+        model.prf_fetcher.prf_handler.done()
     network_assets.done()
 
-    print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)
-    print("Num of bytes sent 1 -> 2", network_assets.sender_12.num_of_bytes_sent)
+    # print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)
+    # print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)
+    print("Num of bytes sent 1 ", network_assets.sender_12.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)

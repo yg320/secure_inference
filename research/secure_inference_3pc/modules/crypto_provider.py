@@ -289,15 +289,14 @@ class SecureSelectShareCryptoProvider(SecureModule):
         return share
 
 class SecureMaxPoolCryptoProvider(SecureMaxPool):
-    def __init__(self, kernel_size, stride, padding, dummy_max_pool, **kwargs):
-        super(SecureMaxPoolCryptoProvider, self).__init__(kernel_size, stride, padding, dummy_max_pool, **kwargs)
+    def __init__(self, kernel_size=3, stride=2, padding=1, **kwargs):
+        super(SecureMaxPoolCryptoProvider, self).__init__(kernel_size, stride, padding, **kwargs)
         self.select_share = SecureSelectShareCryptoProvider(**kwargs)
         self.dReLU = SecureDReLUCryptoProvider(**kwargs)
         self.mult = SecureMultiplicationCryptoProvider(**kwargs)
 
     def forward(self, x):
-        if self.dummy_max_pool:
-            return x[:, :, ::2, ::2]
+
         return super(SecureMaxPoolCryptoProvider, self).forward(x)
 
 
@@ -427,46 +426,24 @@ class PRFFetcherReLU(PRFFetcherModule):
 
 
 class PRFFetcherMaxPool(PRFFetcherModule):
-    def __init__(self, kernel_size=3, stride=2, padding=1, dummy_max_pool=False, **kwargs):
+    def __init__(self, kernel_size=3, stride=2, padding=1, **kwargs):
         super(PRFFetcherMaxPool, self).__init__(**kwargs)
 
         self.select_share = PRFFetcherSelectShare(**kwargs)
         self.dReLU = PRFFetcherDReLU(**kwargs)
         self.mult = PRFFetcherMultiplication(**kwargs)
-        self.dummy_max_pool = dummy_max_pool
 
     def forward(self, shape):
-        # activation = backend.zeros(shape=shape, dtype=SIGNED_DTYPE)
+        assert shape[2] == 112
+        assert shape[3] == 112
+        shape = DummyShapeTensor((shape[0], shape[1], 56, 56))
+        shape_2 = DummyShapeTensor((shape[0] * shape[1] * 56 * 56,))
 
-        if self.dummy_max_pool:
-            return DummyShapeTensor((shape[0], shape[1], shape[2] // 2, shape[3] // 2))
-
-            return activation[:, :, ::2, ::2]
-        assert activation.shape[2] == 112
-        assert activation.shape[3] == 112
-
-        x = backend.pad(activation, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
-                           x[:, :, 0:-1:2, 1:-1:2],
-                           x[:, :, 0:-1:2, 2::2],
-                           x[:, :, 1:-1:2, 0:-1:2],
-                           x[:, :, 1:-1:2, 1:-1:2],
-                           x[:, :, 1:-1:2, 2::2],
-                           x[:, :, 2::2, 0:-1:2],
-                           x[:, :, 2::2, 1:-1:2],
-                           x[:, :, 2::2, 2::2]])
-
-        out_shape = x.shape[1:]
-        x = backend.astype(x.reshape((x.shape[0], -1)), SIGNED_DTYPE)
-
-        max_ = x[0]
         for i in range(1, 9):
-            self.dReLU(max_.shape)
-            self.select_share(max_.shape)
+            self.dReLU(shape_2)
+            self.select_share(shape_2)
 
-        ret = backend.astype(max_.reshape(out_shape), SIGNED_DTYPE)
-
-        return ret
+        return shape
 
 
 class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):

@@ -499,20 +499,14 @@ class SecureSelectShareServer(SecureModule):
 
 
 class SecureMaxPoolServer(SecureMaxPool):
-    def __init__(self, kernel_size, stride, padding, dummy_max_pool,  **kwargs):
-        super(SecureMaxPoolServer, self).__init__(kernel_size, stride, padding, dummy_max_pool,  **kwargs)
+    def __init__(self, kernel_size=3, stride=2, padding=1,  **kwargs):
+        super(SecureMaxPoolServer, self).__init__(kernel_size, stride, padding,  **kwargs)
         self.select_share = SecureSelectShareServer( **kwargs)
         self.dReLU = SecureDReLUServer( **kwargs)
         self.mult = SecureMultiplicationServer( **kwargs)
 
     def forward(self, x):
-        if self.dummy_max_pool:
-            x_client = self.network_assets.receiver_01.get()
-            x_rec = x_client + x
-            if type(x) is torch.Tensor:
-                return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(x_rec.to(torch.float64)).to(x.dtype)
-            else:
-                return torch.nn.MaxPool2d(kernel_size=self.kernel_size, stride=self.stride, padding=self.padding)(torch.from_numpy(x_rec).to(torch.float64)).numpy().astype(x.dtype)
+
         ret = super(SecureMaxPoolServer, self).forward(x)
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
         mu_1 = backend.multiply(mu_1, -1, out=mu_1)
@@ -657,45 +651,27 @@ class PRFFetcherReLU(PRFFetcherModule):
 
 
 class PRFFetcherMaxPool(PRFFetcherModule):
-    def __init__(self, kernel_size=3, stride=2, padding=1, dummy_max_pool=False, **kwargs):
+    def __init__(self, kernel_size=3, stride=2, padding=1,  **kwargs):
         super(PRFFetcherMaxPool, self).__init__( **kwargs)
 
-        self.dummy_max_pool = dummy_max_pool
         self.select_share = PRFFetcherSelectShare( **kwargs)
         self.dReLU = PRFFetcherDReLU( **kwargs)
         self.mult = PRFFetcherMultiplication( **kwargs)
 
     def forward(self, shape):
-        if self.dummy_max_pool:
-            # print(shape, shape, shape)
-            return DummyShapeTensor((shape[0], shape[1], shape[2] // 2, shape[3] // 2))
 
-        assert activation.shape[2] == 112
-        assert activation.shape[3] == 112
+        assert shape[2] == 112
+        assert shape[3] == 112
+        shape = DummyShapeTensor((shape[0], shape[1], 56, 56))
+        shape_2 = DummyShapeTensor((shape[0] * shape[1] * 56 * 56,))
 
-        x = backend.pad(activation, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
-                      x[:, :, 0:-1:2, 1:-1:2],
-                      x[:, :, 0:-1:2, 2::2],
-                      x[:, :, 1:-1:2, 0:-1:2],
-                      x[:, :, 1:-1:2, 1:-1:2],
-                      x[:, :, 1:-1:2, 2::2],
-                      x[:, :, 2::2, 0:-1:2],
-                      x[:, :, 2::2, 1:-1:2],
-                      x[:, :, 2::2, 2::2]])
-
-        out_shape = x.shape[1:]
-        x = x.reshape((x.shape[0], -1))
-
-        max_ = x[0]
         for i in range(1, 9):
-            self.dReLU(max_.shape)
-            self.select_share(max_.shape)
+            self.dReLU(shape_2)
+            self.select_share(shape_2)
 
-        ret = backend.astype(max_.reshape(out_shape), SIGNED_DTYPE)
-        self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=ret.shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
+        return shape
 
-        return ret
 
 class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
     def __init__(self, block_sizes, dummy_relu=False,  **kwargs):
