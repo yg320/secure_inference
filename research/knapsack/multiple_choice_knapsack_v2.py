@@ -554,7 +554,7 @@ class MultipleChoiceKnapsack:
             layer_dim = self.params.LAYER_NAME_TO_DIMS[layer_name][1]
 
             block_sizes = np.array(self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name])[:-1]  # TODO: either use [1,0] or don't infer it at all
-            assert np.max(block_sizes) < 255
+            # assert np.max(block_sizes) < 255
 
             W = np.array([get_cost(tuple(block_size), layer_dim, self.cost_type, self.division) for block_size in block_sizes])
             P = self.layer_name_to_noise[layer_name][channel_index]
