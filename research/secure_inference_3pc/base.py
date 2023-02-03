@@ -20,21 +20,21 @@ class Addresses:
         self.port_12 = 10 * self.base_port + 4
         self.port_21 = 10 * self.base_port + 5
 
-        self.ip_client = "localhost"
-        self.ip_server = "localhost"
-        self.ip_cryptoprovider = "localhost"
-
-        self.ip_client_private = "localhost"
-        self.ip_server_private = "localhost"
-        self.ip_cryptoprovider_private = "localhost"
-
-        # self.ip_client = "34.241.77.58"
-        # self.ip_server = "34.247.166.62"
-        # self.ip_cryptoprovider = "63.32.59.112"
+        # self.ip_client = "localhost"
+        # self.ip_server = "localhost"
+        # self.ip_cryptoprovider = "localhost"
         #
-        # self.ip_client_private = "172.31.40.100"
-        # self.ip_server_private = "172.31.46.207"
-        # self.ip_cryptoprovider_private = "172.31.46.47"
+        # self.ip_client_private = "localhost"
+        # self.ip_server_private = "localhost"
+        # self.ip_cryptoprovider_private = "localhost"
+
+        self.ip_client = "3.253.5.10"
+        self.ip_server = "3.253.18.156"
+        self.ip_cryptoprovider = "34.244.70.5"
+
+        self.ip_client_private = "172.31.40.44"
+        self.ip_server_private = "172.31.47.91"
+        self.ip_cryptoprovider_private = "172.31.47.192"
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
