@@ -143,16 +143,18 @@ class MyAvgPool(nn.Module):
     # TODO: is this the best way to do this?)
 
     def forward(self, x):
-        return self.r(torch.from_numpy(x.astype(np.int64))).numpy().astype(x.dtype)
 
-def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False):
+        out = self.r(torch.from_numpy(x.astype(np.int64))).numpy().astype(x.dtype)
+
+        return out
+def securify_resnet_cifar(model, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu=None, relu_spec_file=None, prf_prefetch=False, switch_pool_relu=False):
     model.backbone.conv1 = build_secure_conv(conv_module=model.backbone.conv1, bn_module=model.backbone.bn1)
     model.backbone.bn1 = torch.nn.Identity()
     model.backbone.relu = build_secure_relu()
 
     model.backbone.maxpool = max_pool()
 
-    if type(model.backbone.maxpool) is not [MyAvgPool, MyAvgPoolFetcher]:
+    if switch_pool_relu:
         model.backbone.relu, model.backbone.maxpool = model.backbone.maxpool, model.backbone.relu
 
     for layer in [1, 2, 3, 4]:
@@ -203,7 +205,10 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
         securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet"]:
         max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
-        securify_resnet_cifar(model, max_pool_layer, build_secure_conv, build_secure_relu, build_secure_fully_connected, secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu, relu_spec_file)
+
+        securify_resnet_cifar(model, max_pool_layer, build_secure_conv, build_secure_relu, build_secure_fully_connected,
+                              secure_model_class, crypto_assets, network_assets, dummy_relu, block_relu,
+                              relu_spec_file, switch_pool_relu=cfg.model.backbone.type == 'MyResNet')
     else:
         raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")
     if relu_spec_file:
@@ -264,7 +269,8 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
             dummy_relu=dummy_relu,
             block_relu=secure_block_relu,
             relu_spec_file=relu_spec_file,
-            prf_prefetch=True
+            prf_prefetch=True,
+            switch_pool_relu = cfg.model.backbone.type == 'MyResNet'
         )
     else:
         raise NotImplementedError(f"{cfg.model.type} {cfg.model.backbone.type}")

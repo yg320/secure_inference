@@ -34,6 +34,22 @@ distortion_extraction = [
         ])
 ]
 
+distortion_extraction_val = [
+    dict(type='LoadImageFromFile'),
+    dict(type='LoadAnnotations', reduce_zero_label=True),
+    dict(
+        type='MultiScaleFlipAug',
+        img_scale=(2048, 512),
+        flip=False,
+        transforms=[
+            dict(type='Resize', keep_ratio=True),
+            dict(type='RandomFlip'),
+            dict(type='Normalize', **img_norm_cfg),
+            dict(type='ImageToTensor', keys=['img', 'gt_semantic_seg']),
+            dict(type='Collect', keys=['img', 'gt_semantic_seg']),
+        ])
+]
+
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
@@ -66,6 +82,12 @@ data = dict(
         ann_dir='annotations/training',
         pipeline=distortion_extraction),
 
+    distortion_extraction_val=dict(
+        type=dataset_type,
+        data_root=data_root,
+        img_dir='images/validation',
+        ann_dir='annotations/validation',
+        pipeline=distortion_extraction_val),
     val=dict(
         type=dataset_type,
         data_root=data_root,
