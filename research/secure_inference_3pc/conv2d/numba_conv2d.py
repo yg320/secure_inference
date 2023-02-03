@@ -266,7 +266,7 @@ class Conv2DHandler:
     def __init__(self):
         pass
 
-    @timer(name="Conv2DHandler.conv2d")
+    # @timer(name="Conv2DHandler.conv2d")
     def conv2d(self, A, B, C=None, D=None, padding=(1, 1), stride=(1, 1), dilation=(1, 1), groups=1, method=NUMBA_CONV):
         if type(padding) is int:
             padding = (padding, padding)
