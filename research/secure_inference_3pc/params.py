@@ -16,7 +16,7 @@ class Params:
     # RELU_SPEC_FILE = "/home/yakir/4x4.pickle"
 
     SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
-    MODEL_PATH = "/home/ubuntu/specs/seg_specs/3x3.pickle" #None #"/home/yakir/epoch_14_avg_pool.pth"
+    MODEL_PATH = "/home/ubuntu/specs/cls_specs/3x3.pickle" #None #"/home/yakir/epoch_14_avg_pool.pth"
     RELU_SPEC_FILE = None
 
     # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k_maxpool.py")
