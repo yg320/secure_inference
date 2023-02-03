@@ -93,6 +93,7 @@ class SecureModelSegmentation(SecureModule):
         super(SecureModelSegmentation, self).__init__(**kwargs)
         self.model = model
 
+    @timer(name="Inference", avg=False)
     def forward(self, img, img_meta):
 
         I = TypeConverter.f2i(img)
