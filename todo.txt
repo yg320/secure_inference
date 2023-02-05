@@ -9,7 +9,7 @@
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
 - Final Seg/Clss results
 - COCO seg
-
+  
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consult Shai about codebase and acceptance date
 - More samples in noise estimation
