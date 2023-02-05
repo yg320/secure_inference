@@ -60,8 +60,8 @@ layer_names = [
             ]
 expected_num_files = 4
 
-input_path = "/storage/yakir/secure_inference/outputs/distortions/segmentation/baseline/deeplabv3_m-v2-d8_512x512_160k_ade20k"
-out_path = "/storage/yakir/secure_inference/outputs/distortions/segmentation/baseline/deeplabv3_m-v2-d8_512x512_160k_ade20k_collected"
+input_path = "/storage/yakir/secure_inference/outputs_v2/distortions/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k/"
+out_path = "/storage/yakir/secure_inference/outputs_v2/distortions/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_collected"
 layer_names = [
                 "conv1",
                 "layer1_0_0",
@@ -104,7 +104,7 @@ layer_names = [
                 "decode_4",
                 "decode_5",
             ]
-expected_num_files = 5
+expected_num_files = 4
 
 os.makedirs(out_path)
 

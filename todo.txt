@@ -3,11 +3,12 @@
 - Finish Methods and Results
 - Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
 - Continue optimizing
-
+- Don't call 3 AWS machine in the same region - LAN. It's confusing
 - Divide by block size in block ReLU (in order not to exceed MSB dummy bits)
 - Use loss as distortion measure
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
 - Final Seg/Clss results
+- COCO seg
 
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consult Shai about codebase and acceptance date

@@ -7,7 +7,7 @@ log_config = dict(
         # dict(type='PaviLoggerHook') # for internal services
     ])
 # yapf:enable
-dist_params = dict(backend='nccl')
+dist_params = dict(backend='gloo')
 log_level = 'INFO'
 load_from = None
 resume_from = None

@@ -11,13 +11,13 @@ class Params:
     # MODEL_PATH = None #"/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth" #None #"/home/yakir/epoch_50.pth"
     # RELU_SPEC_FILE = "/home/ubuntu/specs/seg_specs/6x6.pickle"
 
-    # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
-    # MODEL_PATH = None #"/home/yakir/epoch_50.pth"
-    # RELU_SPEC_FILE = "/home/yakir/4x4.pickle"
-
     SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
-    MODEL_PATH = None #"/home/yakir/epoch_14_avg_pool.pth"
-    RELU_SPEC_FILE = "/home/ubuntu/specs/cls_specs/2x3.pickle"
+    MODEL_PATH = "/home/yakir/epoch_50.pth"
+    RELU_SPEC_FILE = "/home/yakir/4x4.pickle"
+
+    # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k.py")
+    # MODEL_PATH = None #"/home/yakir/epoch_14_avg_pool.pth"
+    # RELU_SPEC_FILE = "/home/ubuntu/specs/cls_specs/2x3.pickle"
 
     # SECURE_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "../configs/classification/resnet/resnet50_8xb32_in1k_maxpool.py")
     # MODEL_PATH = None #"/home/yakir/PycharmProjects/secure_inference/mmlab_models/classification/resnet50_8xb32_in1k_20210831-ea4938fc.pth"
@@ -26,7 +26,7 @@ class Params:
     PUBLIC_IP_SERVER = ""
     PUBLIC_IP_CLIENT = ""
     PUBLIC_IP_CRYPTO_PROVIDER = ""
-    AWS_DUMMY = True
+    AWS_DUMMY = False
     NUM_IMAGES = 3
     CLIENT_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
     SERVER_DEVICE = {"cuda": "cuda:1", "cpu": "cpu"}[DEVICE]

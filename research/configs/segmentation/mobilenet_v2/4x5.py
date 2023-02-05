@@ -24,6 +24,6 @@ runner = dict(type='IterBasedRunner', max_iters=80000)
 checkpoint_config = dict(by_epoch=False, interval=8000)
 evaluation = dict(interval=8000, metric='mIoU', pre_eval=True)
 
-relu_spec_file = ".relu_spec_files_v2/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k/4x5.pickle"
+relu_spec_file = "./relu_spec_files/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k/4x5.pickle"
 load_from = "./mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth"
 work_dir = "./outputs_v2/experiments/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k/4x5"
