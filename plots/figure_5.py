@@ -12,9 +12,9 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 # 4x4 644224
 
 plt.figure(figsize=(5, 4))
-dReLUs_relative_to_baseline = 100*np.array([644224/9608704, 874240/9608704, 1189632/9608704, 1701120/9608704])
-performance_relative_to_baseline_classification = 100*np.array([0.934, 0.952, 0.967, 0.99])
-performance_relative_to_baseline_segmentation = 100*np.array([0.91, 0.92, 0.93, 0.95])
+dReLUs_relative_to_baseline = 100*np.array([644224/9608704, 874240/9608704, 1189632/9608704])
+performance_relative_to_baseline_classification = 100 - 100*np.array([0.934, 0.952, 0.967])
+performance_relative_to_baseline_segmentation = 100 - 100*np.array([0.91, 0.92, 0.93])
 
 # plt.subplot(211)
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_classification, '.-', color="#3399e6", lw=3, markersize=15)
@@ -29,7 +29,7 @@ plt.gca().yaxis.set_minor_locator(MultipleLocator(0.5))
 plt.gca().tick_params(axis='both', which='major', labelsize=11)
 
 plt.xlim([5, 20])
-plt.ylim([90, 100])
+plt.ylim([0, 10])
 plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.5)
 plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
