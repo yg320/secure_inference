@@ -13,7 +13,7 @@
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
 - discuss the 32 bits in 4x4 and 5x5 compared to 1x1
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
-
+- Docker again! (with distortion verify)
 ============================================= Next =============================================
 - More samples in noise estimation
 - What about bandwith? (Instead of ReLU)
