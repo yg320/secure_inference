@@ -16,12 +16,13 @@ distortion_extractor_script = os.path.join(os.path.dirname(__file__), "distortio
 batch_size = args.num_samples // args.num_gpus
 
 distortion_extraction_processes = []
-r = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-# PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:' + r + '\"; '
-os.chdir(r)
-for gpu_index in range(args.num_gpus):
 
-    distortion_output_path = os.path.join(args.output_path, "distortion_row")
+os.chdir(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+distortion_output_path = os.path.join(args.output_path, "distortion_row")
+
+for gpu_index in range(args.num_gpus):
+    # TODO: make it multiprocess (mp.Process), instead of using subprocess. Alternatively, consider using
+    #  torch.nn.parallel.parallel_apply
     python_command = \
         f'python {distortion_extractor_script} ' + \
         f'--config {args.config} ' + \
@@ -35,3 +36,5 @@ for gpu_index in range(args.num_gpus):
     )
 
 exit_codes = [p.wait() for p in distortion_extraction_processes]
+#
+# DistortionCollector(output_path=distortion_output_path).collect()

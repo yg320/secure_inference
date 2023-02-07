@@ -39,18 +39,19 @@ def model_block_relu_transform(model, relu_spec, arch_utils):
 
 
 class DistortionUtils:
-    def __init__(self, gpu_id, params, cfg, mode, seed=123):
+    def __init__(self, gpu_id, params, checkpoint, cfg, mode, seed=123):
 
         self.gpu_id = gpu_id
         self.device = f"cuda:{gpu_id}"
         self.params = params
+        self.checkpoint = checkpoint
         self.cfg = cfg
         self.arch_utils = arch_utils_factory(self.cfg)
 
         self.model = get_model(
             config=self.cfg,
             gpu_id=self.gpu_id,
-            checkpoint_path=self.params.CHECKPOINT
+            checkpoint_path=self.checkpoint
         )
 
         self.dataset = build_data(self.cfg, mode=mode)
@@ -179,18 +180,40 @@ class DistortionUtils:
 
 
 class ChannelDistortionHandler:
-    def __init__(self, gpu_id, output_path, params, cfg, is_train_mode=False):
+    def __init__(self, gpu_id, output_path, checkpoint, config, is_train_mode=False, baseline_block_size_spec_path=None, clean_block_size_spec_path=None):
 
-        self.params = params
-        self.cfg = cfg
-        self.distortion_utils = DistortionUtils(gpu_id=gpu_id,
+        self.gpu_id = gpu_id
+        self.output_path = output_path
+        self.checkpoint = checkpoint
+        self.config = config
+        self.is_train_mode = is_train_mode
+        self.baseline_block_size_spec_path = baseline_block_size_spec_path
+        self.clean_block_size_spec_path = clean_block_size_spec_path
+
+        self.cfg = mmcv.Config.fromfile(self.config)
+        self.params = param_factory(self.cfg)
+
+        os.makedirs(output_path, exist_ok=True)
+        self.distortion_utils = DistortionUtils(gpu_id=self.gpu_id,
                                                 params=self.params,
+                                                checkpoint=self.checkpoint,
                                                 cfg=self.cfg,
                                                 mode="distortion_extraction")
-        self.output_path = output_path
 
-        if is_train_mode:
+        if self.is_train_mode:
             self.distortion_utils.model.train()
+
+        if self.baseline_block_size_spec_path:
+            assert os.path.exists(self.baseline_block_size_spec_path)
+            self.baseline_block_size_spec = pickle.load(open(self.baseline_block_size_spec_path, 'rb'))
+        else:
+            self.baseline_block_size_spec = dict()
+
+        if self.clean_block_size_spec_path:
+            assert os.path.exists(self.clean_block_size_spec_path)
+            self.clean_block_size_spec = pickle.load(open(self.clean_block_size_spec_path, 'rb'))
+        else:
+            self.clean_block_size_spec = dict()
 
     def extract_deformation_channel_ord(self,
                                         batch_index: int,
@@ -253,39 +276,19 @@ if __name__ == "__main__":
     parser.add_argument('--batch_index', type=int, default=0)
     parser.add_argument('--gpu_id', type=int, default=0)
 
-    parser.add_argument('--baseline_block_size_spec', type=str, default=None)
-    parser.add_argument('--clean_block_size_spec', type=str, default=None)
+    parser.add_argument('--baseline_block_size_spec_path', type=str, default=None)
+    parser.add_argument('--clean_block_size_spec_path', type=str, default=None)
     parser.add_argument('--train_mode', action='store_true', default=False)
 
     args = parser.parse_args()
-    seed = None
 
-    cfg = mmcv.Config.fromfile(args.config)
-    gpu_id = args.gpu_id
-    params = param_factory(cfg)
-
-    params.CHECKPOINT = args.checkpoint
-
-    output_path = args.output_path
-    os.makedirs(output_path, exist_ok=True)
-
-    if args.baseline_block_size_spec and os.path.exists(args.baseline_block_size_spec):
-        baseline_block_size_spec = pickle.load(open(args.baseline_block_size_spec, 'rb'))
-    else:
-        baseline_block_size_spec = dict()
-
-    if args.clean_block_size_spec and os.path.exists(args.clean_block_size_spec):
-        clean_block_size_spec = pickle.load(open(args.clean_block_size_spec, 'rb'))
-    else:
-        clean_block_size_spec = dict()
-
-    chd = ChannelDistortionHandler(gpu_id=gpu_id,
-                                   output_path=output_path,
-                                   params=params,
-                                   cfg=cfg,
-                                   is_train_mode=args.train_mode)
+    chd = ChannelDistortionHandler(gpu_id=args.gpu_id,
+                                   output_path=args.output_path,
+                                   checkpoint=args.checkpoint,
+                                   config=args.config,
+                                   is_train_mode=args.train_mode,
+                                   baseline_block_size_spec_path=args.baseline_block_size_spec_path,
+                                   clean_block_size_spec_path=args.clean_block_size_spec_path)
 
     chd.extract_deformation_channel_ord(batch_index=args.batch_index,
-                                        batch_size=args.batch_size,
-                                        baseline_block_size_spec=baseline_block_size_spec,
-                                        clean_block_size_spec=clean_block_size_spec)
+                                        batch_size=args.batch_size)
