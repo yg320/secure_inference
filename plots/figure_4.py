@@ -55,11 +55,14 @@ classification_1x1_64_bits_results_mock = 76.83
 
 segmentation_5x5_24_bits_runtime = seg_24_to_32 * segmentation_5x5_32_bits_runtime
 segmentation_4x4_64_bits_runtime = seg_4x4_to_4x5 * segmentation_4x5_64_bits_runtime
+segmentation_3x3_64_bits_runtime = 47.4
 classification_1x1_24_bits_runtime = runtime_1x1_24_64 * classification_1x1_64_bits_runtime
+segmentation_3x3_24_bits_runtime = 41.2
 segmentation_4x4_24_bits_runtime = 105/3
 segmentation_1x1_24_bits_runtime = 0.7*1154.7/3
 
 segmentation_1x1_64_bits_results = segmentation_1x1_64_bits_results_not_secure
+segmentation_3x3_64_bits_results = 35.2
 segmentation_4x4_64_bits_results = segmentation_4x4_64_bits_results_not_secure
 segmentation_5x5_64_bits_results = segmentation_5x5_64_bits_results_not_secure_mock
 segmentation_6x6_64_bits_results = segmentation_6x6_64_bits_results_not_secure
@@ -74,12 +77,16 @@ segmentation_results_64_bits = 100 * np.array([segmentation_6x6_64_bits_results,
 segmentation_results_24_bits =  segmentation_results_64_bits
 segmentation_runtime_lan_64_bits = segmentation_mmlab_runtime / np.array([segmentation_6x6_64_bits_runtime, segmentation_5x5_64_bits_runtime, segmentation_4x4_64_bits_runtime, segmentation_3x3_64_bits_runtime, segmentation_1x1_64_bits_runtime])
 segmentation_runtime_lan_24_bits = segmentation_mmlab_runtime / np.array([segmentation_6x6_24_bits_runtime, segmentation_5x5_24_bits_runtime, segmentation_4x4_24_bits_runtime, segmentation_3x3_24_bits_runtime, segmentation_1x1_24_bits_runtime])
+segmentation_runtime_wan_64_bits = segmentation_mmlab_runtime / np.array([segmentation_6x6_64_bits_runtime, segmentation_5x5_64_bits_runtime, segmentation_4x4_64_bits_runtime, segmentation_3x3_64_bits_runtime, segmentation_1x1_64_bits_runtime])
+segmentation_runtime_wan_24_bits = segmentation_mmlab_runtime / np.array([segmentation_6x6_24_bits_runtime, segmentation_5x5_24_bits_runtime, segmentation_4x4_24_bits_runtime, segmentation_3x3_24_bits_runtime, segmentation_1x1_24_bits_runtime])
 
 # segmentation_runtime_wan = 66.6/np.array([7.47, 9.14, 66.6])
 classification_results_64_bits = 100 * np.array([classification_4x4_64_bits_results, classification_3x4_64_bits_results, classification_3x3_64_bits_results, classification_2x3_64_bits_results, classification_1x1_64_bits_results]) / classification_mmlab_result
 classification_results_24_bits = 100 * np.array([classification_4x4_24_bits_results, classification_3x4_24_bits_results, classification_3x3_24_bits_results, classification_2x3_24_bits_results, classification_1x1_24_bits_results]) / classification_mmlab_result
 classification_runtime_lan_64_bits = classification_mmlab_runtime / np.array([classification_4x4_64_bits_runtime, classification_3x4_64_bits_runtime, classification_3x3_64_bits_runtime, classification_2x3_64_bits_runtime, classification_1x1_64_bits_runtime])
 classification_runtime_lan_24_bits = classification_mmlab_runtime / np.array([classification_4x4_24_bits_runtime, classification_3x4_24_bits_runtime, classification_3x3_24_bits_runtime, classification_2x3_24_bits_runtime, classification_1x1_24_bits_runtime])
+classification_runtime_wan_64_bits = classification_mmlab_runtime / np.array([classification_4x4_64_bits_runtime, classification_3x4_64_bits_runtime, classification_3x3_64_bits_runtime, classification_2x3_64_bits_runtime, classification_1x1_64_bits_runtime])
+classification_runtime_wan_24_bits = classification_mmlab_runtime / np.array([classification_4x4_24_bits_runtime, classification_3x4_24_bits_runtime, classification_3x3_24_bits_runtime, classification_2x3_24_bits_runtime, classification_1x1_24_bits_runtime])
 
 colors = ["#3399e6", "#69b3a2"]
 ticks_font_size = 12
@@ -118,12 +125,12 @@ if True:
                     verticalalignment='center',
                     fontsize=10, color='black',  fontweight='bold')
 
-    if False:
+    if True:
         ax1 = axes[1][0]
         [i.set_linewidth(1.5) for i in ax1.spines.values()]
         ax1.set_ylabel('WAN (s)', fontsize=axis_label_font_size, labelpad=7)
-        ax1.plot(segmentation_results_64_bits, segmentation_runtime_lan_64_bits, ".-", color=colors[0], lw=plot_lw, markersize=plot_markersize)
-        ax1.plot(segmentation_results_24_bits, segmentation_runtime_lan_24_bits, ".-", color=colors[1], lw=plot_lw, markersize=plot_markersize)
+        ax1.plot(classification_results_64_bits, classification_runtime_lan_64_bits, ".-", color=colors[0], lw=plot_lw, markersize=plot_markersize)
+        ax1.plot(classification_results_24_bits, classification_runtime_lan_24_bits, ".-", color=colors[1], lw=plot_lw, markersize=plot_markersize)
 
         ax1.set_ylim([0.0, 7])
         ax1.set_yticklabels(["", "421", "210", "140", "105", "84", "70"],fontsize=ticks_font_size)
@@ -163,7 +170,7 @@ if True:
 
         ax1.set_ylim([0.0, 13])
         ax1.set_yticks([1,3,5,7,9, 11])
-        ax1.set_yticklabels(["1", "3", "5", "7", "9", "11"], fontsize=ticks_font_size)
+        ax1.set_yticklabels([str(round(segmentation_mmlab_runtime / x, 1))for x in [1,3,5,7,9,11]], fontsize=ticks_font_size)
 
         ax1.grid(visible=True, which='major', color='#666666', linestyle='--', alpha=1, lw=1, axis='y')
         ax1.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.5, lw=2, axis='x')
@@ -177,16 +184,16 @@ if True:
                      verticalalignment='center',
                      fontsize=10, color='black', fontweight='bold')
 
-    if False:
+    if True:
         ax1 = axes[1][1]
         [i.set_linewidth(1.5) for i in ax1.spines.values()]
 
-        ax1.plot(segmentation_results, segmentation_runtime_wan, ".-", color=colors[0], lw=plot_lw,
-                 markersize=plot_markersize)
+        ax1.plot(segmentation_results_64_bits, segmentation_runtime_wan_64_bits, ".-", color=colors[0], lw=plot_lw, markersize=plot_markersize)
+        ax1.plot(segmentation_results_24_bits, segmentation_runtime_wan_24_bits, ".-", color=colors[1], lw=plot_lw, markersize=plot_markersize)
 
         ax1.set_ylim([0.0, 13])
         ax1.set_yticks([1,3,5,7,9, 11])
-        ax1.set_yticklabels(["1", "3", "5", "7", "9", "11"], fontsize=ticks_font_size)
+        ax1.set_yticklabels([str(round(10*segmentation_mmlab_runtime / x))for x in [1,3,5,7,9,11]], fontsize=ticks_font_size)
 
         ax1.grid(visible=True, which='major', color='#666666', linestyle='--', alpha=1, lw=1, axis='y')
         ax1.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.5, lw=2, axis='x')

@@ -217,9 +217,7 @@ class ChannelDistortionHandler:
 
     def extract_deformation_channel_ord(self,
                                         batch_index: int,
-                                        batch_size: int,
-                                        baseline_block_size_spec: Dict[str, np.array],
-                                        clean_block_size_spec: Dict[str, np.array]):
+                                        batch_size: int):
 
         channels_to_run, _ = get_channels_subset(params=self.params)
 
@@ -232,7 +230,7 @@ class ChannelDistortionHandler:
             input_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
             output_block_name = self.params.BLOCK_NAMES[-1]  # TODO: Why do we have None in last layer
 
-            block_size_spec = copy.deepcopy(baseline_block_size_spec)
+            block_size_spec = copy.deepcopy(self.baseline_block_size_spec)
 
             if layer_name not in block_size_spec:
                 block_size_spec[layer_name] = np.ones(shape=(layer_num_channels, 2), dtype=np.int32)
@@ -251,8 +249,8 @@ class ChannelDistortionHandler:
                     block_size_spec[layer_name][channel] = block_size
 
                     cur_assets = self.distortion_utils.get_batch_distortion(
-                        clean_block_size_spec=clean_block_size_spec,
-                        baseline_block_size_spec=baseline_block_size_spec,
+                        clean_block_size_spec=self.clean_block_size_spec,
+                        baseline_block_size_spec=self.baseline_block_size_spec,
                         block_size_spec=block_size_spec,
                         batch_index=batch_index,
                         batch_size=batch_size,

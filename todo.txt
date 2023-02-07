@@ -1,33 +1,32 @@
 ============================================= Tomorrow =============================================
 - Should we discuss the identity block-sizes?
-- Currently,
-
-
+- Discuss unfairness and the fact the MMLab's models have not converged yet
+- Is teaser figure still relevant?
+- Does the code related to the paper? How does the reviewer verify reproducibility?
+- Should code be ready as plug and play on March 8th?
+- Discuss formats of plots and tables
+- What about competitions?!
 ============================================= Following days =============================================
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!! (Do we always send minimal data types?)
 - Divide by block size in block ReLU (in order not to exceed MSB dummy bits)
-
+- Is sneek peak still relevant?
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
-- should we describe the 0x1 block size? (SHAI)
 - discuss the 32 bits in 4x4 and 5x5 compared to 1x1
-- What is the level of reporducibility of the results? (I think it's pretty good)
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
-- Consult Shai about codebase and acceptance date
+
+============================================= Next =============================================
 - More samples in noise estimation
 - What about bandwith? (Instead of ReLU)
 - Make everything deterministic (especially distortion extraction)
-- Discuss formats of plots and tables
 - Understand high l2 distance
-- activate fetcher each and every time
 - ResNet101 with SNR?
 - Should I further verify .train() vs .eval()?
-- What about competitions?!
-- Crypto Provider work with shapes, maybe all crypto-tensors consume too much space?
+- Crypto Provider should work with shapes! maybe all crypto-tensors consume too much space?
 - Remove conv in CUDA?
-- Given another try to conv decomposition! (What about the queue)
+- Give another try to conv decomposition! (What about the queue)
 - Add noise to training for DReLU (Understand mean vs sum)
-- Competition!
 - Measurements with bandwidth = infinity (zeros-like)
+
 ============================================= Major =============================================
 - Should FC and GAP be part of distortion?
 - Try working with learning rate warmup!

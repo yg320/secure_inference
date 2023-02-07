@@ -1,3 +1,2 @@
-import os
-os.chdir("/storage/yakir/secure_inference")
-os.system("python exe_script.py")
+import time
+time.sleep(365*24*60*60)
