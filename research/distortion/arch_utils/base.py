@@ -1,9 +1,9 @@
+from abc import ABC, abstractmethod
+
 from research.bReLU import BlockRelu
 
 
-class ArchUtils:
-    def __init__(self):
-        pass
+class ArchUtils(ABC):
 
     def set_layers(self, model, layer_names_to_layers):
         for layer_name, layer in layer_names_to_layers.items():
@@ -14,5 +14,14 @@ class ArchUtils:
                                 for layer_name, block_sizes in layer_name_to_block_sizes.items()}
         self.set_layers(model, layer_name_to_layers)
 
+    @abstractmethod
+    def set_layer(self, model, layer_name, block_relu):
+        pass
 
+    @abstractmethod
+    def get_layer(self, model, layer_name):
+        pass
 
+    @abstractmethod
+    def run_model_block(self, model, activation, block_name):
+        pass

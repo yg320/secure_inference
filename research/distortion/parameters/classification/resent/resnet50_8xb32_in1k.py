@@ -1,5 +1,6 @@
 from research.distortion.parameters.block_sizes import BLOCK_SIZES_112x112, BLOCK_SIZES_56x56, BLOCK_SIZES_28x28, BLOCK_SIZES_14x14, BLOCK_SIZES_7x7
 
+
 class Params:
     def __init__(self):
 
@@ -20,8 +21,7 @@ class Params:
             'layer3_5',
             'layer4_0',
             'layer4_1',
-            'layer4_2',
-            None
+            'layer4_2'
         ]
 
         self.LAYER_NAMES = \
@@ -149,8 +149,7 @@ class Params:
                 'layer3_5': "layer3_4",
                 'layer4_0': "layer3_5",
                 'layer4_1': "layer4_0",
-                'layer4_2': "layer4_1",
-                None: "layer4_2"
+                'layer4_2': "layer4_1"
             }
 
         self.LAYER_NAME_TO_BLOCK_SIZES = \

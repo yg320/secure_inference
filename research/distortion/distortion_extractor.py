@@ -1,16 +1,27 @@
+import argparse
+import copy
+import os
+from tqdm import tqdm
+from typing import Dict
+import pickle
+import mmcv
 import torch
 import numpy as np
-
-from research.distortion.utils import get_model, get_data
-from research.utils import build_data
-from research.distortion.arch_utils.factory import arch_utils_factory
-# from mmseg.ops import resize
-# import torch.nn.functional as F
-# from mmseg.core import intersect_and_union
 import contextlib
 from functools import lru_cache
 import ctypes
-import mmcv
+
+from research.distortion.parameters.factory import param_factory
+from research.distortion.utils import get_channels_subset
+from research.distortion.utils import get_model
+from research.utils import build_data
+from research.distortion.arch_utils.factory import arch_utils_factory
+
+# TODO: why are these import needed?
+from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
+from research.mmlab_extension.classification.resnet import MyResNet
+from research.mmlab_extension.transforms import CenterCrop
+
 
 @contextlib.contextmanager
 def model_block_relu_transform(model, relu_spec, arch_utils):
@@ -27,80 +38,24 @@ def model_block_relu_transform(model, relu_spec, arch_utils):
         arch_utils.set_layers(model, {layer_name_: orig_layer})
 
 
-IMAGES = "***"
-
-
-@lru_cache(maxsize=None)
-def get_num_relus(block_size, activation_dim):
-
-    if block_size in [(0, 1), (1, 0)]:
-        return 0
-
-    if block_size == (1, 1):
-        return activation_dim ** 2
-
-    avg_pool = torch.nn.AvgPool2d(
-        kernel_size=block_size,
-        stride=block_size, ceil_mode=True)
-
-    cur_input = torch.zeros(size=(1, 1, activation_dim, activation_dim))
-    cur_relu_map = avg_pool(cur_input)
-    num_relus = cur_relu_map.shape[2] * cur_relu_map.shape[3]
-
-    return num_relus
-
-
-def get_block_spec_num_relus(block_spec, params):
-    num_relus = 0
-    for layer_name, block_sizes in block_spec.items():
-        activation_dim = params.LAYER_NAME_TO_DIMS[layer_name][1]
-        for block_size in block_sizes:
-            num_relus += get_num_relus(tuple(block_size), activation_dim)
-    return num_relus
-
-
-@lru_cache(maxsize=None)
-def get_brelu_bandwidth(block_size, activation_dim, l=8, log_p=8, protocol="Porthos", scalar_vector_optimization=True, with_prf=True):
-    assert with_prf
-    if block_size in [(0, 1), (1, 0)]:
-        return 0
-    num_relus = get_num_relus(block_size, activation_dim)
-    if protocol == "Porthos":
-        dReLU_bandwidth = (6 * log_p + 19 - 5) * num_relus
-    elif protocol == "SecureNN":
-        dReLU_bandwidth = (8 * log_p + 24 - 5) * num_relus
-    else:
-        assert False
-    if scalar_vector_optimization:
-        assert with_prf
-        mult_bandwidth = 3 * activation_dim ** 2 + 2 * num_relus
-    else:
-        assert with_prf
-        mult_bandwidth = 5 * activation_dim ** 2
-    bandwidth = l * (dReLU_bandwidth + mult_bandwidth)
-    return bandwidth  # Bandwidth is in Bytes (therefore l=8 and not 64)
-
-
 class DistortionUtils:
-    def __init__(self, gpu_id, params, cfg, mode):
+    def __init__(self, gpu_id, params, cfg, mode, seed=123):
 
         self.gpu_id = gpu_id
         self.device = f"cuda:{gpu_id}"
         self.params = params
         self.cfg = cfg
         self.arch_utils = arch_utils_factory(self.cfg)
+
         self.model = get_model(
             config=self.cfg,
             gpu_id=self.gpu_id,
             checkpoint_path=self.params.CHECKPOINT
         )
 
-        # TODO: Replaced test with train
-        # TODO: find a more elegant way to do this
-        # TODO: this is copied again and again
         self.dataset = build_data(self.cfg, mode=mode)
 
-        np.random.seed(123)
+        np.random.seed(seed)
         self.shuffled_indices = np.arange(len(self.dataset))
         np.random.shuffle(self.shuffled_indices)
 
@@ -116,7 +71,6 @@ class DistortionUtils:
 
         batch_indices = np.arange(batch_index * batch_size, batch_index * batch_size + batch_size)
         batch_indices = self.shuffled_indices[batch_indices]
-        # TODO: just use normal training datastream.. no need to center crop then
 
         # TODO: find a more elegant way to do this
         if self.cfg.model.type == 'ImageClassifier':
@@ -125,9 +79,8 @@ class DistortionUtils:
         elif self.cfg.model.type == 'EncoderDecoder':
             batch = torch.stack([self.dataset[sample_id]['img'][0].data for sample_id in batch_indices]).to(self.device)
             ground_truth = torch.stack([self.dataset[sample_id]['gt_semantic_seg'][0].to(torch.int64) for sample_id in batch_indices]).to(self.device)
-        elif self.cfg.model.type == 'SingleStageDetector':
-            batch = torch.stack([self.dataset[sample_id]['img'][0].data for sample_id in batch_indices]).to(self.device)
-            ground_truth = [self.dataset[sample_id]['gt_labels'].data.to(self.device) for sample_id in batch_indices]
+        else:
+            raise NotImplementedError
 
         return batch, ground_truth
 
@@ -167,7 +120,7 @@ class DistortionUtils:
                     if block_name in output_block_names:
                         block_name_to_activation[block_name] = activation
 
-                if True: #output_block_names[-1] == self.params.BLOCK_NAMES[-2]:  # TODO: why do we have None in the end of self.BLOCK_NAMES?
+                if output_block_names[-1] == self.params.BLOCK_NAMES[-1]:
                     losses = self.get_loss(activation, ground_truth)
                 else:
                     losses = np.nan * np.ones(shape=(input_tensor.shape[0],))
@@ -183,7 +136,7 @@ class DistortionUtils:
             self.get_activations(block_size_spec,
                                  input_block_name=self.params.BLOCK_NAMES[0],
                                  input_tensor=input_images,
-                                 output_block_names=self.params.BLOCK_NAMES[:-1],
+                                 output_block_names=self.params.BLOCK_NAMES,
                                  ground_truth=ground_truth)
         block_name_to_activation["input_images"] = input_images
         return block_name_to_activation, ground_truth, losses
@@ -224,3 +177,115 @@ class DistortionUtils:
         }
         return assets
 
+
+class ChannelDistortionHandler:
+    def __init__(self, gpu_id, output_path, params, cfg, is_train_mode=False):
+
+        self.params = params
+        self.cfg = cfg
+        self.distortion_utils = DistortionUtils(gpu_id=gpu_id,
+                                                params=self.params,
+                                                cfg=self.cfg,
+                                                mode="distortion_extraction")
+        self.output_path = output_path
+
+        if is_train_mode:
+            self.distortion_utils.model.train()
+
+    def extract_deformation_channel_ord(self,
+                                        batch_index: int,
+                                        batch_size: int,
+                                        baseline_block_size_spec: Dict[str, np.array],
+                                        clean_block_size_spec: Dict[str, np.array]):
+
+        channels_to_run, _ = get_channels_subset(params=self.params)
+
+        os.makedirs(self.output_path, exist_ok=True)
+
+        for layer_name in self.params.LAYER_NAMES:
+
+            block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
+            layer_num_channels = self.params.LAYER_NAME_TO_DIMS[layer_name][0]
+            input_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
+            output_block_name = self.params.BLOCK_NAMES[-1]  # TODO: Why do we have None in last layer
+
+            block_size_spec = copy.deepcopy(baseline_block_size_spec)
+
+            if layer_name not in block_size_spec:
+                block_size_spec[layer_name] = np.ones(shape=(layer_num_channels, 2), dtype=np.int32)
+
+            for channel in tqdm(channels_to_run[layer_name], desc=f"Batch={batch_index} Layer={layer_name}"):
+
+                file_name = os.path.join(self.output_path, f"{layer_name}_{channel}_{batch_index}.npy")
+                if os.path.exists(file_name):
+                    continue
+
+                channel_noise = np.zeros(shape=(len(block_sizes), ))
+
+                for block_size_index, block_size in enumerate(block_sizes):
+
+                    orig_block_size = block_size_spec[layer_name][channel].copy()
+                    block_size_spec[layer_name][channel] = block_size
+
+                    cur_assets = self.distortion_utils.get_batch_distortion(
+                        clean_block_size_spec=clean_block_size_spec,
+                        baseline_block_size_spec=baseline_block_size_spec,
+                        block_size_spec=block_size_spec,
+                        batch_index=batch_index,
+                        batch_size=batch_size,
+                        input_block_name=input_block_name,
+                        output_block_name=output_block_name)
+
+                    block_size_spec[layer_name][channel] = orig_block_size
+                    channel_noise[block_size_index] = cur_assets["Noise"]
+                np.save(file_name, channel_noise)
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description='')
+
+    parser.add_argument('--config', type=str)
+    parser.add_argument('--checkpoint', type=str)
+    parser.add_argument('--output_path', type=str)
+    parser.add_argument('--batch_size', type=int)
+
+    parser.add_argument('--batch_index', type=int, default=0)
+    parser.add_argument('--gpu_id', type=int, default=0)
+
+    parser.add_argument('--baseline_block_size_spec', type=str, default=None)
+    parser.add_argument('--clean_block_size_spec', type=str, default=None)
+    parser.add_argument('--train_mode', action='store_true', default=False)
+
+    args = parser.parse_args()
+    seed = None
+
+    cfg = mmcv.Config.fromfile(args.config)
+    gpu_id = args.gpu_id
+    params = param_factory(cfg)
+
+    params.CHECKPOINT = args.checkpoint
+
+    output_path = args.output_path
+    os.makedirs(output_path, exist_ok=True)
+
+    if args.baseline_block_size_spec and os.path.exists(args.baseline_block_size_spec):
+        baseline_block_size_spec = pickle.load(open(args.baseline_block_size_spec, 'rb'))
+    else:
+        baseline_block_size_spec = dict()
+
+    if args.clean_block_size_spec and os.path.exists(args.clean_block_size_spec):
+        clean_block_size_spec = pickle.load(open(args.clean_block_size_spec, 'rb'))
+    else:
+        clean_block_size_spec = dict()
+
+    chd = ChannelDistortionHandler(gpu_id=gpu_id,
+                                   output_path=output_path,
+                                   params=params,
+                                   cfg=cfg,
+                                   is_train_mode=args.train_mode)
+
+    chd.extract_deformation_channel_ord(batch_index=args.batch_index,
+                                        batch_size=args.batch_size,
+                                        baseline_block_size_spec=baseline_block_size_spec,
+                                        clean_block_size_spec=clean_block_size_spec)

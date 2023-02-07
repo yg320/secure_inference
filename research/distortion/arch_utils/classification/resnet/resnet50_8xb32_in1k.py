@@ -1,9 +1,9 @@
 from research.distortion.arch_utils.base import ArchUtils
 
 
-class Utils(ArchUtils):
+class ResNetUtils(ArchUtils):
     def __init__(self):
-        super(Utils, self).__init__()
+        super(ResNetUtils, self).__init__()
 
     def run_model_block(self, model, activation, block_name):
         if block_name == "stem":

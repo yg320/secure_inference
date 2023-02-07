@@ -3,7 +3,7 @@ import mmcv
 import numpy as np
 
 from research.distortion.parameters.factory import param_factory
-from research.distortion.distortion_utils import get_block_spec_num_relus
+from research.distortion.utils import get_block_spec_num_relus
 
 # config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
 # block_size_spec_file = "/home/yakir/knap_base_dim_annel_dis_ext/relu_spec_files/0.pickle"

@@ -24,8 +24,7 @@ class Params:
                 "layer6_1",
                 "layer6_2",
                 "layer7_0",
-                "decode",
-                None
+                "decode"
             ]
 
         self.LAYER_NAME_TO_BLOCK_NAME = \
@@ -136,8 +135,7 @@ class Params:
                 "layer6_1": "layer6_0",
                 "layer6_2": "layer6_1",
                 "layer7_0": "layer6_2",
-                "decode": "layer7_0",
-                None: "decode"
+                "decode": "layer7_0"
             }
 
         self.LAYER_NAME_TO_BLOCK_SIZES = \
