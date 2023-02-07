@@ -1,15 +1,16 @@
+============================================= Tomorrow =============================================
+- Should we discuss the identity block-sizes?
+- Currently,
+
+
 ============================================= Following days =============================================
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!! (Do we always send minimal data types?)
-- Finish Methods and Results
-- Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
-- Continue optimizing
-- Don't call 3 AWS machine in the same region - LAN. It's confusing
 - Divide by block size in block ReLU (in order not to exceed MSB dummy bits)
-- Use loss as distortion measure
+
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
-- Final Seg/Clss results
-- COCO seg
-  
+- should we describe the 0x1 block size? (SHAI)
+- discuss the 32 bits in 4x4 and 5x5 compared to 1x1
+- What is the level of reporducibility of the results? (I think it's pretty good)
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Consult Shai about codebase and acceptance date
 - More samples in noise estimation
@@ -118,6 +119,9 @@
 - Understand Porthos float2int and int2float methods
 - Understand why P needs to be 67. Can't we use 3/5/7/11/13 etc.?
 
+============================================= Lastly =============================================
+- Simulated annealing (With very short finetuning every k steps? Use distortion as loss doesn't feel right)
+
 ============================================= Never =============================================
 - Consider MultiThreaded ReLU
 - Draw a bunch of block sizes and try to learn a model that would lead to additivity
@@ -131,3 +135,5 @@
 - Soft start (alpha * relu + (1-alpha) * bReLU)
 - Can we fuze mobilenet 1x1 and 3x3 convolutions?
 - Finetune iterative (itertaive sub channels (with multiple training))
+- Use loss as distortion measure
+- COCO seg

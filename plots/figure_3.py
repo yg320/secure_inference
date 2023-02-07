@@ -3,6 +3,8 @@ matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 import numpy as np
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+
+#CLS
 # 1x1 9608704
 # 1x2 4834816
 # 2x2 2434816
@@ -11,16 +13,32 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 # 3x4 874240
 # 4x4 644224
 
+# Segmentation
+# 1x1 85262848
+# 1x2 42631680
+# 2x2 21316096
+# 2x3 14580224
+# 3x3 9973840
+# 3x4 7290368
+# 4x4 5329408
+# 4x5 4330240
+# 5x5 3518416
+# 5x6 2968880
+# 6x6 2505328
+# 6x7 2251616
+# 7x7 2024560
+
 plt.figure(figsize=(5, 4))
-dReLUs_relative_to_baseline = 100*np.array([644224/9608704, 874240/9608704, 1189632/9608704])
+dReLUs_relative_to_baseline_classification = 100*np.array([644224/9608704, 874240/9608704, 1189632/9608704])
+dReLUs_relative_to_baseline_segmentation = 100*np.array([2505328/85262848, 3518416/85262848, 5329408/85262848])
 performance_relative_to_baseline_classification = 100 - 100*np.array([0.934, 0.952, 0.967])
-performance_relative_to_baseline_segmentation = 100 - 100*np.array([0.91, 0.92, 0.93])
+performance_relative_to_baseline_segmentation = 100 - 100*np.array([33.05/36.5, 34/36.5, 34.73/36.5])
 
 # plt.subplot(211)
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_classification, '.-', color="#3399e6", lw=3, markersize=15)
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_segmentation, '.-', color="#69b3a2", lw=3, markersize=15)
-plt.xlabel("Relative DReLU Count (%)", fontsize=13, labelpad=7)
-plt.ylabel("Relative Decrease in Performance (%)", fontsize=13, labelpad=7)
+plt.plot(dReLUs_relative_to_baseline_classification, performance_relative_to_baseline_classification, '.-', color="#3399e6", lw=3, markersize=15, label="Classification")
+plt.plot(dReLUs_relative_to_baseline_segmentation, performance_relative_to_baseline_segmentation, '.-', color="#69b3a2", lw=3, markersize=15, label="Segmentation")
+plt.xlabel("Percentage of DReLU Used", fontsize=13, labelpad=7)
+plt.ylabel("Relative Performance Decrease (%)", fontsize=13, labelpad=7)
 
 plt.gca().xaxis.set_major_locator(MultipleLocator(1))
 plt.gca().yaxis.set_major_locator(MultipleLocator(1))
@@ -28,13 +46,14 @@ plt.gca().xaxis.set_minor_locator(MultipleLocator(0.5))
 plt.gca().yaxis.set_minor_locator(MultipleLocator(0.5))
 plt.gca().tick_params(axis='both', which='major', labelsize=11)
 
-plt.xlim([5, 20])
+plt.xlim([2, 15])
 plt.ylim([0, 10])
 plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.5)
 plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
 plt.tight_layout()
-plt.savefig("/home/yakir/figure_5.png")
+plt.legend()
+plt.savefig("/home/yakir/Figure_3.png")
 
 
 
