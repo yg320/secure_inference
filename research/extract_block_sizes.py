@@ -1,7 +1,7 @@
 import os
 import argparse
 import subprocess
-
+# python research/extract_block_sizes.py --config research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py --checkpoint mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --output_path /storage/yakir/secure_inference/benchmark/segmentation --num_samples 48 --num_gpus 4
 parser = argparse.ArgumentParser(description='')
 
 parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k_relu.py")
@@ -17,13 +17,18 @@ batch_size = args.num_samples // args.num_gpus
 
 distortion_extraction_processes = []
 
-os.chdir(os.path.dirname(os.path.dirname(__file__)))
+chdir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print(chdir)
+os.chdir(chdir)
 distortion_output_path = os.path.join(args.output_path, "distortion_row")
+PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:' + chdir + '"; '
+
 
 for gpu_index in range(args.num_gpus):
     # TODO: make it multiprocess (mp.Process), instead of using subprocess. Alternatively, consider using
     #  torch.nn.parallel.parallel_apply, and then, we can discard DistortionCollector
     python_command = \
+        PYTHON_PATH_EXPORT + \
         f'python {distortion_extractor_script} ' + \
         f'--config {args.config} ' + \
         f'--checkpoint {args.checkpoint} ' + \

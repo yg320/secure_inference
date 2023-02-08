@@ -31,7 +31,7 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 plt.figure(figsize=(5, 4))
 dReLUs_relative_to_baseline_classification = 100*np.array([644224/9608704, 874240/9608704, 1189632/9608704])
 dReLUs_relative_to_baseline_segmentation = 100*np.array([2505328/85262848, 3518416/85262848, 5329408/85262848])
-performance_relative_to_baseline_classification = 100 - 100*np.array([0.934, 0.952, 0.967])
+performance_relative_to_baseline_classification = 100 - 100*np.array([71.53/76.98, 72.94/76.98, 74.09/76.98])
 performance_relative_to_baseline_segmentation = 100 - 100*np.array([33.05/36.5, 34/36.5, 34.73/36.5])
 
 # plt.subplot(211)

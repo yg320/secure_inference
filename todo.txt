@@ -1,20 +1,27 @@
 ============================================= Tomorrow =============================================
-- Should we discuss the identity block-sizes?
-- Discuss unfairness and the fact the MMLab's models have not converged yet
-- Is teaser figure still relevant?
-- Does the code related to the paper? How does the reviewer verify reproducibility?
-- Should code be ready as plug and play on March 8th?
 - Discuss formats of plots and tables
 - What about competitions?!
-============================================= Following days =============================================
+
+- Timeline desired! (3 weeks before submission)
+
+============================================= Immediate =============================================
+- AWS!
+- Docker
+- Find optimal stochastic ReLU params
+- Try working with learning rate warmup!
+- We really need to compare Porthos implementation to ours on the same machine..
+
+============================================= Next =============================================
+- Add readme to repo (How to extend, how to run, how to use, etc.)
+- What about the fact that we really disrupts the networks statistics?
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!! (Do we always send minimal data types?)
+- Have cryptoprovider work with shapes only!
 - Divide by block size in block ReLU (in order not to exceed MSB dummy bits)
 - Is sneek peak still relevant?
 - What is up with .train() vs .eval() in simulated annealing? is this relevant to distortion_extraction as well?
 - discuss the 32 bits in 4x4 and 5x5 compared to 1x1
 - Explore 32bits, use trunc and understand when things go wrong (Maybe we can retrain?)
 - Docker again! (with distortion verify)
-============================================= Next =============================================
 - More samples in noise estimation
 - What about bandwith? (Instead of ReLU)
 - Make everything deterministic (especially distortion extraction)
@@ -26,51 +33,35 @@
 - Give another try to conv decomposition! (What about the queue)
 - Add noise to training for DReLU (Understand mean vs sum)
 - Measurements with bandwidth = infinity (zeros-like)
-
-============================================= Major =============================================
 - Should FC and GAP be part of distortion?
-- Try working with learning rate warmup!
-- We really need to compare Porthos implementation to ours on the same machine..
-- Have cryptoprovider work with shapes only!
-- Verify that everything is sent as soon as we have it, and gotten as late as possible
-- AWS!
-- Find optimal stochastic ReLU params
 - A more efficient bReLU (during training as well)
 - A symmetric bReLU
 - Verify +1 in integer_random
-- MaxPool/ReLU flip
 - Implement Load Balancing in ReLU (same as Porthos)
 - Replace mult in ReLU with select share
-- Send Image Size
-- Download ImageNet
 - Go over protocol again. Verify implementation
 - out = out // self.trunc? or just shift? (out = backend.astype((out/self.trunc).round(), dtype=SIGNED_DTYPE))
 - Vector2Scalar multiplication. (for the bReLU)
+- Verify that everything is sent as soon as we have it, and gotten as late as possible
+- Iterative convolution. Maybe queue size?
+- bReLUs iterative?
+- Fuse layers!!!
 
-- CUDA:
-    (*) https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
-    (*) Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors). It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
-    (*) More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
-    (*) CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
-    (*) Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
-    (*) Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
-    (*) CUDA is able to perform integer operations, conv2d is not available due to cudnn. Maybe we can use matrix multiplication instead? Or any other solution.
-    (*) efficient CUDA r_shift
+
 
 
 ============================================= Paper notes =============================================
+- Specify that cost is a function of both image size as well as block size
 - Think about best ways to tell the story - probably bReLU to ~15% or so... and then stochastic DReLU (as it reveals no information)
 - Do we want to add bandwidth graph
 - Ablation on loss?
 - shuffled based knapsack?
-- Table: benchmark Conv2d on Cuda
 - Analysis - Maybe will help in KnapSack separation (due to proper additivity)
 - A paragraph on information leakage
 - Float implementation
 - Non matmul implementation
 - Remove negligble ops (such as test for 1/2**64)
 - We set real benchmark on (Datasets) and Tasks
-- Added CUDA implementation
 - We chose not to decompose to offline/online, but this can be done.
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 - Discarding MSB practically share no information, as weight decay is so common.
@@ -136,3 +127,105 @@
 - Finetune iterative (itertaive sub channels (with multiple training))
 - Use loss as distortion measure
 - COCO seg
+- Resnet101 with SNR
+
+- CUDA:
+    (*) https://docs.nvidia.com/deeplearning/cudnn/developer-guide/index.html
+    (*) Finegrained CUDA (not alwayes) which depends on amount of DReLUs (Careful with small tensors). It seems that also convolutions might benefit from CUDA only in some cases. We have to split the cuda implementation again to happen only when needed. We should split to atomic GPU component and benchmark each with different sizes and decide in runtime which one to use
+    (*) More groups convs, verify that GPU ops don't block (if I have for example a list of conv2d, which I can run in parallel, will they block each other?)
+    (*) CUDA allows for intergers ops, why not convs? maybe matrix multiplication?
+    (*) Consider subdividing convs to 2 or 4 groups, and then convert to integer and them add them up. Will it allow us to divide 64bit number to 8 instead of 16?
+    (*) Build a proper conv2d_handler: CUDA parallelize conv2d by stacking (also for the 2 convs case)
+    (*) CUDA is able to perform integer operations, conv2d is not available due to cudnn. Maybe we can use matrix multiplication instead? Or any other solution.
+    (*) efficient CUDA r_shift
+
+
+
+CURR - 32 - 25.79
+[1000/32000], loss: 1.2956
+[1050/32000], loss: 1.3516
+[1100/32000], loss: 1.2942
+[1150/32000], loss: 1.3051
+[1200/32000], loss: 1.2994
+[1250/32000], loss: 1.3226
+[1300/32000], loss: 1.2531
+[1350/32000], loss: 1.3063
+[1400/32000], loss: 1.2766
+[1450/32000], loss: 1.2871
+[1500/32000], loss: 1.2525
+[1550/32000], loss: 1.2961
+[1600/32000], loss: 1.2523
+[1650/32000], loss: 1.2787
+[1700/32000], loss: 1.2774
+[1750/32000], loss: 1.2984
+[1800/32000], loss: 1.2441
+[1850/32000], loss: 1.2523
+[1900/32000], loss: 1.3341
+[1950/32000], loss: 1.3145
+
+# 6x6 - 80 - 25.38
+[1000/32000], loss: 1.2633
+[1050/32000], loss: 1.3422
+[1100/32000], loss: 1.3011
+[1150/32000], loss: 1.2713
+[1200/32000], loss: 1.2572
+[1250/32000], loss: 1.2560
+[1300/32000], loss: 1.2785
+[1350/32000], loss: 1.2760
+[1400/32000], loss: 1.2701
+[1450/32000], loss: 1.3015
+[1500/32000], loss: 1.2842
+[1550/32000], loss: 1.2492
+[1600/32000], loss: 1.2117
+[1650/32000], loss: 1.2579
+[1700/32000], loss: 1.2380
+[1750/32000], loss: 1.2341
+[1800/32000], loss: 1.2754
+[1850/32000], loss: 1.2164
+[1900/32000], loss: 1.2934
+[1950/32000], loss: 1.3091
+
+4x4 - 80 = 23.1848
+[1000/32000], 1.1705,
+[1050/32000], 1.1883,
+[1100/32000], 1.1685,
+[1150/32000], 1.1721,
+[1200/32000], 1.1526,
+[1250/32000], 1.1500,
+[1300/32000], 1.1669,
+[1350/32000], 1.1374,
+[1400/32000], 1.1454,
+[1450/32000], 1.1703,
+[1500/32000], 1.2115,
+[1550/32000], 1.1738,
+[1600/32000], 1.1525,
+[1650/32000], 1.1845,
+[1700/32000], 1.1562,
+[1750/32000], 1.0919,
+[1800/32000], 1.1435,
+[1850/32000], 1.1799,
+[1900/32000], 1.1338,
+[1950/32000], 1.1352,
+
+sum([
+1.1705,
+1.1883,
+1.1685,
+1.1721,
+1.1526,
+1.1500,
+1.1669,
+1.1374,
+1.1454,
+1.1703,
+1.2115,
+1.1738,
+1.1525,
+1.1845,
+1.1562,
+1.0919,
+1.1435,
+1.1799,
+1.1338,
+1.1352,
+])

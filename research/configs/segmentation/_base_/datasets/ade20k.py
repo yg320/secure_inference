@@ -75,12 +75,12 @@ data = dict(
         ann_dir='annotations/training',
         pipeline=train_pipeline),
 
-    distortion_extraction=dict(
-        type=dataset_type,
-        data_root=data_root,
-        img_dir='images/training',
-        ann_dir='annotations/training',
-        pipeline=distortion_extraction),
+    # distortion_extraction=dict(
+    #     type=dataset_type,
+    #     data_root=data_root,
+    #     img_dir='images/training',
+    #     ann_dir='annotations/training',
+    #     pipeline=distortion_extraction),
 
 
     val=dict(
