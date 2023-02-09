@@ -19,7 +19,7 @@ from mmcls.models import build_classifier
 from mmcls.utils import (auto_select_device, collect_env, get_root_logger,
                          setup_multi_processes)
 
-from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
+from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 
 from research.distortion.arch_utils.factory import arch_utils_factory

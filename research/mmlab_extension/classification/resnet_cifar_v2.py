@@ -103,3 +103,4 @@ class ResNet_CIFAR_V2(ResNet_CIFAR):
 
     def __init__(self, **kwargs):
         super(ResNet_CIFAR_V2, self).__init__(**kwargs)
+
