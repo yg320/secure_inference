@@ -228,7 +228,7 @@ class ChannelDistortionHandler:
             block_sizes = self.params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]
             layer_num_channels = self.params.LAYER_NAME_TO_DIMS[layer_name][0]
             input_block_name = self.params.LAYER_NAME_TO_BLOCK_NAME[layer_name]
-            output_block_name = self.params.BLOCK_NAMES[-1]  # TODO: Why do we have None in last layer
+            output_block_name = self.params.BLOCK_NAMES[-1]
 
             block_size_spec = copy.deepcopy(self.baseline_block_size_spec)
 
