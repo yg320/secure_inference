@@ -1,5 +1,6 @@
 ====================================== First ====================================
 - ResNet50 MaxPool (if some resources are available)
+- Docker!
 - Prepare Collection/Knapsack/training code as well as configuration files
 - Noise additivity
 - Continue with Comparison
