@@ -7,8 +7,8 @@ from research.distortion.utils import get_block_spec_num_relus
 
 # config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_8xb32_in1k.py"
 # block_size_spec_file = "/home/yakir/knap_base_dim_annel_dis_ext/relu_spec_files/0.pickle"
-config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k_relu_secure_aspp.py"
-block_size_spec_file = "/home/yakir/Downloads/6x6_good.pickle"
+config_path = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/finetune_models/resnet18_2xb64_cifar100_12.3K_relus_lr_0.01.py"
+block_size_spec_file = "/home/yakir/distortion_200/block_size/12.3K.pickle"
 cfg = mmcv.Config.fromfile(config_path)
 params = param_factory(cfg)
 block_size_spec = pickle.load(open(block_size_spec_file, 'rb'))

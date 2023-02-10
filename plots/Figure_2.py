@@ -38,23 +38,23 @@ if bReLU_2x3[4:6, 3:].mean() < 0:
 
 height, width = activation.shape
 box_color = "#3399e6" #"g"
-fig = plt.figure(figsize=(8, 5))
+fig = plt.figure(figsize=(5, 8))
 images = [[activation, activation, activation], [bReLU_1x1, bReLU_3x3, bReLU_2x3]]
 for i in range(2):
     for j in range(3):
 
-        ax = fig.add_subplot(2, 3, 3*i+j+1, aspect='equal')
-        if i == 0 and j == 0:
-            plt.ylabel("Input activation", fontsize=13)
-        if i == 1 and j == 0:
-            plt.ylabel("Output activation", fontsize=13)
-
-        if i == 1 and j == 0:
-            plt.xlabel("bReLU 1x1", fontsize=13)
-        if i == 1 and j == 1:
-            plt.xlabel("bReLU 3x3", fontsize=13)
-        if i == 1 and j == 2:
-            plt.xlabel("bReLU 2x3", fontsize=13)
+        ax = fig.add_subplot(3, 2, 3*i+j+1, aspect='equal')
+        # if i == 0 and j == 0:
+        #     plt.ylabel("Input activation", fontsize=13)
+        # if i == 1 and j == 0:
+        #     plt.ylabel("Output activation", fontsize=13)
+        #
+        # if i == 1 and j == 0:
+        #     plt.xlabel("bReLU 1x1", fontsize=13)
+        # if i == 1 and j == 1:
+        #     plt.xlabel("bReLU 3x3", fontsize=13)
+        # if i == 1 and j == 2:
+        #     plt.xlabel("bReLU 2x3", fontsize=13)
 
         image = images[i][j]
         for x in range(width):

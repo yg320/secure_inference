@@ -1,4 +1,39 @@
+====================================== First ====================================
+- ResNet50 MaxPool (if some resources are available)
+- Prepare Collection/Knapsack/training code as well as configuration files
+- Noise additivity
+- Continue with Comparison
+    * More samples for distortion
+    * Use also zero channels
+    * Learning rate
+    * Different architectures
+    * Read the paper
+- Related work
+
+====================================== Second ====================================
+
+- CrypTFlow inference on AWS
+- Add a Pipeline figure to the paper
+- Add MSB/LSB graph
+- Add table of WAN bandwidths
+- Security paragraph
+- Change performance so that it's relative to MMlab's
+- Teaser's figure (ReReduce/CrypTFlow)
+
+====================================== Thesis ====================================
+
+- Write a presentation (30 minutes)
+- Expand related work
+    * background
+        + Beaver's
+        + Yao's
+        + Garbled circuits
+        + SecureNN
+        + SecureMPC
+    * A paragraph instead of a sentence
+
 ============================================= Tomorrow =============================================
+
 - Discuss formats of plots and tables
 - What about competitions?!
 
