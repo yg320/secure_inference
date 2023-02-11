@@ -108,7 +108,7 @@ class ResNet_CIFAR_V2(ResNet_CIFAR):
 @BACKBONES.register_module()
 class ResNet_CIFAR_V2_mini(ResNet_CIFAR_V2):
     def __init__(self, **kwargs):
-        kwargs["stem_channels"] = 32
-        kwargs["base_channels"] = 32
+        kwargs["stem_channels"] = 48
+        kwargs["base_channels"] = 48
         kwargs["strides"] = (2, 2, 2, 2)
         super(ResNet_CIFAR_V2_mini, self).__init__(**kwargs)

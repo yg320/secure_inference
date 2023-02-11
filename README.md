@@ -1,12 +1,16 @@
-## Using Secure KSNet:
-### Segmentation, MobileNetV2, COCO
+## What does this package offer?:
+
+## How To Run Secure KSNet:
+###  [Segmentation, MobileNetV2, COCO](https://github.com/open-mmlab/mmsegmentation/blob/master/configs/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py)
 - **First, we extract disotrtion for each channel and each block size by running:** 
     - python research/extract_block_sizes.py --config research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py --checkpoint {PATH_TO_MMLAB_MODELS}/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --output_path {WORK_DIR}/segmentation --num_samples NUM_SAMPLES --num_gpus NUM_GPUS 
     - we used NUM_SAMPLES=48 over NUM_GPUS=4
 ### Classification, ResNet50, ImageNet
 - **Here, we first need to replace the MaxPool layer with an AvgPool layer and finetune by running:**
-    - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/base_models/resnet50_8xb32_in1k_avg_pool.py 4 --load-from {PATH_TO_MMLAB_MODELS}/classification/resnet50_8xb32_in1k_20210831-ea4938fc.pth
-
+    - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py 4 --load-from mmlab_models/classification/resnet50_8xb32_in1k_20210831-ea4938fc.pth --work-dir benchmark/classification/resnet50_coco/avg_pool
+- **Next, we extract disotrtion for each channel and each block size by running:** 
+    - python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --checkpoint benchmark/classification/resnet50_coco/avg_pool/epoch_25.pth --output_path {WORK_DIR}/classification --num_samples NUM_SAMPLES --num_gpus NUM_GPUS 
+    - we used NUM_SAMPLES=512 over NUM_GPUS=4
 
 ## Extending Secure Inference
 To extend secure inference to your own architecture
@@ -16,6 +20,12 @@ To extend secure inference to your own architecture
 - **Add the proper file to distortion/arch_utils**
 - **Add the proper line to distortion/arch_utils/factor.py**
 - **distortion extraction line in data**
+
+## Next Steps:
+- **Knowledge distillation (similar to DeepReDuce) with out bReLU layer and Knapsack algorithm**
+- **Knapsack as a starting point for some iterative algorithm (such as simulated annealing)**
+- **For larger networks, where it takes too much time to extract distortion, we can measure distortion in some middle layer and normalize by the appropriate signal to get a SNR measure, this is already supported, and a PoC has been made**
+- **Iterative Knapsack, where we work on a bunch of layers each time**
 
 
 [//]: # (<div align="center">)

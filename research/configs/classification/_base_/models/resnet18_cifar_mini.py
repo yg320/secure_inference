@@ -14,6 +14,6 @@ model = dict(
     head=dict(
         type='LinearClsHead',
         num_classes=10,
-        in_channels=256,
+        in_channels=384,
         loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
     ))

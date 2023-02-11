@@ -25,9 +25,11 @@ from research.distortion.distortion_extractor import DistortionUtils
 
 
 np.random.seed(1234)
-config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/base_models/resnet50_8xb32_in1k_avg_pool.py"
+
+config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py"
 checkpoint = "/home/yakir/epoch_14_avg_pool.pth"
 mode = "distortion_extraction"
+
 gpu_id = 0
 batch_size = 64
 cfg = mmcv.Config.fromfile(config)
@@ -48,18 +50,22 @@ distortions = {layer_name:np.load(os.path.join("/home/yakir/distortion_epoch_14_
 
 additive_noises = []
 noises = []
+additive_losses = []
+losses = []
 
 for i in tqdm(range(10000)):
 
-    separate_noise = 0
+    additive_noise = 0
+
     for index, channel_order in enumerate(channels_to_use):
         layer_name = channel_order_to_layer[channel_order]
         channel = channel_order_to_channel[channel_order]
         block_size_index = np.random.choice(len(params.LAYER_NAME_TO_BLOCK_SIZES[layer_name]) - 1)
         block_size_spec[layer_name][channel] = params.LAYER_NAME_TO_BLOCK_SIZES[layer_name][block_size_index]
-        separate_noise -= distortions[layer_name][channel, block_size_index]
+        additive_noise -= distortions[layer_name][channel, block_size_index]
 
     batch_noise = []
+    batch_loss = []
     for batch_index in range(8):
         cur_assets = distortion_utils.get_batch_distortion(
             clean_block_size_spec=dict(),
@@ -71,8 +77,13 @@ for i in tqdm(range(10000)):
             output_block_name=output_block_name)
 
         batch_noise.append(cur_assets["Noise"])
+        batch_loss.append(cur_assets["Distorted Loss"])
+    loss = np.mean(batch_loss)
     noise = np.mean(batch_noise)
-    additive_noises.append(separate_noise)
+
+    additive_noises.append(additive_noise)
+    losses.append(loss)
     noises.append(noise)
 
-    print('fds')
+    pickle.dump({"additive_noises":additive_noises, "noises":noises, "losses":losses},
+                open("/home/yakir/distortion_additivity.pickle", "wb"))

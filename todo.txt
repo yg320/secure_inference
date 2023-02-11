@@ -1,4 +1,5 @@
 ====================================== First ====================================
+- KnapSack + Training sessions..
 - ResNet50 MaxPool (if some resources are available)
 - Docker!
 - Prepare Collection/Knapsack/training code as well as configuration files
@@ -9,8 +10,10 @@
     * Learning rate
     * Different architectures
     * Read the paper
+    * Run for 200 epochs
+    * LR
 - Related work
-
+    * Chebychev and general ReLU approximations (Look in ReReduce..)
 ====================================== Second ====================================
 
 - CrypTFlow inference on AWS

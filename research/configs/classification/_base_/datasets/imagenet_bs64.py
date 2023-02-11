@@ -19,6 +19,17 @@ test_pipeline = [
     dict(type='ImageToTensor', keys=['img']),
     dict(type='Collect', keys=['img'])
 ]
+
+distortion_extraction_pipeline = [
+    dict(type='LoadImageFromFile'),
+    dict(type='Resize', size=(256, -1)),
+    dict(type='CenterCrop', crop_size=224),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='ImageToTensor', keys=['img']),
+    dict(type='ToTensor', keys=['gt_label']),
+    dict(type='Collect', keys=['img', 'gt_label'])
+]
+
 data = dict(
     samples_per_gpu=64,
     workers_per_gpu=8,
@@ -31,6 +42,11 @@ data = dict(
         data_prefix='data/imagenet/val',
         ann_file='data/imagenet/meta/val.txt',
         pipeline=test_pipeline),
+    distortion_extraction=dict(
+        type=dataset_type,
+        data_prefix='data/imagenet/train',
+        pipeline=distortion_extraction_pipeline),
+
     test=dict(
         # replace `data/val` with `data/test` for standard test
         type=dataset_type,

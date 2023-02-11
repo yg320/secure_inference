@@ -10,7 +10,7 @@ lr_config = dict(policy='step', step=[30, 60, 90], gamma=0.25, min_lr=0.0001, wa
 runner = dict(type='EpochBasedRunner', max_epochs=100)
 
 
-relu_spec_file = "//home/yakir/distortion_200_mini/block_size/14.33K.pickle"
+relu_spec_file = "//home/yakir/distortion_200_mini_48/block_size/14.33K.pickle"
 load_from = "/home/yakir/PycharmProjects/secure_inference/work_dirs/resnet18_2xb64_cifar100_mini/epoch_200.pth"
 
 

@@ -137,9 +137,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--block_size_spec_file_name', type=str,
-                        default="/home/yakir/distortion_200_mini/block_size/14.33K.pickle")
+                        default="/home/yakir/distortion_200_mini_48/block_size/14.33K.pickle")
     parser.add_argument('--channel_distortion_path', type=str,
-                        default="/home/yakir/distortion_200_mini/distortion_collected")
+                        default="/home/yakir/distortion_200_mini_48/distortion_collected")
     parser.add_argument('--config', type=str,
                         default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet18_2xb64_cifar100_mini.py")
     parser.add_argument('--ratio', type=float, default=None)

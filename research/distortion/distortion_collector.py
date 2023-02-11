@@ -37,4 +37,4 @@ class DistortionCollector:
 
             np.save(os.path.join(distortion_collected_path, f"{layer_name}.npy"), -distortions)
 
-# DistortionCollector("/home/yakir/distortion_200_mini").collect()
+# DistortionCollector("/home/yakir/distortion_200_mini_64").collect()
