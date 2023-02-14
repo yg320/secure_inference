@@ -39,7 +39,7 @@ plt.plot(dReLUs_relative_to_baseline_classification, performance_relative_to_bas
 plt.plot(dReLUs_relative_to_baseline_segmentation, performance_relative_to_baseline_segmentation, '.-', color="#69b3a2", lw=3, markersize=15, label="Segmentation")
 plt.xlabel("Percentage of DReLU Used", fontsize=13, labelpad=7)
 plt.ylabel("Relative Performance Decrease (%)", fontsize=13, labelpad=7)
-assert False, "Add percentage in ticks"
+# assert False, "Add percentage in ticks"
 plt.gca().xaxis.set_major_locator(MultipleLocator(1))
 plt.gca().yaxis.set_major_locator(MultipleLocator(1))
 plt.gca().xaxis.set_minor_locator(MultipleLocator(0.5))
@@ -53,7 +53,7 @@ plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
 
 plt.tight_layout()
 plt.legend()
-plt.savefig("/home/yakir/Figure_3.png")
+plt.savefig("/home/yakir/Figure_1.png")
 
 
 

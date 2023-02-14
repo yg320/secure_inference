@@ -1,5 +1,15 @@
 ====================================== First ====================================
+- Training:
+    * 0.03, 0.06, 0.09, 0.12, 0.15, 0.18 - Classification + Segmentation
+    * 4x4 naive - Classification + Segmentation
+    * 4x4 algo - Classification + Segmentation
+    * 4x4 algo + from scratch - Classification + Segmentation
+    * 4x4 naive + from scratch - Classification + Segmentation
+
+- Secure inference results. Stochastic DReLU!
 - KnapSack + Training sessions..
+- distortion_extraction bug
+- Remove the -1
 - ResNet50 MaxPool (if some resources are available)
 - Docker!
 - Prepare Collection/Knapsack/training code as well as configuration files
@@ -15,7 +25,8 @@
 - Related work
     * Chebychev and general ReLU approximations (Look in ReReduce..)
 ====================================== Second ====================================
-
+- Remove weight decay in finetuning
+- Porthos float to fix
 - CrypTFlow inference on AWS
 - Add a Pipeline figure to the paper
 - Add MSB/LSB graph
@@ -97,14 +108,13 @@
 - shuffled based knapsack?
 - Analysis - Maybe will help in KnapSack separation (due to proper additivity)
 - A paragraph on information leakage
+
 - Float implementation
 - Non matmul implementation
 - Remove negligble ops (such as test for 1/2**64)
-- We set real benchmark on (Datasets) and Tasks
-- We chose not to decompose to offline/online, but this can be done.
+
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 - Discarding MSB practically share no information, as weight decay is so common.
-- A note about softmax and logits
 
 ============================================= Minor! =============================================
 - Channel distortion random seed, and multi-GPUs
@@ -268,3 +278,37 @@ sum([
 1.1338,
 1.1352,
 ])
+
+
+
+
+
+
+
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.03.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.03 --device 0 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.09.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.09 --device 0 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.12.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.12 --device 0 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.15.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.15 --device 1 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.18.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.18 --device 1 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.21.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.21 --device 1 ;
+
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.03.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected_with_zero_channels --ratio 0.03 --device 2 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.06.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected_with_zero_channels --ratio 0.06 --device 2 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.12.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected_with_zero_channels --ratio 0.12 --device 2 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.15.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected_with_zero_channels --ratio 0.15 --device 3 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.18.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected_with_zero_channels --ratio 0.18 --device 3 ;
+export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.21.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected_with_zero_channels --ratio 0.21 --device 3 ;
+
+
+
+
+./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.06 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.06.pickle ; ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.06_with_zero --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/with_zero_0.06.pickle ;
+
+
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.06 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.06.pickle ; export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.09 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.09.pickle ;
+
+
+export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.03 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.03.pickle ;  export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.09 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.09.pickle ;
+
+
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/4x4_algo --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/4x4_algo.pickle

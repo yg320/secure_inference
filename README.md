@@ -5,13 +5,22 @@
 - **First, we extract disotrtion for each channel and each block size by running:** 
     - python research/extract_block_sizes.py --config research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py --checkpoint {PATH_TO_MMLAB_MODELS}/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --output_path {WORK_DIR}/segmentation --num_samples NUM_SAMPLES --num_gpus NUM_GPUS 
     - we used NUM_SAMPLES=48 over NUM_GPUS=4
+- **Now we are ready to get the knapsack optimal patch-sizes by running:**
+  - export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k_relu.py --block_size_spec_file_name benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.06.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/segmentation/mobilenet_ade/distortion/distortion_collected/ --ratio 0.06
+- **Finally, we can train the network**
+  - export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.06 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.06.pickle
+ 
 ### Classification, ResNet50, ImageNet
 - **Here, we first need to replace the MaxPool layer with an AvgPool layer and finetune by running:**
     - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py 4 --load-from mmlab_models/classification/resnet50_8xb32_in1k_20210831-ea4938fc.pth --work-dir benchmark/classification/resnet50_coco/avg_pool
 - **Next, we extract disotrtion for each channel and each block size by running:** 
-    - python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --checkpoint benchmark/classification/resnet50_coco/avg_pool/epoch_25.pth --output_path {WORK_DIR}/classification --num_samples NUM_SAMPLES --num_gpus NUM_GPUS 
+    - python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --checkpoint benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --output_path {WORK_DIR}/classification --num_samples NUM_SAMPLES --num_gpus NUM_GPUS 
     - we used NUM_SAMPLES=512 over NUM_GPUS=4
-
+- **Now we are ready to get the knapsack optimal patch-sizes by running:**
+    - export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.06.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.06
+- **Finally, we can train the network**
+    - export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.06 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.06.pickle
+ 
 ## Extending Secure Inference
 To extend secure inference to your own architecture
 

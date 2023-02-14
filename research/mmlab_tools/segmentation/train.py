@@ -29,6 +29,8 @@ def parse_args():
     parser.add_argument('config', help='train config file path')
     parser.add_argument('--work-dir', help='the dir to save logs and models')
     parser.add_argument(
+        '--relu-spec-file', help='the relu spec file', default=None)
+    parser.add_argument(
         '--load-from', help='the checkpoint file to load weights from')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
@@ -134,6 +136,8 @@ def main():
         cfg.load_from = args.load_from
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
+    if args.relu_spec_file is not None:
+        cfg.relu_spec_file = args.relu_spec_file
     if args.gpus is not None:
         cfg.gpu_ids = range(1)
         warnings.warn('`--gpus` is deprecated because we only support '
