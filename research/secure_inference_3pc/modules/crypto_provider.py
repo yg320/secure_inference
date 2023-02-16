@@ -246,6 +246,7 @@ class SecureReLUCryptoProvider(SecureModule):
         self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
+        # return X_share
         if self.dummy_relu:
             return X_share
         else:

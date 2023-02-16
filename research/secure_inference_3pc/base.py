@@ -12,7 +12,7 @@ from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE,
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2353
+        self.base_port = 2363
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2

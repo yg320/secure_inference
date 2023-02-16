@@ -11,7 +11,6 @@ from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.server import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
 
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
-from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 from research.secure_inference_3pc.modules.server import SecureConv2DServer, SecureReLUServer, SecureMaxPoolServer, SecureBlockReLUServer
 

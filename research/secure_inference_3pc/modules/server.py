@@ -421,6 +421,7 @@ class SecureMSBServer(SecureModule):
 
 
 class SecureDReLUServer(SecureModule):
+    # counter = 0
     def __init__(self,  **kwargs):
         super(SecureDReLUServer, self).__init__( **kwargs)
 
@@ -428,6 +429,9 @@ class SecureDReLUServer(SecureModule):
         self.msb = SecureMSBServer(**kwargs)
 
     def forward(self, X_share):
+        # SecureDReLUServer.counter += 1
+        # np.save("/home/yakir/Data2/secure_activation_statistics/server/{}.npy".format(SecureDReLUServer.counter), X_share)
+
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         backend.multiply(mu_1, -1, out=mu_1)
 
@@ -450,6 +454,7 @@ class SecureReLUServer(SecureModule):
         self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
+        # return X_share
         if self.dummy_relu:
             share_client = self.network_assets.receiver_01.get()
             recon = share_client + X_share

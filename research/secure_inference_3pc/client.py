@@ -19,7 +19,6 @@ from research.utils import build_data
 from research.secure_inference_3pc.modules.client import SecureConv2DClient, SecureReLUClient, SecureMaxPoolClient, SecureBlockReLUClient
 
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
-from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 from research.secure_inference_3pc.timer import timer
 import numpy as np

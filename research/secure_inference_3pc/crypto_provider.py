@@ -11,7 +11,6 @@ from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherConv
 
 import mmcv
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
-from research.mmlab_extension.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
 
 

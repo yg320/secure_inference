@@ -475,6 +475,7 @@ class SecureMSBClient(SecureModule):
 
 
 class SecureDReLUClient(SecureModule):
+    # counter = 0
     def __init__(self, **kwargs):
         super(SecureDReLUClient, self).__init__(**kwargs)
 
@@ -482,7 +483,8 @@ class SecureDReLUClient(SecureModule):
         self.msb = SecureMSBClient(**kwargs)
 
     def forward(self, X_share):
-
+        # SecureDReLUClient.counter += 1
+        # np.save("/home/yakir/Data2/secure_activation_statistics/client/{}.npy".format(SecureDReLUClient.counter), X_share)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
 
         X0_converted = self.share_convert(X_share)
@@ -500,6 +502,7 @@ class SecureReLUClient(SecureModule):
         self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
+        # return X_share
         if self.dummy_relu:
             self.network_assets.sender_01.put(X_share)
             mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
