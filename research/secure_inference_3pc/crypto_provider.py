@@ -5,13 +5,14 @@ from research.secure_inference_3pc.base import get_assets
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
 
-from research.secure_inference_3pc.resnet_converter import get_secure_model, init_prf_fetcher
+from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU, SecureReLUCryptoProvider, SecureConv2DCryptoProvider, SecureMaxPoolCryptoProvider, SecureBlockReLUCryptoProvider
 
 import mmcv
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
-from research.mmlab_extension.classification.resnet import AvgPoolResNet, MyResNet
+from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
+from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 
 
 

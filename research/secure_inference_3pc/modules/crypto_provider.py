@@ -189,7 +189,8 @@ class SecureMSBCryptoProvider(SecureModule):
         x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=(size[0], NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS), dtype=backend.int8)
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
-        x_bit_0_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
+        x_bit_0_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
+        beta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
 
         processing_numba(x, x_1, x_bit_0_0, x_bits_0,
                          x.astype(UNSIGNED_DTYPE, copy=False),
@@ -206,17 +207,16 @@ class SecureMSBCryptoProvider(SecureModule):
         # x_bit_0_1 = backend.subtract(x_bit0, x_bit_0_0, out=x_bit0)
 
         self.network_assets.sender_02.put(x_0)
-        self.network_assets.sender_02.put(x_bit_0_0)
+        # self.network_assets.sender_02.put(x_bit_0_0)
 
         self.network_assets.sender_12.put(x_bits_1)
         self.network_assets.sender_12.put(x_bit_0_1)
 
         beta_p = self.private_compare()
 
-        beta_p_0 = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size, dtype=SIGNED_DTYPE)
         beta_p_1 = beta_p - beta_p_0
 
-        self.network_assets.sender_02.put(beta_p_0)
+        # self.network_assets.sender_02.put(beta_p_0)
         self.network_assets.sender_12.put(beta_p_1)
 
         self.mult(size)
@@ -387,9 +387,9 @@ class PRFFetcherMSB(PRFFetcherModule):
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
         self.private_compare(shape)
-        self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
         self.mult(shape)
 
         return shape

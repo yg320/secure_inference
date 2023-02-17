@@ -433,7 +433,7 @@ class SecureMSBClient(SecureModule):
     def post_compare(self, beta, x_bit_0_0, r_mode_2, mu_0):
 
         beta = backend.astype(beta, SIGNED_DTYPE)
-        beta_p_0 = self.network_assets.receiver_02.get()
+        beta_p_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=mu_0.shape, dtype=SIGNED_DTYPE)
 
         gamma_0 = beta_p_0 - (2 * beta * beta_p_0)
         delta_0 = x_bit_0_0 - (2 * r_mode_2 * x_bit_0_0)
@@ -449,10 +449,11 @@ class SecureMSBClient(SecureModule):
 
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
+        x_bit_0_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
+
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=a_0.dtype)
 
         x_0 = self.network_assets.receiver_02.get()
-        x_bit_0_0 = self.network_assets.receiver_02.get()
         r_1 = self.network_assets.receiver_01.get()
 
 
@@ -638,9 +639,12 @@ class PRFFetcherMSB(PRFFetcherModule):
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=shape, dtype=backend.int8)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
         self.private_compare(shape)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
         self.mult(shape)
 
         return shape
