@@ -209,6 +209,8 @@ def main():
             config=cfg.pretty_text,
             CLASSES=datasets[0].CLASSES))
 
+    if 'distortion_extraction' in cfg.data:
+        del cfg.data['distortion_extraction']
     # add an attribute for visualization convenience
     train_model(
         model,
