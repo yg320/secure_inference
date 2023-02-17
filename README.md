@@ -20,7 +20,9 @@
     - export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --block_size_spec_file_name benchmark/classification/resnet50_coco/distortion/block_speck/0.06.pickle --channel_distortion_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/distortion_collected --ratio 0.06
 - **Finally, we can train the network**
     - export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.06 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.06.pickle
- 
+
+### Classification, ResNet18, COCO100
+
 ## Extending Secure Inference
 To extend secure inference to your own architecture
 

@@ -5,35 +5,32 @@
     * 4x4 algo - Classification + Segmentation
     * 4x4 algo + from scratch - Classification + Segmentation
     * 4x4 naive + from scratch - Classification + Segmentation
+- Evaluation:
+    * Fix 2 2->0 sending...
+    * 0.03, 0.06, 0.09, 0.12, 0.15, 0.18 - Classification + Segmentation
+    * DeepReDuce comparison
+- Continue with Deep Reduce comparison
+    * LR
 
 - Secure inference results. Stochastic DReLU!
-- KnapSack + Training sessions..
-- distortion_extraction bug
-- Remove the -1
-- ResNet50 MaxPool (if some resources are available)
-- Docker!
-- Prepare Collection/Knapsack/training code as well as configuration files
-- Noise additivity
-- Continue with Comparison
-    * More samples for distortion
-    * Use also zero channels
-    * Learning rate
-    * Different architectures
-    * Read the paper
-    * Run for 200 epochs
-    * LR
-- Related work
-    * Chebychev and general ReLU approximations (Look in ReReduce..)
-====================================== Second ====================================
-- Remove weight decay in finetuning
-- Porthos float to fix
-- CrypTFlow inference on AWS
+    * Extract Statistics
+
+- CrypTFlow inference on AWS and add to figure
 - Add a Pipeline figure to the paper
-- Add MSB/LSB graph
 - Add table of WAN bandwidths
 - Security paragraph
 - Change performance so that it's relative to MMlab's
-- Teaser's figure (ReReduce/CrypTFlow)
+- Add training details
+- Think about max pool as baseline
+
+====================================== Wendesday ====================================
+
+- More training to improve graphs
+- COCO segmentation
+====================================== Second ====================================
+- Porthos float to fix
+- Remove weight decay in finetuning
+- Remove the -1 and 0 block sizes
 
 ====================================== Thesis ====================================
 
@@ -47,21 +44,11 @@
         + SecureMPC
     * A paragraph instead of a sentence
 
-============================================= Tomorrow =============================================
-
-- Discuss formats of plots and tables
-- What about competitions?!
-
-- Timeline desired! (3 weeks before submission)
-
-============================================= Immediate =============================================
-- AWS!
-- Docker
-- Find optimal stochastic ReLU params
-- Try working with learning rate warmup!
-- We really need to compare Porthos implementation to ours on the same machine..
 
 ============================================= Next =============================================
+- Verify that new docker didn't change anything in segmentation
+- TinyImageNet?
+- Imporve inference code
 - Add readme to repo (How to extend, how to run, how to use, etc.)
 - What about the fact that we really disrupts the networks statistics?
 - Everything to Numba (Vectorize?) + Inplace + LUT + Prefetch + measure ops time + Further optimize Convs + Mod %67 + DTYPES!! (Do we always send minimal data types?)
@@ -96,27 +83,20 @@
 - Iterative convolution. Maybe queue size?
 - bReLUs iterative?
 - Fuse layers!!!
+- Remove negligble ops (such as test for 1/2**64)
 
 
 
 
 ============================================= Paper notes =============================================
-- Specify that cost is a function of both image size as well as block size
-- Think about best ways to tell the story - probably bReLU to ~15% or so... and then stochastic DReLU (as it reveals no information)
-- Do we want to add bandwidth graph
-- Ablation on loss?
-- shuffled based knapsack?
-- Analysis - Maybe will help in KnapSack separation (due to proper additivity)
-- A paragraph on information leakage
 
-- Float implementation
-- Non matmul implementation
-- Remove negligble ops (such as test for 1/2**64)
 
 - We can use a small set of images to approximate distortion. Anyway, people share the structure of the network, which reveal some information. we unveil some resolution related information, but nothing about images content and weight content.
 - Discarding MSB practically share no information, as weight decay is so common.
 
 ============================================= Minor! =============================================
+- Models and everything in the cloud
+- What aboutSegmentation on COCO
 - Channel distortion random seed, and multi-GPUs
 
 - Linearize loss and use it as a distortion measure
@@ -311,4 +291,32 @@ export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.
 export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.03 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.03.pickle ;  export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.09 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.09.pickle ;
 
 
-export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/4x4_algo --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/4x4_algo.pickle
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --work-dir benchmark/classification/resnet50_coco/experiments/4x4_algo --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/4x4_algo.pickle --resume-from benchmark/classification/resnet50_coco/experiments/4x4_algo/epoch_17.pth ;
+
+
+
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.09 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.09.pickle  ; export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.12 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.12.pickle  ; export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.15 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.15.pickle  ; export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.03 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.03.pickle  ;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.09 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.09.pickle ;  export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.12 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.12.pickle ;   export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.15 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.15.pickle ;   export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir benchmark/segmentation/mobilenet_ade/experiments/0.18 --relu-spec-file benchmark/segmentation/mobilenet_ade/distortion/block_spec/0.18.pickle ;
+
+
+
+
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.15 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.15.pickle  ; export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.18 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.18.pickle  ; export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/0.03 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/0.03.pickle  ;
