@@ -42,8 +42,8 @@ data = dict(
         data_prefix='data/cifar100',
         pipeline=test_pipeline,
         test_mode=True),
-    # distortion_extraction=dict(
-    #     type=dataset_type,
-    #     data_prefix='data/cifar100',
-    #     pipeline=distortion_extraction_pipeline),
+    distortion_extraction=dict(
+        type=dataset_type,
+        data_prefix='data/cifar100',
+        pipeline=distortion_extraction_pipeline),
 )
