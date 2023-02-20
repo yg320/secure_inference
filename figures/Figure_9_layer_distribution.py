@@ -50,4 +50,4 @@ for bar in bars:
 plt.gca().tick_params(axis='both', which='major', labelsize=12)
 
 plt.tight_layout()
-plt.savefig("/home/yakir/Figure_8.png")
+plt.savefig("/home/yakir/Figure_9.png")

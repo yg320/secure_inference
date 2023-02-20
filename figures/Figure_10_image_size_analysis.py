@@ -46,7 +46,7 @@ plt.xlabel("Image Size", fontsize=14)
 plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.5)
 plt.gca().set_ylabel("ReLU Communication Cost Ratio", fontsize=14, labelpad=12)
 plt.tight_layout()
-plt.savefig("/home/yakir/Figure_9.png")
+plt.savefig("/home/yakir/Figure_10.png")
 
 
 # # plt.bar(species, relu_ratio, width, color = "red")

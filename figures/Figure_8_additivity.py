@@ -16,7 +16,7 @@ plt.xlabel("Additive Distortion", fontsize=14)
 plt.ylabel("Real Distortion", fontsize=14)
 plt.gca().tick_params(axis='both', which='major', labelsize=12)
 plt.tight_layout()
-plt.savefig("/home/yakir/Figure_7.png")
+plt.savefig("/home/yakir/Figure_8.png")
 print(np.corrcoef(content["additive_noises"][:3000], content["noises"][:3000])[0,1])
 
 # plt.title("Correlation between additive noise and noise level: 0.99", fontsize=13)
