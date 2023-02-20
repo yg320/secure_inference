@@ -136,9 +136,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/tiny_tesnet18/distortions/conv_stride_2/1K.pickle")
-    parser.add_argument('--channel_distortion_path', type=str, default="/home/yakir/tiny_tesnet18/distortions/conv_stride_2/distortion_collected/")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/tiny_tesnet18/conv_stride_2.py")
+    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/deepreduce_comparison/distortions/superlightweight/block_sizes/14.33K.pickle")
+    parser.add_argument('--channel_distortion_path', type=str, default="/home/yakir/deepreduce_comparison/distortions/superlightweight/distortion_collected/")
+    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet18_cifar100/superlightweight.py")
     parser.add_argument('--ratio', type=float, default=None)
     parser.add_argument('--max_cost', type=int, default=14330)
     parser.add_argument('--device', type=int, default=0)

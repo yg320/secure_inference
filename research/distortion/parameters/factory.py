@@ -1,6 +1,6 @@
 from research.distortion.parameters.classification.resent.resnet50_8xb32_in1k import Params as resnet50_8xb32_in1k_Params
 from research.distortion.parameters.classification.resent.resnet18_8xb16_cifar100 import Params as resnet18_8xb16_cifar100_Params
-from research.distortion.parameters.classification.resent.resnet18_8xb16_cifar100_mini import Params as resnet18_8xb16_cifar100_Params_mini
+from research.distortion.parameters.classification.resent.resnet18_8xb16_cifar100_lightweight import Params as resnet18_8xb16_cifar100_Params_lightweight
 from research.distortion.parameters.segmentation.MobileNetV2 import Params as MobileNetV2_Params
 
 
@@ -17,7 +17,7 @@ class ParamsFactory:
                 return resnet18_8xb16_cifar100_Params()
         elif cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type in ['ResNet_CIFAR_V2_mini']:
             if cfg.model.backbone.depth == 18:
-                return resnet18_8xb16_cifar100_Params_mini()
+                return resnet18_8xb16_cifar100_Params_lightweight()
         elif cfg.model.type == 'EncoderDecoder' and cfg.model.backbone.type == 'MobileNetV2':
             return MobileNetV2_Params()
         raise NotImplementedError

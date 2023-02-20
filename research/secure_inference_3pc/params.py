@@ -28,8 +28,8 @@ class Params:
     # # RELU_SPEC_FILE = None
 
     SECURE_CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/work_dirs/resnet18_2xb64_cifar100_49.2K_relus/resnet18_2xb64_cifar100_49.2K_relus.py"
-    MODEL_PATH = "/home/yakir/PycharmProjects/secure_inference/work_dirs/resnet18_2xb64_cifar100_ft_49.15K_relus/epoch_100.pth"
-    RELU_SPEC_FILE = '/home/yakir/tesnet18/distortions/resnet18_2xb64_cifar100/block_sizes/49.15K.pickle'
+    MODEL_PATH = "/home/yakir/PycharmProjects/secure_inference/work_dirs/resnet18_2xb64_cifar100_ft_28.67K_relus/epoch_100.pth"
+    RELU_SPEC_FILE = '/home/yakir/tesnet18/distortions/resnet18_2xb64_cifar100/block_sizes/28.67K.pickle'
 
     AWS_DUMMY = False
     NUM_IMAGES = 10000

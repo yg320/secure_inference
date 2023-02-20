@@ -4,7 +4,7 @@ import torch.utils.checkpoint as cp
 from mmcls.models.builder import BACKBONES
 from mmcls.models.backbones import ResNet_CIFAR
 from mmcls.models.backbones.resnet import Bottleneck, BasicBlock
-
+from mmcv.cnn import build_conv_layer, build_norm_layer
 
 class BottleneckV2(Bottleneck):
 
@@ -106,9 +106,22 @@ class ResNet_CIFAR_V2(ResNet_CIFAR):
 
 
 @BACKBONES.register_module()
-class ResNet_CIFAR_V2_mini(ResNet_CIFAR_V2):
+class ResNet_CIFAR_V2_lightweight(ResNet_CIFAR_V2):
     def __init__(self, **kwargs):
-        kwargs["stem_channels"] = 48
-        kwargs["base_channels"] = 48
-        kwargs["strides"] = (2, 2, 2, 2)
-        super(ResNet_CIFAR_V2_mini, self).__init__(**kwargs)
+        kwargs["stem_channels"] = 32
+        kwargs["base_channels"] = 32
+        super(ResNet_CIFAR_V2_lightweight, self).__init__(**kwargs)
+
+    def _make_stem_layer(self, in_channels, base_channels):
+        self.conv1 = build_conv_layer(
+            self.conv_cfg,
+            in_channels,
+            base_channels,
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            bias=False)
+        self.norm1_name, norm1 = build_norm_layer(
+            self.norm_cfg, base_channels, postfix=1)
+        self.add_module(self.norm1_name, norm1)
+        self.relu = nn.ReLU(inplace=True)

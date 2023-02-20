@@ -10,7 +10,7 @@ class ArchUtilsFactory:
         if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type in ['MyResNet', 'AvgPoolResNet']:
             if cfg.model.backbone.depth == 50:
                 return resnet50_8xb32_in1k_Utils()
-        if cfg.model.type == 'ImageClassifier' and cfg.model.backbone.type in ['ResNet_CIFAR_V2', 'ResNet_CIFAR_V2_mini']:
+        if cfg.model.type == 'ImageClassifier' and "ResNet_CIFAR_V2" in cfg.model.backbone.type:
             if cfg.model.backbone.depth == 18:
                 return ResNet18_CIFAR_Utils()
         if cfg.model.type == 'EncoderDecoder' and cfg.model.backbone.type in ['MobileNetV2']:
