@@ -85,6 +85,7 @@ class SecureModelClassification(SecureModule):
         out_1 = self.network_assets.receiver_01.get()
         out = out_1 + out_0
         out = TypeConverter.i2f(out)
+        print(out.numpy().mean())
         out = out.argmax()
 
         return out
@@ -167,7 +168,7 @@ def full_inference_classification(cfg, model, num_images, device, network_assets
 
 def full_inference_segmentation(cfg, model, num_images, device, network_assets, dummy=False):
     if not dummy:
-        dataset = build_data(cfg, mode="distortion_extraction_val")
+        dataset = build_data(cfg, mode="test")
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
@@ -184,15 +185,13 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
         else:
             img = dataset[sample_id]['img'][0].data.unsqueeze(0)
             img_meta = dataset[sample_id]['img_metas'][0].data
-            seg_map = dataset[sample_id]['gt_semantic_seg'][0].data.unsqueeze(0)
+            seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
+            # seg_map = dataset[sample_id]['gt_semantic_seg'][0].data.unsqueeze(0)
 
         if model.prf_fetcher:
             model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
-        # img_meta['img_shape'] = (256, 256, 3)
-        # img = img[:, :, :256, :256]
-        # seg_map = seg_map[:min(seg_map.shape), :min(seg_map.shape)]
-        # img_meta['ori_shape'] = (seg_map.shape[0], seg_map.shape[1], 3)
+
         # Handshake
         network_assets.sender_01.put(np.array(img.shape))
         network_assets.sender_02.put(np.array(img.shape))
@@ -200,7 +199,7 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
         network_assets.receiver_02.get()
 
         seg_pred = model(img, img_meta)
-
+        # print(seg_pred.mean())
         if not dummy:
             results.append(
                 intersect_and_union(
@@ -211,8 +210,8 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
                     label_map=dict(),
                     reduce_zero_label=dataset.reduce_zero_label)
             )
-            if sample_id % 10 == 0:
-                print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+
+            print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.done()
 

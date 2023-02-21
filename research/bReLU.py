@@ -201,9 +201,38 @@ class SecureOptimizedBlockReLU(Module):
         if np.all(self.block_sizes == [0, 1]):
             return activation
         mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
-
+        mean_tensors = (mean_tensors >> 5).astype(np.int16).astype(np.int64) << (64-16)
         # with Timer(name="DReLU"):
         sign_tensors = self.DReLU(mean_tensors)
+
+        # clipped_mean_tensors = (mean_tensors >> 4).astype(np.int16).astype(np.int64) << (64-16)
+
+        # sign_tensors_4 = self.DReLU(clipped_mean_tensors.copy())
+        # sign_tensors = self.DReLU(mean_tensors)
+        #
+        # if self.network_assets.receiver_02 is None: # server
+        #     self.network_assets.sender_01.put(sign_tensors_4)
+        #     self.network_assets.sender_01.put(sign_tensors)
+        #     self.network_assets.sender_01.put(clipped_mean_tensors)
+        #     self.network_assets.sender_01.put(mean_tensors)
+        # else: # client
+        #     sign_tensors_4_server = self.network_assets.receiver_01.get()
+        #     sign_tensors_server = self.network_assets.receiver_01.get()
+        #     clipped_mean_tensors_server = self.network_assets.receiver_01.get()
+        #     mean_tensors_server = self.network_assets.receiver_01.get()
+        #
+        #     sign_tensors_4_recon = sign_tensors_4_server + sign_tensors_4
+        #     sign_tensors_recon = sign_tensors_server + sign_tensors
+        #     mean_tensors_recon = mean_tensors_server + mean_tensors
+        #     clipped_mean_tensors_recon = clipped_mean_tensors_server + clipped_mean_tensors
+        #
+        return self.post_bReLU(activation,
+                               sign_tensors,
+                               cumsum_shapes,
+                               pad_handlers,
+                               self.is_identity_channels,
+                               self.active_block_sizes,
+                               self.active_block_sizes_to_channels)
 
         relu_map = self.post(activation, sign_tensors, cumsum_shapes,  pad_handlers)
         self.final_mult(activation, relu_map)
