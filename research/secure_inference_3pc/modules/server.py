@@ -9,7 +9,7 @@ from research.secure_inference_3pc.base import get_c_party_1, module_67
 from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, TRUNC_BITS
-from research.bReLU import SecureOptimizedBlockReLU
+from research.bReLU import SecureOptimizedBlockReLU, unpack_bReLU
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 from research.secure_inference_3pc.timer import Timer, timer
@@ -350,34 +350,11 @@ def mult_server_numba(x, y, c, m, e0, e1, f0, f1):
     else:
         return mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1)
 
-from torch.nn import Module
-class DepthToSpace(Module):
-
-    def __init__(self, block_size):
-        super().__init__()
-        self.block_size = block_size
-
-
-    def forward(self, x):
-        N, C, H, W, _ = x.shape
-        x = x.reshape(N, C, H, W, self.block_size[0], self.block_size[1])
-        x = backend.permute(x, (0, 1, 2, 4, 3, 5))
-        x = x.reshape(N, C, H * self.block_size[0], W * self.block_size[1])
-        return x
 
 class SecurePostBReLUMultServer(SecureModule):
     def __init__(self, **kwargs):
         super(SecurePostBReLUMultServer, self).__init__(**kwargs)
 
-    def post(self, activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels):
-        relu_map = backend.ones_like(activation)
-        for i, block_size in enumerate(active_block_sizes):
-            orig_shape = (1, active_block_sizes_to_channels[i].shape[0], pad_handlers[i].out_shape[0]//block_size[0], pad_handlers[i].out_shape[1]//block_size[1], 1)
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shape)
-            tensor = backend.repeat(sign_tensor, block_size[0] * block_size[1])
-            cur_channels = active_block_sizes_to_channels[i]
-            relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(active_block_sizes[i])(tensor))
-        return relu_map
 
     def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, is_identity_channels, active_block_sizes, active_block_sizes_to_channels):
 
@@ -399,8 +376,8 @@ class SecurePostBReLUMultServer(SecureModule):
         E = backend.add(E_share_client, E_share, out=E_share)
         F = backend.add(F_share_client, F_share, out=F_share)
 
-        F = self.post(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
-        sign_tensors = self.post(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        F = unpack_bReLU(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        sign_tensors = unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
 
         out = - E * F + non_identity_activation * F + sign_tensors * E + C_share
         activation[:, ~is_identity_channels] = out

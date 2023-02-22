@@ -3,6 +3,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from research.secure_inference_3pc.backend import backend
+from research.secure_inference_3pc.timer import timer, Timer
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 # TODO: don't use you own get_data and data handling. use mmseg one
 # TODO: don't use your standalone_inference - use mmseg one
 
@@ -135,8 +137,17 @@ class PadHandler:
     def unpad(self, x):
         return x[:, :, self.pad_x_l:x.shape[2] - self.pad_x_r, self.pad_y_l:x.shape[3] - self.pad_y_r]
 
-from research.secure_inference_3pc.timer import timer, Timer
-from research.secure_inference_3pc.const import IS_TORCH_BACKEND
+
+def unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels):
+    relu_map = backend.ones_like(activation)
+    for i, block_size in enumerate(active_block_sizes):
+        orig_shape = (1, active_block_sizes_to_channels[i].shape[0], pad_handlers[i].out_shape[0]//block_size[0], pad_handlers[i].out_shape[1]//block_size[1], 1)
+        sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shape)
+        tensor = backend.repeat(sign_tensor, block_size[0] * block_size[1])
+        cur_channels = active_block_sizes_to_channels[i]
+        relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(active_block_sizes[i])(tensor))
+    return relu_map
+
 class SecureOptimizedBlockReLU(Module):
 
     def __init__(self, block_sizes):
@@ -162,16 +173,6 @@ class SecureOptimizedBlockReLU(Module):
         pad_handlers[index] = padder
         return
 
-    # @timer("prep")
-    def prep_fake(self, activation):
-
-        pad_handlers = [self.pad_handler_class(activation.shape[2:], block_size) for block_size in self.active_block_sizes]
-        a = [np.prod(padder.out_shape) * channels.shape[0] // np.prod(block_size) for padder, block_size, channels in zip(pad_handlers, self.active_block_sizes, self.active_block_sizes_to_channels)]
-        cumsum_shapes = [0] + list(np.cumsum([x for x in a]))
-        mean_tensors = torch.zeros(size=(sum(a), ), dtype=activation.dtype, device=activation.device)
-        return mean_tensors, cumsum_shapes, pad_handlers
-
-    # @timer("prep")
     def prep(self, activation):
 
         mean_tensors = [None] * len(self.active_block_sizes)
@@ -184,152 +185,20 @@ class SecureOptimizedBlockReLU(Module):
         mean_tensors = backend.concatenate(mean_tensors)
         return mean_tensors, cumsum_shapes, pad_handlers
 
-    # @timer("post")
-    def post(self, activation, sign_tensors, cumsum_shapes, pad_handlers):
-        relu_map = backend.ones_like(activation)
-        for i, block_size in enumerate(self.active_block_sizes):
-            orig_shape = (1, self.active_block_sizes_to_channels[i].shape[0], pad_handlers[i].out_shape[0]//block_size[0], pad_handlers[i].out_shape[1]//block_size[1], 1)
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shape)
-            tensor = backend.repeat(sign_tensor, block_size[0] * block_size[1])
-            cur_channels = self.active_block_sizes_to_channels[i]
-            relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
-        return relu_map
-
-    # @timer(name="bReLU")
     def forward(self, activation):
 
         if np.all(self.block_sizes == [0, 1]):
             return activation
         mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
         mean_tensors = (mean_tensors >> 5).astype(np.int16).astype(np.int64) << (64-16)
-        # with Timer(name="DReLU"):
         sign_tensors = self.DReLU(mean_tensors)
 
-        # clipped_mean_tensors = (mean_tensors >> 4).astype(np.int16).astype(np.int64) << (64-16)
-
-        # sign_tensors_4 = self.DReLU(clipped_mean_tensors.copy())
-        # sign_tensors = self.DReLU(mean_tensors)
-        #
-        # if self.network_assets.receiver_02 is None: # server
-        #     self.network_assets.sender_01.put(sign_tensors_4)
-        #     self.network_assets.sender_01.put(sign_tensors)
-        #     self.network_assets.sender_01.put(clipped_mean_tensors)
-        #     self.network_assets.sender_01.put(mean_tensors)
-        # else: # client
-        #     sign_tensors_4_server = self.network_assets.receiver_01.get()
-        #     sign_tensors_server = self.network_assets.receiver_01.get()
-        #     clipped_mean_tensors_server = self.network_assets.receiver_01.get()
-        #     mean_tensors_server = self.network_assets.receiver_01.get()
-        #
-        #     sign_tensors_4_recon = sign_tensors_4_server + sign_tensors_4
-        #     sign_tensors_recon = sign_tensors_server + sign_tensors
-        #     mean_tensors_recon = mean_tensors_server + mean_tensors
-        #     clipped_mean_tensors_recon = clipped_mean_tensors_server + clipped_mean_tensors
-        #
-        return self.post_bReLU(activation,
-                               sign_tensors,
-                               cumsum_shapes,
-                               pad_handlers,
-                               self.is_identity_channels,
-                               self.active_block_sizes,
-                               self.active_block_sizes_to_channels)
-
-        relu_map = self.post(activation, sign_tensors, cumsum_shapes,  pad_handlers)
-        self.final_mult(activation, relu_map)
+        activation = self.post_bReLU(activation,
+                                     sign_tensors,
+                                     cumsum_shapes,
+                                     pad_handlers,
+                                     self.is_identity_channels,
+                                     self.active_block_sizes,
+                                     self.active_block_sizes_to_channels)
 
         return activation
-
-    # @timer(name="final_mult")
-    def final_mult(self, activation, relu_map):
-        activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels],
-                                                              activation[:, ~self.is_identity_channels])
-#
-
-# from research.secure_inference_3pc.timer import timer
-# class SecureOptimizedBlockReLU(Module):
-#
-#     def __init__(self, block_sizes):
-#         super(SecureOptimizedBlockReLU, self).__init__()
-#         self.block_sizes = np.array(block_sizes)
-#
-#         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
-#         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
-#         self.pad_handler_class = PadHandler
-#
-#     @timer("prep")
-#     def prep(self, activation):
-#
-#         reshaped_inputs = []
-#         mean_tensors = []
-#         channels = []
-#         orig_shapes = []
-#         pad_handlers = []
-#
-#         for block_size in self.active_block_sizes:
-#             cur_channels = [bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]
-#             cur_input = activation[:, cur_channels]
-#             padder = self.pad_handler_class(cur_input, block_size)
-#             cur_input = padder.pad(cur_input)
-#             reshaped_input = SpaceToDepth(block_size)(cur_input)
-#             mean_tensor = backend.sum(reshaped_input, axis=-1, keepdims=True)
-#
-#             channels.append(cur_channels)
-#             reshaped_inputs.append(reshaped_input)
-#             orig_shapes.append(mean_tensor.shape)
-#             mean_tensors.append(mean_tensor.flatten())
-#             pad_handlers.append(padder)
-#
-#         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
-#         mean_tensors = backend.concatenate(mean_tensors)
-#         return mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers
-#
-#     @timer("post")
-#     def post(self, activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers):
-#         relu_map = backend.ones_like(activation)
-#         for i in range(len(self.active_block_sizes)):
-#             sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shapes[i])
-#             repeats = reshaped_inputs[i].shape[-1]
-#             tensor = backend.repeat(sign_tensor, repeats)
-#
-#             relu_map[:, channels[i]] = pad_handlers[i].unpad(DepthToSpace(self.active_block_sizes[i])(tensor))
-#         return relu_map
-#
-#     @timer("bReLU")
-#     def forward(self, activation):
-#
-#         if np.all(self.block_sizes == [0, 1]):
-#             return activation
-#         mean_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers = self.prep(activation)
-#
-#         sign_tensors = self.DReLU(mean_tensors)
-#
-#         relu_map = self.post(activation, sign_tensors, cumsum_shapes, orig_shapes, reshaped_inputs, channels, pad_handlers)
-#         activation[:, ~self.is_identity_channels] = self.mult(relu_map[:, ~self.is_identity_channels], activation[:, ~self.is_identity_channels])
-#         return activation
-
-
-
-
-
-if __name__ == "__main__":
-    import time
-
-    block_sizes = [[3, 4], [1, 1], [0,1], [0, 1], [0,1], [2, 2], [7, 8], [3, 3], [3, 4], [2, 4], [1, 1], [7,8], [7, 8], [11,3], [2, 4], [3, 3],  [3, 3],  [3, 3], [1, 1], [1, 1], [3, 4],[3, 3],[7, 8], [3, 3], [5, 7], [7, 8], [7, 8], [7, 8]]
-    image = np.random.normal(size=(1, len(block_sizes), 224, 224))
-    image_torch = torch.from_numpy(image)
-    relu_0 = BlockRelu(block_sizes)
-    relu_numpy = NumpySecureOptimizedBlockReLU(block_sizes)
-    relu_torch = TorchSecureOptimizedBlockReLU(block_sizes)
-
-    t0 = time.time()
-    out_0 = relu_0(image_torch)
-    t1 = time.time()
-    out_numpy = relu_numpy(image)
-    t2 = time.time()
-    out_torch = relu_torch(image_torch)
-    t3 = time.time()
-
-    # out_numpy = torch.from_numpy(out_numpy)
-    print(torch.all(torch.isclose(out_0, out_torch)))
-    print((t3 - t2) / (t2 - t1))
-    print('fds')

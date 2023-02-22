@@ -13,9 +13,9 @@ if stats:
     X = []
     Y = []
     Z = []
-    for i in tqdm(range(1,5001)):
-        x = np.load(f"/home/yakir/Data2/secure_activation_statistics/server/{i}.npy")
-        y = np.load(f"/home/yakir/Data2/secure_activation_statistics/client/{i}.npy")
+    for i in tqdm(range(1,231)):
+        x = np.load(f"/home/yakir/Data2/secure_activation_statistics_cls/server/{i}.npy")
+        y = np.load(f"/home/yakir/Data2/secure_activation_statistics_cls/client/{i}.npy")
         X.append(x.flatten())
         Y.append(y.flatten())
     X = np.hstack(X)
