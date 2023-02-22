@@ -155,7 +155,8 @@ class SecureOptimizedBlockReLU(Module):
         self.block_sizes = np.array(block_sizes)
 
         self.active_block_sizes = [block_size for block_size in np.unique(self.block_sizes, axis=0) if 0 not in block_size]
-        self.active_block_sizes_to_channels = [torch.where(torch.Tensor([bool(x) for x in np.all(self.block_sizes == block_size, axis=1)]))[0] for block_size in self.active_block_sizes]
+        self.non_identity_block_sizes = np.array([block_size for block_size in self.block_sizes if 0 not in block_size])
+        self.active_block_sizes_to_channels = [torch.where(torch.Tensor([bool(x) for x in np.all(self.non_identity_block_sizes == block_size, axis=1)]))[0] for block_size in self.active_block_sizes]
         if not IS_TORCH_BACKEND:
             self.active_block_sizes_to_channels = [x.numpy() for x in self.active_block_sizes_to_channels]
         self.is_identity_channels = np.array([0 in block_size for block_size in self.block_sizes])
@@ -189,16 +190,20 @@ class SecureOptimizedBlockReLU(Module):
 
         if np.all(self.block_sizes == [0, 1]):
             return activation
-        mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
+        non_identity_activation = activation[:, ~self.is_identity_channels]
+
+        mean_tensors, cumsum_shapes, pad_handlers = self.prep(non_identity_activation)
         mean_tensors = (mean_tensors >> 5).astype(np.int16).astype(np.int64) << (64-16)
         sign_tensors = self.DReLU(mean_tensors)
 
-        activation = self.post_bReLU(activation,
-                                     sign_tensors,
-                                     cumsum_shapes,
-                                     pad_handlers,
-                                     self.is_identity_channels,
-                                     self.active_block_sizes,
-                                     self.active_block_sizes_to_channels)
+        tmp = self.post_bReLU(non_identity_activation,
+                              sign_tensors,
+                              cumsum_shapes,
+                              pad_handlers,
+                              self.active_block_sizes,
+                              self.active_block_sizes_to_channels)
+
+        activation[:, ~self.is_identity_channels] = tmp
+
 
         return activation

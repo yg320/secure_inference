@@ -356,16 +356,14 @@ class SecurePostBReLUMultServer(SecureModule):
         super(SecurePostBReLUMultServer, self).__init__(**kwargs)
 
 
-    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, is_identity_channels, active_block_sizes, active_block_sizes_to_channels):
+    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, active_block_sizes, active_block_sizes_to_channels):
 
-        non_identity_activation = activation[:, ~is_identity_channels]
-
-        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
-        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=activation.shape, dtype=activation.dtype)
 
-        E_share = backend.subtract(non_identity_activation, A_share, out=A_share)
+        E_share = backend.subtract(activation, A_share, out=A_share)
         F_share = backend.subtract(sign_tensors, B_share, out=B_share)
 
         self.network_assets.sender_01.put(E_share)
@@ -376,14 +374,14 @@ class SecurePostBReLUMultServer(SecureModule):
         E = backend.add(E_share_client, E_share, out=E_share)
         F = backend.add(F_share_client, F_share, out=F_share)
 
-        F = unpack_bReLU(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
-        sign_tensors = unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        F = unpack_bReLU(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)
+        sign_tensors = unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)
 
-        out = - E * F + non_identity_activation * F + sign_tensors * E + C_share
-        activation[:, ~is_identity_channels] = out
+        out = - E * F + activation * F + sign_tensors * E + C_share
+
         mu_1 = backend.multiply(mu_1, -1, out=mu_1)
-        activation = activation + mu_1
-        return activation
+        out = out + mu_1
+        return out
 
 
 

@@ -163,26 +163,24 @@ class SecurePostBReLUMultCryptoProvider(SecureModule):
         super(SecurePostBReLUMultCryptoProvider, self).__init__(**kwargs)
 
 
-    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, is_identity_channels, active_block_sizes, active_block_sizes_to_channels):
+    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers,  active_block_sizes, active_block_sizes_to_channels):
 
-        non_identity_activation = activation[:, ~is_identity_channels]
-
-        A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
         B_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
-        C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
-        A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
+        A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
 
-        B = unpack_bReLU(activation, B, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        B = unpack_bReLU(activation, B, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)
 
         C_share_0 = A * B - C_share_1
 
         self.network_assets.sender_02.put(C_share_0)
 
-        return
+        return activation
 
 
 
@@ -301,8 +299,7 @@ class SecureBlockReLUCryptoProvider(SecureModule, SecureOptimizedBlockReLU):
     def forward(self, activation):
         if self.dummy_relu:
             return activation
-        SecureOptimizedBlockReLU.forward(self, activation)
-        return activation
+        return SecureOptimizedBlockReLU.forward(self, activation)
 
 
 class SecureSelectShareCryptoProvider(SecureModule):

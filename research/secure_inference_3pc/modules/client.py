@@ -378,14 +378,13 @@ class SecurePostBReLUMultClient(SecureModule):
     def __init__(self, **kwargs):
         super(SecurePostBReLUMultClient, self).__init__(**kwargs)
 
-    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, is_identity_channels, active_block_sizes, active_block_sizes_to_channels):
-        non_identity_activation = activation[:, ~is_identity_channels]
+    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, active_block_sizes, active_block_sizes_to_channels):
 
-        A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        A_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
         B_share = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=activation.shape, dtype=SIGNED_DTYPE)
 
-        E_share = non_identity_activation - A_share
+        E_share = activation - A_share
         F_share = sign_tensors - B_share
 
         self.network_assets.sender_01.put(E_share)
@@ -398,15 +397,14 @@ class SecurePostBReLUMultClient(SecureModule):
         E = E_share_server + E_share
         F = F_share_server + F_share
 
-        F = unpack_bReLU(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
-        sign_tensors = unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        F = unpack_bReLU(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)
+        sign_tensors = unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)
 
-        out = non_identity_activation * F + sign_tensors * E + C_share
-        activation[:, ~is_identity_channels] = out
+        out = activation * F + sign_tensors * E + C_share
 
-        activation = activation + mu_0
+        out = out + mu_0
 
-        return activation
+        return out
 
 
 
