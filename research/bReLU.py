@@ -148,6 +148,7 @@ def unpack_bReLU(activation, sign_tensors, cumsum_shapes, pad_handlers, active_b
         relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(active_block_sizes[i])(tensor))
     return relu_map
 
+
 class SecureOptimizedBlockReLU(Module):
 
     def __init__(self, block_sizes):
@@ -196,14 +197,12 @@ class SecureOptimizedBlockReLU(Module):
         mean_tensors = (mean_tensors >> 5).astype(np.int16).astype(np.int64) << (64-16)
         sign_tensors = self.DReLU(mean_tensors)
 
-        tmp = self.post_bReLU(non_identity_activation,
-                              sign_tensors,
-                              cumsum_shapes,
-                              pad_handlers,
-                              self.active_block_sizes,
-                              self.active_block_sizes_to_channels)
-
-        activation[:, ~self.is_identity_channels] = tmp
-
+        activation[:, ~self.is_identity_channels] = \
+            self.post_bReLU(non_identity_activation,
+                            sign_tensors,
+                            cumsum_shapes,
+                            pad_handlers,
+                            self.active_block_sizes,
+                            self.active_block_sizes_to_channels)
 
         return activation
