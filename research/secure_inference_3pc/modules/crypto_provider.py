@@ -375,6 +375,29 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         return
 
 
+class PRFFetcherPostBReLUMultiplication(SecureModule):
+    def __init__(self, **kwargs):
+        super(PRFFetcherPostBReLUMultiplication, self).__init__(**kwargs)
+
+    def forward(self, activation_shape, sign_tensors_shape):
+
+        #         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
+        #         B_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
+        #         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
+        #         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
+        #         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
+
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=sign_tensors_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=sign_tensors_shape, dtype=SIGNED_DTYPE)
+
+        return
+
+
+
+# TODO: redundant
 class PRFFetcherMultiplication(PRFFetcherModule):
     def __init__(self, **kwargs):
         super(PRFFetcherMultiplication, self).__init__(**kwargs)
@@ -475,7 +498,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
         SecureModule.__init__(self, **kwargs)
         SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.secure_DReLU = PRFFetcherDReLU(**kwargs)
-        self.secure_mult = PRFFetcherMultiplication(**kwargs)
+        self.secure_mult = PRFFetcherPostBReLUMultiplication(**kwargs)
 
         self.dummy_relu = dummy_relu
 
@@ -489,7 +512,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
             mult_shape = shape[0], sum(~self.is_identity_channels), shape[2], shape[3]
 
             self.secure_DReLU(mean_tensor_shape)
-            self.secure_mult(mult_shape)
+            self.secure_mult(mult_shape, mean_tensor_shape)
 
         return shape
 

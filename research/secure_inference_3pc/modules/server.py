@@ -126,6 +126,14 @@ def mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1):
         # f1[i] = - e * f + x[i] * f + y[i] * e + c[i] - m[i]
     return f1
 
+
+def mult_server_numba(x, y, c, m, e0, e1, f0, f1):
+    if x.ndim == 1:
+        return mult_server_flatten(x, y, c, m, e0, e1, f0, f1)
+    else:
+        return mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1)
+
+
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups,  **kwargs):
         super(SecureConv2DServer, self).__init__(**kwargs)
@@ -305,6 +313,7 @@ class PrivateCompareServer(SecureModule):
 
         return
 
+
 class ShareConvertServer(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertServer, self).__init__(**kwargs)
@@ -344,13 +353,6 @@ class ShareConvertServer(SecureModule):
         # return y_1
 
 
-def mult_server_numba(x, y, c, m, e0, e1, f0, f1):
-    if x.ndim == 1:
-        return mult_server_flatten(x, y, c, m, e0, e1, f0, f1)
-    else:
-        return mult_server_non_flatten(x, y, c, m, e0, e1, f0, f1)
-
-
 class SecurePostBReLUMultServer(SecureModule):
     def __init__(self, **kwargs):
         super(SecurePostBReLUMultServer, self).__init__(**kwargs)
@@ -382,7 +384,6 @@ class SecurePostBReLUMultServer(SecureModule):
         mu_1 = backend.multiply(mu_1, -1, out=mu_1)
         out = out + mu_1
         return out
-
 
 
 class SecureMultiplicationServer(SecureModule):
@@ -612,6 +613,20 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         return shape
 
 
+class PRFFetcherPostBReLUMultiplication(SecureModule):
+    def __init__(self, **kwargs):
+        super(PRFFetcherPostBReLUMultiplication, self).__init__(**kwargs)
+
+    def forward(self, activation_shape, sign_tensors_shape):
+
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=sign_tensors_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
+        self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=activation_shape, dtype=SIGNED_DTYPE)
+
+        return
+
+
 class PRFFetcherMultiplication(PRFFetcherModule):
     def __init__(self, **kwargs):
         super(PRFFetcherMultiplication, self).__init__(**kwargs)
@@ -720,7 +735,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
         SecureModule.__init__(self,  **kwargs)
         SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.secure_DReLU = PRFFetcherDReLU( **kwargs)
-        self.secure_mult = PRFFetcherMultiplication( **kwargs)
+        self.secure_mult = PRFFetcherPostBReLUMultiplication(**kwargs)
 
         self.dummy_relu = dummy_relu
 
@@ -733,7 +748,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
             mult_shape = shape[0], sum(~self.is_identity_channels), shape[2], shape[3]
 
             self.secure_DReLU(mean_tensor_shape)
-            self.secure_mult(mult_shape)
+            self.secure_mult(mult_shape, mean_tensor_shape)
 
         return shape
 
