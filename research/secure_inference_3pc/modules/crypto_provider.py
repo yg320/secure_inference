@@ -10,7 +10,7 @@ from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_h
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, UNSIGNED_DTYPE
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
-from research.bReLU import SecureOptimizedBlockReLU, unpack_bReLU
+from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
@@ -158,29 +158,57 @@ class ShareConvertCryptoProvider(SecureModule):
         return
 
 
+
+from torch.nn import Module
+class DepthToSpace(Module):
+
+    def __init__(self, block_size):
+        super().__init__()
+        self.block_size = block_size
+
+
+    def forward(self, x):
+        N, C, H, W, _ = x.shape
+        x = x.reshape(N, C, H, W, self.block_size[0], self.block_size[1])
+        x = backend.permute(x, (0, 1, 2, 4, 3, 5))
+        x = x.reshape(N, C, H * self.block_size[0], W * self.block_size[1])
+        return x
+
+
 class SecurePostBReLUMultCryptoProvider(SecureModule):
     def __init__(self, **kwargs):
         super(SecurePostBReLUMultCryptoProvider, self).__init__(**kwargs)
 
+    def post(self, activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels):
+        relu_map = backend.ones_like(activation)
+        for i, block_size in enumerate(active_block_sizes):
+            orig_shape = (1, active_block_sizes_to_channels[i].shape[0], pad_handlers[i].out_shape[0]//block_size[0], pad_handlers[i].out_shape[1]//block_size[1], 1)
+            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shape)
+            tensor = backend.repeat(sign_tensor, block_size[0] * block_size[1])
+            cur_channels = active_block_sizes_to_channels[i]
+            relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(active_block_sizes[i])(tensor))
+        return relu_map
 
-    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers,  active_block_sizes, active_block_sizes_to_channels):
+    def forward(self, activation, sign_tensors, cumsum_shapes,  pad_handlers, is_identity_channels, active_block_sizes, active_block_sizes_to_channels):
 
-        A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
+        non_identity_activation = activation[:, ~is_identity_channels]
+
+        A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
         B_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
-        C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
-        A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
+        C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
 
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
 
-        B = unpack_bReLU(activation, B, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)
+        B = self.post(activation, B, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
 
         C_share_0 = A * B - C_share_1
 
         self.network_assets.sender_02.put(C_share_0)
 
-        return activation
+        return
 
 
 
@@ -299,8 +327,22 @@ class SecureBlockReLUCryptoProvider(SecureModule, SecureOptimizedBlockReLU):
     def forward(self, activation):
         if self.dummy_relu:
             return activation
-        return SecureOptimizedBlockReLU.forward(self, activation)
-
+        SecureOptimizedBlockReLU.forward(self, activation)
+        return activation
+        #
+        #
+        # shape = activation.shape
+        # if self.dummy_relu:
+        #     return activation
+        #
+        # if not np.all(self.block_sizes == [0, 1]):
+        #     mean_tensor_shape = (int(sum(np.ceil(shape[2] / block_size[0]) * np.ceil(shape[3] / block_size[1]) for block_size in self.block_sizes if 0 not in block_size)),)
+        #     mult_shape = shape[0], sum(~self.is_identity_channels), shape[2], shape[3]
+        #
+        #     self.secure_DReLU(torch.zeros(size=mean_tensor_shape))
+        #     self.secure_mult(mult_shape)
+        #
+        # return activation
 
 class SecureSelectShareCryptoProvider(SecureModule):
     def __init__(self, **kwargs):
@@ -356,7 +398,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
         super(PRFFetcherPrivateCompare, self).__init__(**kwargs)
 
     def forward(self, shape):
-        return 
+        return
 
 
 class PRFFetcherShareConvert(PRFFetcherModule):
@@ -375,29 +417,6 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         return
 
 
-class PRFFetcherPostBReLUMultiplication(SecureModule):
-    def __init__(self, **kwargs):
-        super(PRFFetcherPostBReLUMultiplication, self).__init__(**kwargs)
-
-    def forward(self, activation_shape, sign_tensors_shape):
-
-        #         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
-        #         B_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
-        #         C_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
-        #         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=activation.shape, dtype=SIGNED_DTYPE)
-        #         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
-
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=sign_tensors_shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=activation_shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=sign_tensors_shape, dtype=SIGNED_DTYPE)
-
-        return
-
-
-
-# TODO: redundant
 class PRFFetcherMultiplication(PRFFetcherModule):
     def __init__(self, **kwargs):
         super(PRFFetcherMultiplication, self).__init__(**kwargs)
@@ -498,7 +517,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
         SecureModule.__init__(self, **kwargs)
         SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.secure_DReLU = PRFFetcherDReLU(**kwargs)
-        self.secure_mult = PRFFetcherPostBReLUMultiplication(**kwargs)
+        self.secure_mult = PRFFetcherMultiplication(**kwargs)
 
         self.dummy_relu = dummy_relu
 
@@ -512,7 +531,7 @@ class PRFFetcherBlockReLU(SecureModule, SecureOptimizedBlockReLU):
             mult_shape = shape[0], sum(~self.is_identity_channels), shape[2], shape[3]
 
             self.secure_DReLU(mean_tensor_shape)
-            self.secure_mult(mult_shape, mean_tensor_shape)
+            self.secure_mult(mult_shape)
 
         return shape
 
