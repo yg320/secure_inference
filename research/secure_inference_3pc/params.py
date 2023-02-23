@@ -35,7 +35,7 @@ class Params:
     SECURE_CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py"
     MODEL_PATH = "/home/yakir/assets/resnet_imagenet/models/ratio_0.12.pth"
     RELU_SPEC_FILE = '/home/yakir/assets/resnet_imagenet/block_spec/0.12.pickle'
-    NUM_IMAGES = 5
+    NUM_IMAGES = 1
 
 
     AWS_DUMMY = False
@@ -43,5 +43,5 @@ class Params:
     SERVER_DEVICE = {"cuda": "cuda:1", "cpu": "cpu"}[DEVICE]
     CRYPTO_PROVIDER_DEVICE = {"cuda": "cuda:0", "cpu": "cpu"}[DEVICE]
     DUMMY_RELU = False
-    PRF_PREFETCH = False
+    PRF_PREFETCH = True
     SIMULATED_BANDWIDTH = None #1000000000 #None #10000000000  # Bits/Second

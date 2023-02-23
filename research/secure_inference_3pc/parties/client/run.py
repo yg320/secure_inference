@@ -2,7 +2,7 @@ from research.secure_inference_3pc.backend import backend
 from tqdm import tqdm
 
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.base import  get_assets, TypeConverter
+from research.secure_inference_3pc.base import get_assets, TypeConverter
 
 from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.const import CLIENT, SERVER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -12,11 +12,15 @@ from research.secure_inference_3pc.timer import Timer
 
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
-from research.secure_inference_3pc.modules.client import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
+from research.secure_inference_3pc.parties.client.prf_modules import PRFFetcherConv2D, PRFFetcherReLU, \
+    PRFFetcherMaxPool, \
+    PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
 from research.secure_inference_3pc.params import Params
 import mmcv
 from research.utils import build_data
-from research.secure_inference_3pc.modules.client import SecureConv2DClient, SecureReLUClient, SecureMaxPoolClient, SecureBlockReLUClient
+from research.secure_inference_3pc.parties.client.secure_modules import SecureConv2DClient, SecureReLUClient, \
+    SecureMaxPoolClient, \
+    SecureBlockReLUClient
 
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
@@ -25,7 +29,9 @@ from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why
 from research.secure_inference_3pc.timer import timer
 import numpy as np
 
-def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
+
+def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False,
+                                 device="cpu"):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
     shape = tuple(conv_module.weight.shape) + (1, 1)
 
@@ -48,7 +54,6 @@ def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
-
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DClient
 
     return conv_class(
@@ -70,7 +75,7 @@ def build_secure_relu(crypto_assets, network_assets, is_prf_fetcher=False, dummy
 
 
 class SecureModelClassification(SecureModule):
-    def __init__(self, model,  **kwargs):
+    def __init__(self, model, **kwargs):
         super(SecureModelClassification, self).__init__(**kwargs)
         self.model = model
 
@@ -90,6 +95,7 @@ class SecureModelClassification(SecureModule):
 
         return out
 
+
 class SecureModelSegmentation(SecureModule):
     def __init__(self, model, **kwargs):
         super(SecureModelSegmentation, self).__init__(**kwargs)
@@ -97,7 +103,6 @@ class SecureModelSegmentation(SecureModule):
 
     @timer(name="Inference", avg=False)
     def forward(self, img, img_meta):
-
         I = TypeConverter.f2i(img)
         I1 = self.prf_handler[CLIENT, SERVER].integers(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=img.shape)
         I0 = I - I1
@@ -131,7 +136,6 @@ class SecureModelSegmentation(SecureModule):
 
 
 def full_inference_classification(cfg, model, num_images, device, network_assets, dummy=False):
-
     if not dummy:
         dataset = build_data(cfg, mode="test")
     results_gt = []
@@ -177,10 +181,13 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
 
         if dummy:
             img = np.zeros((1, 3, 512, 683), dtype=np.float32)
-            img_meta = {'filename': 'data/ade/ADEChallengeData2016/images/validation/ADE_val_00000001.jpg', 'ori_filename': 'ADE_val_00000001.jpg',
-                        'ori_shape': (512, 683, 3), 'img_shape': (512, 683, 3), 'pad_shape': (512, 683, 3), 'scale_factor': np.array([1., 1., 1., 1.], dtype=np.float32),
+            img_meta = {'filename': 'data/ade/ADEChallengeData2016/images/validation/ADE_val_00000001.jpg',
+                        'ori_filename': 'ADE_val_00000001.jpg',
+                        'ori_shape': (512, 683, 3), 'img_shape': (512, 683, 3), 'pad_shape': (512, 683, 3),
+                        'scale_factor': np.array([1., 1., 1., 1.], dtype=np.float32),
                         'flip': False, 'flip_direction': 'horizontal', 'img_norm_cfg':
-                {'mean': np.array([123.675, 116.28 , 103.53 ], dtype=np.float32), 'std': np.array([58.395, 57.12 , 57.375], dtype=np.float32), 'to_rgb': True}}
+                            {'mean': np.array([123.675, 116.28, 103.53], dtype=np.float32),
+                             'std': np.array([58.395, 57.12, 57.375], dtype=np.float32), 'to_rgb': True}}
             seg_map = np.zeros((512, 683), dtype=np.uint8)
         else:
             img = dataset[sample_id]['img'][0].data.unsqueeze(0)
@@ -190,7 +197,6 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
 
         if model.prf_fetcher:
             model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
-
 
         # Handshake
         network_assets.sender_01.put(np.array(img.shape))
@@ -221,7 +227,8 @@ if __name__ == "__main__":
     # assert (Params.RELU_SPEC_FILE is None) or (Params.DUMMY_RELU is False)
     cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, device=Params.CLIENT_DEVICE, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    crypto_assets, network_assets = get_assets(party, device=Params.CLIENT_DEVICE,
+                                               simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
@@ -259,18 +266,19 @@ if __name__ == "__main__":
         device=Params.CLIENT_DEVICE
     )
 
-
-
     if cfg.model.type == "EncoderDecoder":
-        full_inference_segmentation(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets, Params.AWS_DUMMY)
+        full_inference_segmentation(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets,
+                                    Params.AWS_DUMMY)
     else:
-        full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets, Params.AWS_DUMMY)
+        full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets,
+                                      Params.AWS_DUMMY)
 
     network_assets.done()
 
     # print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
     # print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)
-    print("Num of bytes sent 0 ", network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)
+    print("Num of bytes sent 0 ",
+          network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)
 
 # sudo apt-get update
 # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh

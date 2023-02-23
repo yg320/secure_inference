@@ -1,5 +1,6 @@
-from research.secure_inference_3pc.backend import backend
+import mmcv
 
+from research.secure_inference_3pc.backend import backend
 
 from research.secure_inference_3pc.base import get_assets
 from research.secure_inference_3pc.modules.base import SecureModule
@@ -7,13 +8,15 @@ from research.secure_inference_3pc.const import CRYPTO_PROVIDER, MIN_VAL, MAX_VA
 
 from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.params import Params
-from research.secure_inference_3pc.modules.crypto_provider import PRFFetcherConv2D, PRFFetcherReLU, PRFFetcherMaxPool, PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU, SecureReLUCryptoProvider, SecureConv2DCryptoProvider, SecureMaxPoolCryptoProvider, SecureBlockReLUCryptoProvider
+from research.secure_inference_3pc.parties.crypto_provider.prf_modules import PRFFetcherConv2D, PRFFetcherReLU, \
+    PRFFetcherMaxPool, \
+    PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
+from research.secure_inference_3pc.parties.crypto_provider.secure_modules import SecureReLUCryptoProvider, \
+    SecureConv2DCryptoProvider, SecureMaxPoolCryptoProvider, SecureBlockReLUCryptoProvider
 
-import mmcv
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
-
 
 
 def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
@@ -30,7 +33,9 @@ def build_secure_conv(crypto_assets, network_assets, conv_module, bn_module, is_
         device=device
     )
 
-def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False, device="cpu"):
+
+def build_secure_fully_connected(crypto_assets, network_assets, conv_module, bn_module, is_prf_fetcher=False,
+                                 device="cpu"):
     conv_class = PRFFetcherConv2D if is_prf_fetcher else SecureConv2DCryptoProvider
 
     return conv_class(
@@ -50,14 +55,12 @@ def build_secure_relu(is_prf_fetcher=False, dummy_relu=False, **kwargs):
     return relu_class(dummy_relu=dummy_relu, **kwargs)
 
 
-
 class SecureModelSegmentation(SecureModule):
-    def __init__(self, model,  **kwargs):
-        super(SecureModelSegmentation, self).__init__( **kwargs)
+    def __init__(self, model, **kwargs):
+        super(SecureModelSegmentation, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, image_shape):
-
         dummy_image = self.prf_handler[CRYPTO_PROVIDER].integers(low=MIN_VAL,
                                                                  high=MAX_VAL,
                                                                  size=image_shape,
@@ -66,12 +69,11 @@ class SecureModelSegmentation(SecureModule):
 
 
 class SecureModelClassification(SecureModule):
-    def __init__(self, model,  **kwargs):
-        super(SecureModelClassification, self).__init__( **kwargs)
+    def __init__(self, model, **kwargs):
+        super(SecureModelClassification, self).__init__(**kwargs)
         self.model = model
 
     def forward(self, image_shape):
-
         dummy_image = self.prf_handler[CRYPTO_PROVIDER].integers(low=MIN_VAL,
                                                                  high=MAX_VAL,
                                                                  size=image_shape,
@@ -80,11 +82,13 @@ class SecureModelClassification(SecureModule):
         out = self.model.neck(out)
         out = self.model.head.fc(out)
 
+
 if __name__ == "__main__":
     party = 2
     cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, device=Params.CRYPTO_PROVIDER_DEVICE, simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    crypto_assets, network_assets = get_assets(party, device=Params.CRYPTO_PROVIDER_DEVICE,
+                                               simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
 
     if Params.PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
@@ -132,7 +136,6 @@ if __name__ == "__main__":
         if model.prf_fetcher:
             model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=image_size, dtype=SIGNED_DTYPE))
 
-
         out = model(image_size)
 
     if model.prf_fetcher:
@@ -140,5 +143,5 @@ if __name__ == "__main__":
 
     network_assets.done()
 
-
-    print("Num of bytes sent 2 ", network_assets.sender_12.num_of_bytes_sent + network_assets.sender_02.num_of_bytes_sent)
+    print("Num of bytes sent 2 ",
+          network_assets.sender_12.num_of_bytes_sent + network_assets.sender_02.num_of_bytes_sent)

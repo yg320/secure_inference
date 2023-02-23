@@ -1,3 +1,3 @@
-export PYTHONPATH="." ; python research/secure_inference_3pc/server.py &
-export PYTHONPATH="." ; python research/secure_inference_3pc/crypto_provider.py &
-export PYTHONPATH="." ; python research/secure_inference_3pc/client.py   &
+export PYTHONPATH="." ; python research/secure_inference_3pc/parties/server/run.py &
+export PYTHONPATH="." ; python research/secure_inference_3pc/parties/crypto_provider/run.py &
+export PYTHONPATH="." ; python research/secure_inference_3pc/parties/client/run.py   &
