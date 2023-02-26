@@ -198,7 +198,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     return ret
 
 
-def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected,
+def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected,
                      prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets,
                      dummy_relu, device):
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets,
@@ -216,7 +216,7 @@ def init_prf_fetcher(cfg, Params, max_pool, build_secure_conv, build_secure_relu
                                        network_assets=network_assets, is_prf_fetcher=True, device=device)
 
     prf_fetcher_model = get_model(
-        config=Params.SECURE_CONFIG_PATH,
+        config=checkpoint_path,
         gpu_id=None,
         checkpoint_path=None
     )

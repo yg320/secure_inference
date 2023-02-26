@@ -1,21 +1,20 @@
 from research.secure_inference_3pc.backend import backend
 from tqdm import tqdm
+import argparse
 
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.base import get_assets, TypeConverter
 
 from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
-from research.secure_inference_3pc.const import CLIENT, SERVER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
+from research.secure_inference_3pc.const import CLIENT, SERVER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, DUMMY_RELU, PRF_PREFETCH
 from mmseg.ops import resize
 
-from research.secure_inference_3pc.timer import Timer
 
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
 from research.secure_inference_3pc.parties.client.prf_modules import PRFFetcherConv2D, PRFFetcherReLU, \
     PRFFetcherMaxPool, \
     PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
-from research.secure_inference_3pc.params import Params
 import mmcv
 from research.utils import build_data
 from research.secure_inference_3pc.parties.client.secure_modules import SecureConv2DClient, SecureReLUClient, \
@@ -225,54 +224,62 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
 
 if __name__ == "__main__":
     party = 0
-    # assert (Params.RELU_SPEC_FILE is None) or (Params.DUMMY_RELU is False)
-    cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, device=Params.CLIENT_DEVICE,
-                                               simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    parser = argparse.ArgumentParser(description='')
 
-    if Params.PRF_PREFETCH:
+    parser.add_argument('--dummy_image', action='store_true', default=False)
+    parser.add_argument('--num_images', type=int,  default=1)
+    parser.add_argument('--device', type=str, default="cpu")
+    parser.add_argument('--secure_config_path', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py")
+    parser.add_argument('--relu_spec_file', type=str, default="/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle")
+    args = parser.parse_args()
+
+    cfg = mmcv.Config.fromfile(args.secure_config_path)
+
+    crypto_assets, network_assets = get_assets(party, device=args.device)
+
+    if PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
             cfg=cfg,
-            Params=Params,
+            checkpoint_path=None,
             max_pool=PRFFetcherMaxPool,
             build_secure_conv=build_secure_conv,
             build_secure_relu=build_secure_relu,
             build_secure_fully_connected=build_secure_fully_connected,
             prf_fetcher_secure_model=PRFFetcherSecureModelSegmentation if cfg.model.type == "EncoderDecoder" else PRFFetcherSecureModelClassification,
             secure_block_relu=PRFFetcherBlockReLU,
-            relu_spec_file=Params.RELU_SPEC_FILE,
+            relu_spec_file=args.relu_spec_file,
             crypto_assets=crypto_assets,
             network_assets=network_assets,
-            dummy_relu=Params.DUMMY_RELU,
-            device=Params.CLIENT_DEVICE,
+            dummy_relu=DUMMY_RELU,
+            device=args.device,
         )
     else:
         prf_fetcher = None
 
     model = get_secure_model(
         cfg,
-        checkpoint_path=Params.MODEL_PATH,  # TODO: implement fc
+        checkpoint_path=None,
         build_secure_conv=build_secure_conv,
         build_secure_relu=build_secure_relu,
         build_secure_fully_connected=build_secure_fully_connected,
         max_pool=SecureMaxPoolClient,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUClient,
-        relu_spec_file=Params.RELU_SPEC_FILE,
+        relu_spec_file=args.relu_spec_file,
         crypto_assets=crypto_assets,
         network_assets=network_assets,
-        dummy_relu=Params.DUMMY_RELU,
+        dummy_relu=DUMMY_RELU,
         prf_fetcher=prf_fetcher,
-        device=Params.CLIENT_DEVICE
+        device=args.device
     )
 
     if cfg.model.type == "EncoderDecoder":
-        full_inference_segmentation(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets,
-                                    Params.AWS_DUMMY)
+        full_inference_segmentation(cfg, model, args.num_images, args.device, network_assets,
+                                    args.dummy_image)
     else:
-        full_inference_classification(cfg, model, Params.NUM_IMAGES, Params.CLIENT_DEVICE, network_assets,
-                                      Params.AWS_DUMMY)
+        full_inference_classification(cfg, model, args.num_images, args.device, network_assets,
+                                      args.dummy_image)
 
     network_assets.done()
 

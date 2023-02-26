@@ -66,7 +66,7 @@ class NetworkAssets:
             self.sender_01.put(None)
 
 
-def get_assets(party, device, simulated_bandwidth=None):
+def get_assets(party, device):
 
     addresses = Addresses()
 
@@ -81,15 +81,15 @@ def get_assets(party, device, simulated_bandwidth=None):
                 # CRYPTO_PROVIDER: None,
             })
         network_assets = NetworkAssets(
-            sender_01=Sender(ip=addresses.ip_server, port=addresses.port_01, simulated_bandwidth=simulated_bandwidth),
-            sender_02=Sender(ip=addresses.ip_cryptoprovider, port=addresses.port_02, simulated_bandwidth=simulated_bandwidth),
+            sender_01=Sender(ip=addresses.ip_server, port=addresses.port_01),
+            sender_02=Sender(ip=addresses.ip_cryptoprovider, port=addresses.port_02),
             sender_12=None,
             receiver_01=Receiver(ip=addresses.ip_client_private, port=addresses.port_10, device=device),
             receiver_02=Receiver(ip=addresses.ip_client_private, port=addresses.port_20, device=device),
             receiver_12=None
         )
 
-    if party == 1:
+    elif party == 1:
         crypto_assets = MultiPartyPRFHandler(
             party=1, device=device, seeds={
                 (CLIENT, SERVER): 0,
@@ -100,15 +100,15 @@ def get_assets(party, device, simulated_bandwidth=None):
                 # CRYPTO_PROVIDER: None,
             })
         network_assets = NetworkAssets(
-            sender_01=Sender(ip=addresses.ip_client, port=addresses.port_10, simulated_bandwidth=simulated_bandwidth),
+            sender_01=Sender(ip=addresses.ip_client, port=addresses.port_10),
             sender_02=None,
-            sender_12=Sender(ip=addresses.ip_cryptoprovider, port=addresses.port_12, simulated_bandwidth=simulated_bandwidth),
+            sender_12=Sender(ip=addresses.ip_cryptoprovider, port=addresses.port_12),
             receiver_01=Receiver(ip=addresses.ip_server_private, port=addresses.port_01, device=device),
             receiver_02=None,
             receiver_12=Receiver(ip=addresses.ip_server_private, port=addresses.port_21, device=device),
         )
 
-    if party == 2:
+    elif party == 2:
         crypto_assets = MultiPartyPRFHandler(
             party=2, device=device, seeds={
                 # (CLIENT, SERVER): None,
@@ -121,13 +121,15 @@ def get_assets(party, device, simulated_bandwidth=None):
 
         network_assets = NetworkAssets(
             sender_01=None,
-            sender_02=Sender(ip=addresses.ip_client, port=addresses.port_20, simulated_bandwidth=simulated_bandwidth),
-            sender_12=Sender(ip=addresses.ip_server, port=addresses.port_21, simulated_bandwidth=simulated_bandwidth),
+            sender_02=Sender(ip=addresses.ip_client, port=addresses.port_20),
+            sender_12=Sender(ip=addresses.ip_server, port=addresses.port_21),
             receiver_01=None,
             receiver_02=Receiver(ip=addresses.ip_cryptoprovider_private, port=addresses.port_02, device=device),
             receiver_12=Receiver(ip=addresses.ip_cryptoprovider_private, port=addresses.port_12, device=device),
         )
 
+    else:
+        raise ValueError("Party must be 0, 1 or 2")
     return crypto_assets, network_assets
 
 

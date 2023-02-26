@@ -15,6 +15,9 @@ TRUNC_BITS = 16
 TRUNC = 2 ** TRUNC_BITS
 IS_TORCH_BACKEND = False
 
+DUMMY_RELU = False
+PRF_PREFETCH = False
+
 UNSIGNED_DTYPE = {32: np.uint32, 64: np.uint64}[NUM_BITS]
 SIGNED_DTYPE = {32: np.int32, 64: np.int64}[NUM_BITS]
 TORCH_DTYPE = {32: torch.int32, 64: torch.int64}[NUM_BITS]

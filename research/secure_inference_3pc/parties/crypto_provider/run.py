@@ -1,13 +1,12 @@
 import mmcv
-
+import argparse
 from research.secure_inference_3pc.backend import backend
 
 from research.secure_inference_3pc.base import get_assets
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.const import CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
+from research.secure_inference_3pc.const import CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, DUMMY_RELU, PRF_PREFETCH
 
 from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
-from research.secure_inference_3pc.params import Params
 from research.secure_inference_3pc.parties.crypto_provider.prf_modules import PRFFetcherConv2D, PRFFetcherReLU, \
     PRFFetcherMaxPool, \
     PRFFetcherSecureModelSegmentation, PRFFetcherSecureModelClassification, PRFFetcherBlockReLU
@@ -85,26 +84,36 @@ class SecureModelClassification(SecureModule):
 
 if __name__ == "__main__":
     party = 2
-    cfg = mmcv.Config.fromfile(Params.SECURE_CONFIG_PATH)
 
-    crypto_assets, network_assets = get_assets(party, device=Params.CRYPTO_PROVIDER_DEVICE,
-                                               simulated_bandwidth=Params.SIMULATED_BANDWIDTH)
+    parser = argparse.ArgumentParser(description='')
 
-    if Params.PRF_PREFETCH:
+    parser.add_argument('--device', type=str, default="cpu")
+    parser.add_argument('--num_images', type=int,  default=1)
+    parser.add_argument('--secure_config_path', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py")
+    parser.add_argument('--relu_spec_file', type=str, default="/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle")
+
+    args = parser.parse_args()
+
+
+    cfg = mmcv.Config.fromfile(args.secure_config_path)
+
+    crypto_assets, network_assets = get_assets(party, device=args.device)
+
+    if PRF_PREFETCH:
         prf_fetcher = init_prf_fetcher(
             cfg=cfg,
-            Params=Params,
+            checkpoint_path=None,
             max_pool=PRFFetcherMaxPool,
             build_secure_conv=build_secure_conv,
             build_secure_relu=build_secure_relu,
             build_secure_fully_connected=build_secure_fully_connected,
             prf_fetcher_secure_model=PRFFetcherSecureModelSegmentation if cfg.model.type == "EncoderDecoder" else PRFFetcherSecureModelClassification,
             secure_block_relu=PRFFetcherBlockReLU,
-            relu_spec_file=Params.RELU_SPEC_FILE,
+            relu_spec_file=args.relu_spec_file,
             crypto_assets=crypto_assets,
             network_assets=network_assets,
-            dummy_relu=Params.DUMMY_RELU,
-            device=Params.CRYPTO_PROVIDER_DEVICE
+            dummy_relu=DUMMY_RELU,
+            device=args.device
         )
     else:
         prf_fetcher = None
@@ -118,18 +127,18 @@ if __name__ == "__main__":
         max_pool=SecureMaxPoolCryptoProvider,
         secure_model_class=SecureModelSegmentation if cfg.model.type == "EncoderDecoder" else SecureModelClassification,
         block_relu=SecureBlockReLUCryptoProvider,
-        relu_spec_file=Params.RELU_SPEC_FILE,
+        relu_spec_file=args.relu_spec_file,
         crypto_assets=crypto_assets,
         network_assets=network_assets,
-        dummy_relu=Params.DUMMY_RELU,
+        dummy_relu=DUMMY_RELU,
         prf_fetcher=prf_fetcher,
-        device=Params.CRYPTO_PROVIDER_DEVICE
+        device=args.device
 
     )
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
-    for _ in range(Params.NUM_IMAGES):
+    for _ in range(args.num_images):
 
         image_size = network_assets.receiver_02.get()
         network_assets.sender_02.put(image_size)
