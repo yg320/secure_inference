@@ -20,6 +20,7 @@ from mmseg.models import build_segmentor
 from mmseg.utils import (collect_env, get_device, get_root_logger,
                          setup_multi_processes)
 
+from research.mmlab_extension.segmentation.resnet_seg import AvgPoolResNetSeg  # TODO: why is this needed?
 
 from research.distortion.arch_utils.factory import arch_utils_factory
 import pickle

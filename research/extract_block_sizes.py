@@ -12,6 +12,7 @@ parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjec
 parser.add_argument('--output_path', type=str, default="/home/yakir/tmptmptmp2")
 parser.add_argument('--num_samples', type=int, default=4)
 parser.add_argument('--num_gpus', type=int, default=2)
+parser.add_argument('--batch_index_start', type=int, default=None)
 
 args = parser.parse_args()
 
@@ -30,6 +31,10 @@ PYTHON_PATH_EXPORT = 'export PYTHONPATH=\"${PYTHONPATH}:' + chdir + '"; '
 for gpu_index in range(args.num_gpus):
     # TODO: make it multiprocess (mp.Process), instead of using subprocess. Alternatively, consider using
     #  torch.nn.parallel.parallel_apply, and then, we can discard DistortionCollector
+    if args.batch_index_start is None:
+        batch_index = gpu_index
+    else:
+        batch_index = args.batch_index_start + gpu_index
     python_command = \
         PYTHON_PATH_EXPORT + \
         f'python {distortion_extractor_script} ' + \
@@ -37,7 +42,7 @@ for gpu_index in range(args.num_gpus):
         f'--checkpoint {args.checkpoint} ' + \
         f'--output_path {distortion_output_path} ' + \
         f'--batch_size {batch_size} ' + \
-        f'--batch_index {gpu_index} ' + \
+        f'--batch_index {batch_index} ' + \
         f'--gpu_id {gpu_index} '
     distortion_extraction_processes.append(
         subprocess.Popen(python_command, shell=True)
