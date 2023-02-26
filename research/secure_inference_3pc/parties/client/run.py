@@ -191,6 +191,7 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
             seg_map = np.zeros((512, 683), dtype=np.uint8)
         else:
             img = dataset[sample_id]['img'][0].data.unsqueeze(0)
+
             img_meta = dataset[sample_id]['img_metas'][0].data
             seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
             # seg_map = dataset[sample_id]['gt_semantic_seg'][0].data.unsqueeze(0)

@@ -5,16 +5,16 @@ NUMBA_INT_DTYPE = int64 if NUM_BITS == 64 else int32
 NUMBA_UINT_DTYPE = uint64 if NUM_BITS == 64 else uint32
 
 
-@njit((int8[:, :])(int8[:, :], NUMBA_INT_DTYPE[:], int8[:, :], int8[:], uint8, uint8), parallel=True, nogil=True,
+@njit((int8[:, :])(int8[:, :], NUMBA_INT_DTYPE[:], int8[:, :], int8[:], uint8), parallel=True, nogil=True,
       cache=True)
-def private_compare_numba(s, r, x_bits_0, beta, bits, ignore_msb_bits):
+def private_compare_numba(s, r, x_bits_0, beta, ignore_bits):
     for i in prange(x_bits_0.shape[0]):
         r[i] = r[i] + beta[i]
 
         counter = 0
 
-        for j in range(bits - ignore_msb_bits):
-            decompose_bit = (r[i] >> (bits - 1 - j)) & 1
+        for j in range(64 - ignore_bits):
+            decompose_bit = (r[i] >> (64 - 1 - j)) & 1
             decompose_bit = -2 * decompose_bit * x_bits_0[i, j] + x_bits_0[i, j]
             counter = counter + decompose_bit
 
