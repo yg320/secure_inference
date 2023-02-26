@@ -20,6 +20,7 @@ from research.distortion.arch_utils.factory import arch_utils_factory
 # TODO: why are these import needed?
 from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2
 from research.mmlab_extension.classification.resnet import MyResNet
+from research.mmlab_extension.segmentation.resnet_seg import AvgPoolResNetSeg
 from research.mmlab_extension.transforms import CenterCrop
 
 

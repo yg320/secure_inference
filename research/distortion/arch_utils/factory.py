@@ -2,6 +2,7 @@ from research.distortion.arch_utils.classification.resnet.resnet50_8xb32_in1k im
     resnet50_8xb32_in1k_Utils
 from research.distortion.arch_utils.classification.resnet.resnet18_cifar import ResNet18_CIFAR_Utils
 from research.distortion.arch_utils.segmentation.MobileNetV2 import MobileNetV2_Utils as MobileNetV2_Segmentation_Utils
+from research.distortion.arch_utils.segmentation.resnet50 import ResNetUtils as ResNet50_Segmentation_Utils
 
 
 class ArchUtilsFactory:
@@ -15,6 +16,8 @@ class ArchUtilsFactory:
                 return ResNet18_CIFAR_Utils()
         if cfg.model.type == 'EncoderDecoder' and cfg.model.backbone.type in ['MobileNetV2']:
             return MobileNetV2_Segmentation_Utils()
+        if cfg.model.type == 'EncoderDecoder' and cfg.model.backbone.type in ['AvgPoolResNetSeg']:
+            return ResNet50_Segmentation_Utils()
 
         raise NotImplementedError
 
