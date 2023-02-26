@@ -31,6 +31,25 @@ test_pipeline = [
             dict(type='Collect', keys=['img']),
         ])
 ]
+
+distortion_extraction_pipeline = [
+    dict(type='LoadImageFromFile'),
+    dict(type='LoadAnnotations'),
+    dict(
+        type='MultiScaleFlipAug',
+        img_scale=(2048, 512),
+        # img_ratios=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
+        flip=False,
+        transforms=[
+            dict(type='Resize', keep_ratio=True),
+            dict(type='CenterCrop', crop_size=crop_size),
+            dict(type='RandomFlip'),
+            dict(type='Normalize', **img_norm_cfg),
+            dict(type='ImageToTensor', keys=['img', 'gt_semantic_seg']),
+            dict(type='Collect', keys=['img', 'gt_semantic_seg']),
+        ])
+]
+
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
@@ -54,4 +73,12 @@ data = dict(
         img_dir='JPEGImages',
         ann_dir='SegmentationClass',
         split='ImageSets/Segmentation/val.txt',
-        pipeline=test_pipeline))
+        pipeline=test_pipeline),
+    distortion_extraction=dict(
+        type=dataset_type,
+        data_root=data_root,
+        img_dir='JPEGImages',
+        ann_dir='SegmentationClass',
+        split='ImageSets/Segmentation/train.txt',
+        pipeline=distortion_extraction_pipeline),
+)
