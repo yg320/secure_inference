@@ -1,11 +1,10 @@
 import numpy as np
 
 from research.secure_inference_3pc.modules.base import PRFFetcherModule
-from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
+from research.secure_inference_3pc.const import COMPARISON_NUM_BITS_IGNORED
 from research.secure_inference_3pc.backend import backend
-from research.secure_inference_3pc.base import P
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, P
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
@@ -55,7 +54,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
 
     def forward(self, shape):
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [
-            NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
+            64 - COMPARISON_NUM_BITS_IGNORED], dtype=backend.int8)
         # self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=dummy_tensor.shape, dtype=SIGNED_DTYPE)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
 
@@ -97,7 +96,7 @@ class PRFFetcherMSB(PRFFetcherModule):
     def forward(self, shape):
         self.prf_handler[CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [
-            NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
+            64 - COMPARISON_NUM_BITS_IGNORED], dtype=backend.int8)
         self.prf_handler[SERVER, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
         self.private_compare(shape)

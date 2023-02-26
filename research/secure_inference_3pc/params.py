@@ -32,13 +32,13 @@ class Params:
     # RELU_SPEC_FILE = '/home/yakir/assets/mobilenet_ade/block_spec/0.09.pickle'
     # NUM_IMAGES = 2000
 
-    # SECURE_CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py"
-    # MODEL_PATH = "/home/yakir/assets/resnet_imagenet/models/ratio_0.15.pth"
-    # RELU_SPEC_FILE = '/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle'
+    SECURE_CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py"
+    MODEL_PATH = "/home/yakir/assets/resnet_imagenet/models/ratio_0.15.pth"
+    RELU_SPEC_FILE = '/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle'
 
-    SECURE_CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet18_cifar100/baseline_24.57K.py"
-    MODEL_PATH = "/home/yakir/PycharmProjects/secure_inference/work_dirs/baseline_24.57K/epoch_120.pth"
-    RELU_SPEC_FILE = '/home/yakir/deepreduce_comparison_v2/distortions/baseline/block_sizes/24.57K.pickle'
+    # SECURE_CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet18_cifar100/baseline_24.57K.py"
+    # MODEL_PATH = "/home/yakir/PycharmProjects/secure_inference/work_dirs/baseline_24.57K/epoch_120.pth"
+    # RELU_SPEC_FILE = '/home/yakir/deepreduce_comparison_v2/distortions/baseline/block_sizes/24.57K.pickle'
     NUM_IMAGES = 1
 
 

@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from research.secure_inference_3pc.const import IS_TORCH_BACKEND
-from research.secure_inference_3pc.timer import timer
+
 dtype_converted = {np.int32: torch.int32, np.int64: torch.int64, torch.int8:torch.int8, torch.bool:torch.bool, torch.int32:torch.int32, torch.int64:torch.int64}
 torch_dtype_converted = {torch.int32: np.int32, torch.int64: np.int64, torch.int8:np.int8, torch.bool:np.bool, np.int32:np.int32, np.int64:np.int64, np.int8:np.int8, np.bool:np.bool, None:None}
 

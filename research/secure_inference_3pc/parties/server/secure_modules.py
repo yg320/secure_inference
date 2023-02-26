@@ -1,5 +1,5 @@
 from research.secure_inference_3pc.backend import backend
-from research.secure_inference_3pc.const import IGNORE_MSB_BITS
+from research.secure_inference_3pc.const import COMPARISON_NUM_BITS_IGNORED
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
@@ -181,12 +181,11 @@ class SecureConv2DServer(SecureModule):
 class PrivateCompareServer(SecureModule):
     def __init__(self, **kwargs):
         super(PrivateCompareServer, self).__init__(**kwargs)
-        # self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=64,
-        #                            dtype=SIGNED_DTYPE, **kwargs)
+
 
     def forward(self, x_bits_1, r, beta):
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=backend.int8)
-        d_bits_1 = private_compare_numba_server(s, r, x_bits_1, beta, IGNORE_MSB_BITS)
+        d_bits_1 = private_compare_numba_server(s, r, x_bits_1, beta, COMPARISON_NUM_BITS_IGNORED)
 
         # r[backend.astype(beta, backend.bool)] += 1
         # bits = self.decompose(r)

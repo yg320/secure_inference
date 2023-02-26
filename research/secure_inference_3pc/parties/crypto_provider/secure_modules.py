@@ -1,10 +1,9 @@
-from research.secure_inference_3pc.const import IGNORE_MSB_BITS
+from research.secure_inference_3pc.const import COMPARISON_NUM_BITS_IGNORED
 from research.secure_inference_3pc.backend import backend
-from research.secure_inference_3pc.base import P
 from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, \
-    UNSIGNED_DTYPE
+    UNSIGNED_DTYPE, P
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
@@ -83,12 +82,11 @@ class ShareConvertCryptoProvider(SecureModule):
     def __init__(self, **kwargs):
         super(ShareConvertCryptoProvider, self).__init__(**kwargs)
         self.private_compare = PrivateCompareCryptoProvider(**kwargs)
-        self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=64,
-                                   dtype=SIGNED_DTYPE, **kwargs)
+        self.decompose = Decompose(num_bits_ignored=COMPARISON_NUM_BITS_IGNORED, dtype=SIGNED_DTYPE, **kwargs)
 
     def forward(self, size):
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=size + (
-        64 - IGNORE_MSB_BITS,), dtype=backend.int8)
+        64 - COMPARISON_NUM_BITS_IGNORED,), dtype=backend.int8)
         delta_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
 
         a_tild_0 = self.network_assets.receiver_02.get()
@@ -210,13 +208,12 @@ class SecureMSBCryptoProvider(SecureModule):
         super(SecureMSBCryptoProvider, self).__init__(**kwargs)
         self.mult = SecureMultiplicationCryptoProvider(**kwargs)
         self.private_compare = PrivateCompareCryptoProvider(**kwargs)
-        # self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=NUM_OF_COMPARE_BITS,
-        #                            dtype=SIGNED_DTYPE, **kwargs)
+
 
     def forward(self, size):
         x = self.prf_handler[CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=(
-        size[0], 64 - IGNORE_MSB_BITS), dtype=backend.int8)
+        size[0], 64 - COMPARISON_NUM_BITS_IGNORED), dtype=backend.int8)
         x_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=size, dtype=SIGNED_DTYPE)
         x_bit_0_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=size,
                                                                        dtype=SIGNED_DTYPE)
@@ -226,7 +223,7 @@ class SecureMSBCryptoProvider(SecureModule):
         processing_numba(x, x_1, x_bit_0_0, x_bits_0,
                          x.astype(UNSIGNED_DTYPE, copy=False),
                          x_1.astype(UNSIGNED_DTYPE, copy=False),
-                         IGNORE_MSB_BITS)
+                         COMPARISON_NUM_BITS_IGNORED)
         x_bits_1 = x_bits_0
         x_0 = x_1
         x_bit_0_1 = x

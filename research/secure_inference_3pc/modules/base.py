@@ -15,7 +15,6 @@ class SecureModule(torch.nn.Module):
         self.network_assets = network_assets
         self.device = device
 
-
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
         # ret[backend.unsigned_gt(a, ret)] += 1
@@ -23,7 +22,7 @@ class SecureModule(torch.nn.Module):
             ret += backend.unsigned_gt(a, ret).to(ret.dtype)
         else:
             ret[backend.unsigned_gt(a, ret)] += 1
-        ret[ret == - 1] = 0   # If ret were uint64, then the condition would be ret == 2**64 - 1
+        ret[ret == - 1] = 0  # If ret were uint64, then the condition would be ret == 2**64 - 1
         return ret
 
     def sub_mode_L_minus_one(self, a, b):
@@ -40,6 +39,8 @@ class SecureModule(torch.nn.Module):
     #     else:
     #         self.forward()
     #
+
+
 class PRFFetcherModule(SecureModule):
     def __init__(self, **kwargs):
         if "device" not in kwargs:
@@ -49,22 +50,21 @@ class PRFFetcherModule(SecureModule):
 
 class Decompose(SecureModule):
     # buffer = backend.zeros(shape=(200000, 20), dtype=backend.int8)
-    def __init__(self, ignore_msb_bits, num_of_compare_bits, dtype, **kwargs):
+    def __init__(self, num_bits_ignored, dtype, **kwargs):
         super(Decompose, self).__init__(**kwargs)
-        self.ignore_msb_bits = ignore_msb_bits
-        self.num_of_compare_bits = num_of_compare_bits
+        self.num_bits_ignored = num_bits_ignored
         self.powers = backend.unsqueeze(backend.arange(NUM_BITS, dtype=dtype), 0)
-        end = None if self.ignore_msb_bits == 0 else -self.ignore_msb_bits
-        self.powers = backend.put_on_device(backend.flip(self.powers, axis=-1)[:, NUM_BITS - self.num_of_compare_bits:end], self.device)
+        end = None if self.num_bits_ignored == 0 else -self.num_bits_ignored
+        self.powers = backend.put_on_device(backend.flip(self.powers, axis=-1)[:, :end], self.device)
 
     def forward(self, value):
         orig_shape = list(value.shape)
         value = value.reshape(-1, 1)
-        value_bits = backend.zeros(shape=(value.shape[0], self.num_of_compare_bits - self.ignore_msb_bits), dtype=backend.int8)
+        value_bits = backend.zeros(shape=(value.shape[0], NUM_BITS - self.num_bits_ignored), dtype=backend.int8)
         # value_bits = Decompose.buffer[:value.shape[0]]
         value_bits = backend.right_shift(value, self.powers, out=value_bits)
         value_bits = backend.bitwise_and(value_bits, 1, out=value_bits)
-        ret = value_bits.reshape(orig_shape + [self.num_of_compare_bits - self.ignore_msb_bits])
+        ret = value_bits.reshape(orig_shape + [NUM_BITS - self.num_bits_ignored])
         return ret
 
     # @timer("Decompose")

@@ -3,7 +3,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from research.secure_inference_3pc.backend import backend
-from research.secure_inference_3pc.const import IS_TORCH_BACKEND
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND, COMPARISON_NUM_BITS_IGNORED, NUM_OF_LSB_TO_IGNORE
+
 
 # TODO: don't use you own get_data and data handling. use mmseg one
 # TODO: don't use your standalone_inference - use mmseg one
@@ -175,12 +176,13 @@ class SecureOptimizedBlockReLU(Module):
         return mean_tensors, cumsum_shapes, pad_handlers
 
 
+
     def forward(self, activation):
 
         if np.all(self.block_sizes == [0, 1]):
             return activation
         mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
-        mean_tensors = (mean_tensors >> 5).astype(np.int16).astype(np.int64) << (64-16)
+        mean_tensors = (mean_tensors >> NUM_OF_LSB_TO_IGNORE).astype(np.int16).astype(np.int64) << COMPARISON_NUM_BITS_IGNORED
         sign_tensors = self.DReLU(mean_tensors)
 
         return self.post_bReLU(activation,

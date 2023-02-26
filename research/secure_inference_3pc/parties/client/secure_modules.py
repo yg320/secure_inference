@@ -1,9 +1,8 @@
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.base import P
 from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, IGNORE_MSB_BITS, TRUNC_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, COMPARISON_NUM_BITS_IGNORED, TRUNC_BITS,  P
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.secure_inference_3pc.modules.base import Decompose
 from research.bReLU import SecureOptimizedBlockReLU
@@ -185,12 +184,11 @@ class SecureConv2DClient(SecureModule):
 class PrivateCompareClient(SecureModule):
     def __init__(self, **kwargs):
         super(PrivateCompareClient, self).__init__(**kwargs)
-        # self.decompose = Decompose(ignore_msb_bits=IGNORE_MSB_BITS, num_of_compare_bits=64,
-        #                            dtype=SIGNED_DTYPE, **kwargs)
+
 
     def forward(self, x_bits_0, r, beta):
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=P, size=x_bits_0.shape, dtype=backend.int8)
-        d_bits_0 = private_compare_numba(s, r, x_bits_0, beta, IGNORE_MSB_BITS)
+        d_bits_0 = private_compare_numba(s, r, x_bits_0, beta, COMPARISON_NUM_BITS_IGNORED)
         # r[backend.astype(beta, backend.bool)] += 1
         # bits = self.decompose(r)
         # c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
@@ -233,7 +231,7 @@ class ShareConvertClient(SecureModule):
         r_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape, dtype=SIGNED_DTYPE)
         mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=a_0.shape, dtype=SIGNED_DTYPE)
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [
-            64 - IGNORE_MSB_BITS], dtype=backend.int8)
+            64 - COMPARISON_NUM_BITS_IGNORED], dtype=backend.int8)
 
         alpha = backend.astype(0 < r_0 - r, SIGNED_DTYPE)
         a_tild_0 = a_0 + r_0
@@ -391,7 +389,7 @@ class SecureMSBClient(SecureModule):
     def pre_compare(self, a_0):
         beta = self.prf_handler[CLIENT, SERVER].integers(0, 2, size=a_0.shape, dtype=backend.int8)
         x_bits_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(0, P, size=list(a_0.shape) + [
-            64 - IGNORE_MSB_BITS], dtype=backend.int8)
+            64 - COMPARISON_NUM_BITS_IGNORED], dtype=backend.int8)
         x_bit_0_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=a_0.shape,
                                                                        dtype=SIGNED_DTYPE)
 

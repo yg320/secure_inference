@@ -3,10 +3,8 @@ from research.secure_inference_3pc.modules.base import PRFFetcherModule, SecureM
 # TODO: change everything from dummy_tensors to dummy_tensor_shape - there is no need to pass dummy_tensors
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.base import P
 
-from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, \
-    NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
+from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, COMPARISON_NUM_BITS_IGNORED,  P
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
 from research.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
@@ -49,7 +47,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
 
     def forward(self, shape):
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=P,
-                                                        size=[shape[0]] + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS],
+                                                        size=[shape[0]] + [64 - COMPARISON_NUM_BITS_IGNORED],
                                                         dtype=backend.int8)
 
 
@@ -63,8 +61,7 @@ class PRFFetcherShareConvert(PRFFetcherModule):
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
-        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [
-            NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
+        self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [64 - COMPARISON_NUM_BITS_IGNORED], dtype=backend.int8)
 
         self.private_compare(shape)
 
@@ -105,7 +102,7 @@ class PRFFetcherMSB(PRFFetcherModule):
     def forward(self, shape):
         self.prf_handler[CLIENT, SERVER].integers_fetch(0, 2, size=shape, dtype=backend.int8)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(0, P, size=list(shape) + [
-            NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS], dtype=backend.int8)
+            64 - COMPARISON_NUM_BITS_IGNORED], dtype=backend.int8)
         self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)

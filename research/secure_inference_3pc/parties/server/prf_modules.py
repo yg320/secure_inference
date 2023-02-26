@@ -2,7 +2,7 @@ from research.secure_inference_3pc.backend import backend
 
 from research.secure_inference_3pc.modules.base import PRFFetcherModule
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
-from research.secure_inference_3pc.const import NUM_OF_COMPARE_BITS, IGNORE_MSB_BITS
+from research.secure_inference_3pc.const import COMPARISON_NUM_BITS_IGNORED
 
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
@@ -50,7 +50,7 @@ class PRFFetcherPrivateCompare(PRFFetcherModule):
 
     def forward(self, shape):
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=1, high=67,
-                                                        size=[shape[0]] + [NUM_OF_COMPARE_BITS - IGNORE_MSB_BITS],
+                                                        size=[shape[0]] + [64 - COMPARISON_NUM_BITS_IGNORED],
                                                         dtype=backend.int8)
 
 

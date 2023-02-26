@@ -1,18 +1,15 @@
 import torch
-from research.secure_inference_3pc.backend import backend
-from research.secure_inference_3pc.timer import timer
 
 from research.secure_inference_3pc.communication.utils import Sender, Receiver
-import time
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
-from numba import njit, prange
-from research.secure_inference_3pc.const import TRUNC, NUM_BITS, UNSIGNED_DTYPE, SIGNED_DTYPE, P, TORCH_DTYPE
+from research.secure_inference_3pc.const import TRUNC, TORCH_DTYPE
+from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2448
+        self.base_port = 2451
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2
@@ -35,6 +32,7 @@ class Addresses:
         # self.ip_client_private = "172.31.40.44"
         # self.ip_server_private = "172.31.47.91"
         # self.ip_cryptoprovider_private = "172.31.47.192"
+
 
 class NetworkAssets:
     def __init__(self, sender_01, sender_02, sender_12, receiver_01, receiver_02, receiver_12):
@@ -132,20 +130,6 @@ def get_assets(party, device, simulated_bandwidth=None):
 
     return crypto_assets, network_assets
 
-min_org_shit = -283206
-max_org_shit = 287469
-org_shit = backend.astype(backend.arange(min_org_shit, max_org_shit + 1) % P, backend.int8)
-
-def module_67(xxx):
-    if IS_TORCH_BACKEND:
-    # TODO: fix this
-        return xxx % 67
-    else:
-        orig_shape = xxx.shape
-        xxx = xxx.reshape(-1)
-        backend.subtract(xxx, min_org_shit, out=xxx)
-        return org_shit[backend.astype(xxx, SIGNED_DTYPE)].reshape(orig_shape)
-
 
 def fuse_conv_bn(conv_module, batch_norm_module):
     # TODO: this was copied from somewhere
@@ -209,64 +193,7 @@ def fuse_conv_bn(conv_module, batch_norm_module):
 
     return W, B
 
-def get_c_party_0(x_bits, multiplexer_bits, beta):
-    beta = backend.unsqueeze(beta, -1)
-    beta = 2 * beta  # Not allowed to change beta inplace
-    backend.subtract(beta, 1, out=beta)
-    backend.multiply(multiplexer_bits, x_bits, out=multiplexer_bits)
-    backend.multiply(multiplexer_bits, -2, out=multiplexer_bits)
-    backend.add(multiplexer_bits, x_bits, out=multiplexer_bits)
 
-    w_cumsum = backend.astype(multiplexer_bits, backend.int32)
-    backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-    backend.subtract(w_cumsum, multiplexer_bits, out=w_cumsum)
-    backend.multiply(x_bits, beta, out=x_bits)
-    backend.add(w_cumsum, x_bits, out=w_cumsum)
-
-    return w_cumsum
-
-def get_c_party_1(x_bits, multiplexer_bits, beta):
-    beta = backend.unsqueeze(beta, -1)
-    beta = -2 * beta  # Not allowed to change beta inplace
-    backend.add(beta, 1, out=beta)
-
-    w = multiplexer_bits * x_bits
-    backend.multiply(w, -2, out=w)
-    backend.add(w, x_bits, out=w)
-    backend.add(w, multiplexer_bits, out=w)
-
-    w_cumsum = backend.astype(w, backend.int32)
-    backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-    backend.subtract(w_cumsum, w, out=w_cumsum)
-
-    backend.subtract(multiplexer_bits, x_bits, out=multiplexer_bits)
-    backend.multiply(multiplexer_bits, beta, out=multiplexer_bits)
-    backend.add(multiplexer_bits, 1, out=multiplexer_bits)
-    backend.add(w_cumsum, multiplexer_bits, out=w_cumsum)
-
-    return w_cumsum
-
-
-# def get_c(x_bits, multiplexer_bits, beta, j):
-#     beta = beta[..., backend.newaxis]
-#     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
-#     w_cumsum = w.astype(backend.int32)
-#     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
-#     backend.subtract(w_cumsum, w, out=w_cumsum)
-#     rrr = w_cumsum
-#     zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
-#     ret = rrr + zzz.astype(backend.int32)
-#
-#     return ret
-#
-#
-# def get_c_case_2(u, j):
-#     c = (P + 1 - j) * (u + 1) + (P-j) * u
-#     c[..., 0] = u[...,0] * (P-1) ** j
-#     return c % P
-
-
-from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 class TypeConverter:
     trunc = TRUNC
     int_dtype = TORCH_DTYPE
@@ -291,3 +218,61 @@ class TypeConverter:
             return (data.to(TypeConverter.float_dtype) / TypeConverter.trunc)
         else:
             return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc  # NUMPY_CONVERSION
+
+
+# def get_c_party_0(x_bits, multiplexer_bits, beta):
+#     beta = backend.unsqueeze(beta, -1)
+#     beta = 2 * beta  # Not allowed to change beta inplace
+#     backend.subtract(beta, 1, out=beta)
+#     backend.multiply(multiplexer_bits, x_bits, out=multiplexer_bits)
+#     backend.multiply(multiplexer_bits, -2, out=multiplexer_bits)
+#     backend.add(multiplexer_bits, x_bits, out=multiplexer_bits)
+#
+#     w_cumsum = backend.astype(multiplexer_bits, backend.int32)
+#     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+#     backend.subtract(w_cumsum, multiplexer_bits, out=w_cumsum)
+#     backend.multiply(x_bits, beta, out=x_bits)
+#     backend.add(w_cumsum, x_bits, out=w_cumsum)
+#
+#     return w_cumsum
+#
+# def get_c_party_1(x_bits, multiplexer_bits, beta):
+#     beta = backend.unsqueeze(beta, -1)
+#     beta = -2 * beta  # Not allowed to change beta inplace
+#     backend.add(beta, 1, out=beta)
+#
+#     w = multiplexer_bits * x_bits
+#     backend.multiply(w, -2, out=w)
+#     backend.add(w, x_bits, out=w)
+#     backend.add(w, multiplexer_bits, out=w)
+#
+#     w_cumsum = backend.astype(w, backend.int32)
+#     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+#     backend.subtract(w_cumsum, w, out=w_cumsum)
+#
+#     backend.subtract(multiplexer_bits, x_bits, out=multiplexer_bits)
+#     backend.multiply(multiplexer_bits, beta, out=multiplexer_bits)
+#     backend.add(multiplexer_bits, 1, out=multiplexer_bits)
+#     backend.add(w_cumsum, multiplexer_bits, out=w_cumsum)
+#
+#     return w_cumsum
+#
+
+# def get_c(x_bits, multiplexer_bits, beta, j):
+#     beta = beta[..., backend.newaxis]
+#     w = x_bits + j * multiplexer_bits - 2 * multiplexer_bits * x_bits
+#     w_cumsum = w.astype(backend.int32)
+#     backend.cumsum(w_cumsum, axis=-1, out=w_cumsum)
+#     backend.subtract(w_cumsum, w, out=w_cumsum)
+#     rrr = w_cumsum
+#     zzz = j + (1 - 2 * beta) * (j * multiplexer_bits - x_bits)
+#     ret = rrr + zzz.astype(backend.int32)
+#
+#     return ret
+#
+#
+# def get_c_case_2(u, j):
+#     c = (P + 1 - j) * (u + 1) + (P-j) * u
+#     c[..., 0] = u[...,0] * (P-1) ** j
+#     return c % P
+
