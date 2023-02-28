@@ -14,6 +14,7 @@ class SecureConv2DClient(SecureModule):
         self.dilation = dilation
 
     def forward(self, X_share):
+        print("conv")
         assert self.W_share.shape[2] == self.W_share.shape[3]
         assert self.W_share.shape[1] == X_share.shape[1]
         assert X_share.shape[2] == X_share.shape[3]
