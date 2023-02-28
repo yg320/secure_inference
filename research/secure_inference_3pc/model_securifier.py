@@ -44,9 +44,7 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu, prf_prefetch)
         decoder.image_pool[0].forward = foo
 
 
-def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets,
-                                   network_assets, dummy_relu, block_relu=None, relu_spec_file=None,
-                                   prf_prefetch=False):
+def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, prf_prefetch=False):
     convert_conv_module(model.backbone.conv1, build_secure_conv, build_secure_relu)
 
     for layer in [1, 2, 3, 4, 5, 6, 7]:
@@ -57,6 +55,49 @@ def securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, 
 
     convert_decoder(model.decode_head, build_secure_conv, build_secure_relu, prf_prefetch)
 
+    return model
+
+
+# TODO: code duplication
+def securify_resnet_deeplab(model, max_pool, build_secure_conv, build_secure_relu, prf_prefetch=False, switch_pool_relu=False):
+    model.backbone.stem[0] = build_secure_conv(conv_module=model.backbone.stem[0], bn_module=model.backbone.stem[1])
+    model.backbone.stem[1] = torch.nn.Identity()
+    model.backbone.stem[2] = build_secure_relu()
+
+    model.backbone.stem[3] = build_secure_conv(conv_module=model.backbone.stem[3], bn_module=model.backbone.stem[4])
+    model.backbone.stem[4] = torch.nn.Identity()
+    model.backbone.stem[5] = build_secure_relu()
+
+    model.backbone.stem[6] = build_secure_conv(conv_module=model.backbone.stem[6], bn_module=model.backbone.stem[7])
+    model.backbone.stem[7] = torch.nn.Identity()
+    model.backbone.stem[8] = build_secure_relu()
+
+    if hasattr(model.backbone, "maxpool"):
+        model.backbone.maxpool = max_pool()
+        if switch_pool_relu:
+            model.backbone.stem[8], model.backbone.maxpool = model.backbone.maxpool, model.backbone.stem[8]
+
+    for layer in [1, 2, 3, 4]:
+        cur_res_layer = getattr(model.backbone, f"layer{layer}")
+        for block in cur_res_layer:
+
+            block.conv1 = build_secure_conv(conv_module=block.conv1, bn_module=block.bn1)
+            block.bn1 = torch.nn.Identity()
+            block.relu_1 = build_secure_relu()
+
+            block.conv2 = build_secure_conv(conv_module=block.conv2, bn_module=block.bn2)
+            block.bn2 = torch.nn.Identity()
+            block.relu_2 = build_secure_relu()
+
+            if hasattr(block, "conv3"):
+                block.conv3 = build_secure_conv(conv_module=block.conv3, bn_module=block.bn3)
+                block.bn3 = torch.nn.Identity()
+                block.relu_3 = build_secure_relu()
+
+            if block.downsample:
+                block.downsample = build_secure_conv(conv_module=block.downsample[0], bn_module=block.downsample[1])
+
+    convert_decoder(model.decode_head, build_secure_conv, build_secure_relu, prf_prefetch)
     return model
 
 
@@ -172,8 +213,18 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
     )
 
     if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "MobileNetV2":
-        securify_deeplabv3_mobilenetv2(model, build_secure_conv, build_secure_relu, secure_model_class, crypto_assets,
-                                       network_assets, dummy_relu, block_relu, relu_spec_file)
+        securify_deeplabv3_mobilenetv2(model,
+                                       build_secure_conv,
+                                       build_secure_relu)
+    if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type in ["AvgPoolResNetSeg", "MyResNetSeg"]:
+        max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNetSeg' else max_pool
+
+        securify_resnet_deeplab(model,
+                                max_pool_layer,
+                                build_secure_conv,
+                                build_secure_relu,
+                                switch_pool_relu=cfg.model.backbone.type == "MyResNetSeg")
+
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", 'ResNet_CIFAR_V2']:
         max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
         securify_resnet(model,
@@ -201,6 +252,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
 def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_secure_relu, build_secure_fully_connected,
                      prf_fetcher_secure_model, secure_block_relu, relu_spec_file, crypto_assets, network_assets,
                      dummy_relu, device):
+
     build_secure_conv = partial(build_secure_conv, crypto_assets=crypto_assets, network_assets=network_assets,
                                 is_prf_fetcher=True, device=device)
     build_secure_fully_connected = partial(build_secure_fully_connected, crypto_assets=crypto_assets,
@@ -226,14 +278,19 @@ def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_se
             model=prf_fetcher_model,
             build_secure_conv=build_secure_conv,
             build_secure_relu=build_secure_relu,
-            secure_model_class=prf_fetcher_secure_model,
-            crypto_assets=crypto_assets,
-            network_assets=network_assets,
-            dummy_relu=dummy_relu,
-            block_relu=secure_block_relu,
-            relu_spec_file=relu_spec_file,
             prf_prefetch=True
         )
+    elif cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "AvgPoolResNetSeg":
+        max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNetSeg' else max_pool
+
+        securify_resnet_deeplab(prf_fetcher_model,
+                                max_pool_layer,
+                                build_secure_conv,
+                                build_secure_relu,
+                                prf_prefetch=True,
+
+                                switch_pool_relu=cfg.model.backbone.type == "MyResNetV1cSeg")
+
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", "ResNet_CIFAR_V2"]:
         max_pool_layer = MyAvgPoolFetcher if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
 

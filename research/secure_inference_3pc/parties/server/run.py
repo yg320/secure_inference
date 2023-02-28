@@ -13,6 +13,8 @@ from research.secure_inference_3pc.parties.server.prf_modules import PRFFetcherC
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
 from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
+from research.mmlab_extension.segmentation.resnet_seg import AvgPoolResNetSeg
+
 from research.secure_inference_3pc.parties.server.secure_modules import SecureConv2DServer, SecureReLUServer, \
     SecureMaxPoolServer, \
     SecureBlockReLUServer
@@ -117,8 +119,7 @@ if __name__ == "__main__":
     parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--model_path', type=str, default="/home/yakir/assets/resnet_imagenet/models/ratio_0.15.pth")
     parser.add_argument('--secure_config_path', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py")
-    parser.add_argument('--relu_spec_file', type=str, default="/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle")
-    parser.add_argument('--num_images', type=int,  default=1)
+    parser.add_argument('--relu_spec_file', type=str, default=None)
     args = parser.parse_args()
 
 
@@ -166,9 +167,12 @@ if __name__ == "__main__":
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
 
-    for _ in range(args.num_images):
+    while True:
 
         image_size = network_assets.receiver_01.get()
+
+        if image_size.shape == (1,):
+            break
         network_assets.sender_01.put(image_size)
 
         if model.prf_fetcher:

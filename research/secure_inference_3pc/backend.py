@@ -70,8 +70,10 @@ class NumpyBackend:
         return a.astype(np.uint64, copy=False) > b.astype(np.uint64, copy=False)
 
     def pad(self, data, pad_width, mode):
-        return np.pad(data, pad_width, mode=mode, constant_values=0)
-
+        if mode == "constant":
+            return np.pad(data, pad_width, mode=mode, constant_values=0)
+        else:
+            return np.pad(data, pad_width, mode=mode)
     def stack(self, data, axis=0):
         return np.stack(data, axis=axis)
 

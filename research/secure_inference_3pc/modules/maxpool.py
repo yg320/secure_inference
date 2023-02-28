@@ -14,20 +14,19 @@ class SecureMaxPool(SecureModule):
         assert self.padding == 1
 
     def forward(self, x):
+        out_shape = (x.shape[2] + 1) // 2, (x.shape[3] + 1) // 2
+        x = backend.pad(x, ((0, 0), (0, 0), (1, 2), (1, 2)), mode='edge')
 
-        assert x.shape[2] == 112, x.shape
-        assert x.shape[3] == 112, x.shape
-
-        x = backend.pad(x, ((0, 0), (0, 0), (1, 0), (1, 0)), mode='constant')
-        x = backend.stack([x[:, :, 0:-1:2, 0:-1:2],
-                           x[:, :, 0:-1:2, 1:-1:2],
-                           x[:, :, 0:-1:2, 2::2],
-                           x[:, :, 1:-1:2, 0:-1:2],
-                           x[:, :, 1:-1:2, 1:-1:2],
-                           x[:, :, 1:-1:2, 2::2],
-                           x[:, :, 2::2, 0:-1:2],
-                           x[:, :, 2::2, 1:-1:2],
-                           x[:, :, 2::2, 2::2]])
+        x = backend.stack([
+            x[:, :, 0::2, 0::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 0::2, 1::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 0::2, 2::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 1::2, 0::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 1::2, 1::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 1::2, 2::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 2::2, 0::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 2::2, 1::2][:, :, :out_shape[0], :out_shape[1]],
+            x[:, :, 2::2, 2::2][:, :, :out_shape[0], :out_shape[1]]])
 
         out_shape = x.shape[1:]
         x = x.reshape((x.shape[0], -1))

@@ -1,6 +1,7 @@
 from research.secure_inference_3pc.backend import backend
 from tqdm import tqdm
 import argparse
+import os
 
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.base import get_assets, TypeConverter
@@ -22,6 +23,7 @@ from research.secure_inference_3pc.parties.client.secure_modules import SecureCo
     SecureBlockReLUClient
 
 from research.mmlab_extension.segmentation.secure_aspphead import SecureASPPHead
+from research.mmlab_extension.segmentation.resnet_seg import AvgPoolResNetSeg
 from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
 from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 
@@ -89,7 +91,6 @@ class SecureModelClassification(SecureModule):
         out_1 = self.network_assets.receiver_01.get()
         out = out_1 + out_0
         out = TypeConverter.i2f(out)
-        print(out.numpy().mean())
         out = out.argmax()
 
         return out
@@ -134,67 +135,97 @@ class SecureModelSegmentation(SecureModule):
         return seg_pred
 
 
-def full_inference_classification(cfg, model, num_images, device, network_assets, dummy=False):
-    if not dummy:
-        dataset = build_data(cfg, mode="test")
-    results_gt = []
-    results_pred = []
-    model.eval()
-    if model.prf_fetcher:
-        model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
+def run_inference_classification(img, gt, dataset, img_meta=None, is_dummy=False):
+    out = model(img)
+    if not is_dummy:
+        return gt == out
+        # results_gt.append(gt)
+        # results_pred.append(out)
+        # print((backend.array(results_gt) == backend.array(results_pred)).mean())
 
-    for sample_id in tqdm(range(num_images)):
 
-        if dummy:
+def run_inference_segmentation(img, gt, dataset, img_meta=None, is_dummy=False):
+    seg_pred = model(img, img_meta)
+
+    if not is_dummy:
+        return intersect_and_union(
+            seg_pred,
+            gt,
+            len(dataset.CLASSES),
+            dataset.ignore_index,
+            label_map=dict(),
+            reduce_zero_label=dataset.reduce_zero_label)
+
+def get_sample_data(dataset_type, dataset, sample_id):
+    if dataset is None:
+        if "VOC" in dataset_type:
+            img = np.zeros((1, 3, 512, 713), dtype=np.float32)
+            img_meta = {
+                'filename': 'data/ade/ADEChallengeData2016/images/validation/ADE_val_00000001.jpg',
+                'ori_filename': 'ADE_val_00000001.jpg',
+                'ori_shape': (512, 713, 3), 'img_shape': (512, 713, 3), 'pad_shape': (512, 713, 3),
+                'scale_factor': np.array([1., 1., 1., 1.], dtype=np.float32),
+                'flip': False, 'flip_direction': 'horizontal', 'img_norm_cfg':
+                    {'mean': np.array([123.675, 116.28, 103.53], dtype=np.float32),
+                     'std': np.array([58.395, 57.12, 57.375], dtype=np.float32), 'to_rgb': True}
+            }
+            gt = np.zeros((512, 673), dtype=np.uint8)
+        elif "ADE20K" in dataset_type:
+            img = np.zeros((1, 3, 512, 673), dtype=np.float32)
+            img_meta = {
+                'filename': 'data/ade/ADEChallengeData2016/images/validation/ADE_val_00000001.jpg',
+                'ori_filename': 'ADE_val_00000001.jpg',
+                'ori_shape': (512, 673, 3), 'img_shape': (512, 673, 3), 'pad_shape': (512, 673, 3),
+                'scale_factor': np.array([1., 1., 1., 1.], dtype=np.float32),
+                'flip': False, 'flip_direction': 'horizontal', 'img_norm_cfg':
+                    {'mean': np.array([123.675, 116.28, 103.53], dtype=np.float32),
+                     'std': np.array([58.395, 57.12, 57.375], dtype=np.float32), 'to_rgb': True}
+            }
+            gt = np.zeros((512, 673), dtype=np.uint8)
+        elif 'CIFAR100' in dataset_type:
+            img = np.zeros((3, 32, 32), dtype=np.float32)
+            gt = 0
+            img_meta = None
+        elif 'ImageNet' in dataset_type:
             img = np.zeros((3, 224, 224), dtype=np.float32)
             gt = 0
+            img_meta = None
         else:
+            raise NotImplementedError
+    else:
+        if ("VOC" in dataset_type) or ("ADE20K" in dataset_type):
+            img = dataset[sample_id]['img'][0].data.unsqueeze(0)
+            img_meta = dataset[sample_id]['img_metas'][0].data
+            gt = dataset.get_gt_seg_map_by_idx(sample_id)
+        elif ('CIFAR100' in dataset_type) or ('ImageNet' in dataset_type):
             img = dataset[sample_id]['img'].data
+            img = img.reshape((1,) + img.shape)
             gt = dataset.get_gt_labels()[sample_id]
-        img = backend.put_on_device(img.reshape((1,) + img.shape), device)
-        if model.prf_fetcher:
-            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+            img_meta = None
+        else:
+            raise NotImplementedError
 
-        # Handshake
-        network_assets.sender_01.put(np.array(img.shape))
-        network_assets.sender_02.put(np.array(img.shape))
-        network_assets.receiver_01.get()
-        network_assets.receiver_02.get()
+    return img, gt, img_meta
 
-        out = model(img)
-        results_gt.append(gt)
-        results_pred.append(out)
-        print((backend.array(results_gt) == backend.array(results_pred)).mean())
-    if model.prf_fetcher:
-        model.prf_fetcher.prf_handler.done()
-
-
-def full_inference_segmentation(cfg, model, num_images, device, network_assets, dummy=False):
+def full_inference(cfg, model, image_start, image_end, device, network_assets, dummy=False, dump_dir=None, skip_existing=False):
+    is_segmentation = cfg.model.type == "EncoderDecoder"
+    run_inference_func = run_inference_segmentation if is_segmentation else run_inference_classification
+    datadtype = cfg.data['test']['type']
     if not dummy:
         dataset = build_data(cfg, mode="test")
+    else:
+        dataset = None
+
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.fetch(model=model.prf_fetcher)
+    model.eval()
 
     results = []
-    for sample_id in tqdm(range(num_images)):
 
-        if dummy:
-            img = np.zeros((1, 3, 512, 683), dtype=np.float32)
-            img_meta = {'filename': 'data/ade/ADEChallengeData2016/images/validation/ADE_val_00000001.jpg',
-                        'ori_filename': 'ADE_val_00000001.jpg',
-                        'ori_shape': (512, 683, 3), 'img_shape': (512, 683, 3), 'pad_shape': (512, 683, 3),
-                        'scale_factor': np.array([1., 1., 1., 1.], dtype=np.float32),
-                        'flip': False, 'flip_direction': 'horizontal', 'img_norm_cfg':
-                            {'mean': np.array([123.675, 116.28, 103.53], dtype=np.float32),
-                             'std': np.array([58.395, 57.12, 57.375], dtype=np.float32), 'to_rgb': True}}
-            seg_map = np.zeros((512, 683), dtype=np.uint8)
-        else:
-            img = dataset[sample_id]['img'][0].data.unsqueeze(0)
-
-            img_meta = dataset[sample_id]['img_metas'][0].data
-            seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
-            # seg_map = dataset[sample_id]['gt_semantic_seg'][0].data.unsqueeze(0)
-
+    for sample_id in tqdm(range(image_start, image_end)):
+        if skip_existing and os.path.exists(os.path.join(dump_dir, f"{sample_id}.npy")):
+            continue
+        img, gt, img_meta = get_sample_data(datadtype, dataset, sample_id)
         if model.prf_fetcher:
             model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
@@ -203,35 +234,42 @@ def full_inference_segmentation(cfg, model, num_images, device, network_assets, 
         network_assets.sender_02.put(np.array(img.shape))
         network_assets.receiver_01.get()
         network_assets.receiver_02.get()
+        cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
 
-        seg_pred = model(img, img_meta)
-        # print(seg_pred.mean())
-        if not dummy:
-            results.append(
-                intersect_and_union(
-                    seg_pred,
-                    seg_map,
-                    len(dataset.CLASSES),
-                    dataset.ignore_index,
-                    label_map=dict(),
-                    reduce_zero_label=dataset.reduce_zero_label)
-            )
+        if dump_dir is not None:
+            np.save(os.path.join(dump_dir, f"{sample_id}.npy"), cur_result)
 
+        results.append(cur_result)
+
+        if is_segmentation:
             print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+        else:
+            print(sample_id, np.mean(results))
+
+    network_assets.sender_01.put(np.array([0]))
+    network_assets.sender_02.put(np.array([0]))
+
     if model.prf_fetcher:
         model.prf_fetcher.prf_handler.done()
 
 
 if __name__ == "__main__":
     party = 0
-
+    # CHECKPOINT=/home/yakir/assets/resnet_voc/models/iter_20000.pth
+    # RELU_SPEC_FILE=/home/yakir/assets/resnet_voc/block_spec/0.12.pickle
+    # SECURE_CONFIG_PATH=/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/deeplabv3/deeplabv3_r50-d8_512x512_40k_voc12aug_avg_pool_secure_aspp.py
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--dummy_image', action='store_true', default=False)
-    parser.add_argument('--num_images', type=int,  default=1)
+    parser.add_argument('--dump_dir', type=str, default=None)
+    parser.add_argument('--image_start', type=int, default=0)
+    parser.add_argument('--image_end', type=int, default=1)
+    parser.add_argument('--skip_existing', type=bool, default=False)
     parser.add_argument('--device', type=str, default="cpu")
-    parser.add_argument('--secure_config_path', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py")
-    parser.add_argument('--relu_spec_file', type=str, default="/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle")
+    parser.add_argument('--secure_config_path', type=str,
+                        default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/deeplabv3/deeplabv3_r50-d8_512x512_40k_voc12aug_avg_pool_secure_aspp.py")
+    parser.add_argument('--relu_spec_file', type=str, default=None)
+
     args = parser.parse_args()
 
     cfg = mmcv.Config.fromfile(args.secure_config_path)
@@ -274,17 +312,18 @@ if __name__ == "__main__":
         device=args.device
     )
 
-    if cfg.model.type == "EncoderDecoder":
-        full_inference_segmentation(cfg, model, args.num_images, args.device, network_assets,
-                                    args.dummy_image)
-    else:
-        full_inference_classification(cfg, model, args.num_images, args.device, network_assets,
-                                      args.dummy_image)
+    full_inference(cfg,
+                   model,
+                   args.image_start,
+                   args.image_end,
+                   args.device,
+                   network_assets,
+                   args.dummy_image,
+                   args.dump_dir,
+                   args.skip_existing)
 
     network_assets.done()
 
-    # print("Num of bytes sent 0 -> 1", network_assets.sender_01.num_of_bytes_sent)
-    # print("Num of bytes sent 0 -> 2", network_assets.sender_02.num_of_bytes_sent)
     print("Num of bytes sent 0 ",
           network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)
 
