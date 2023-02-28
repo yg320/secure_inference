@@ -208,6 +208,11 @@ def get_sample_data(dataset_type, dataset, sample_id):
     return img, gt, img_meta
 
 def full_inference(cfg, model, image_start, image_end, device, network_assets, dummy=False, dump_dir=None, skip_existing=False):
+
+    if dump_dir is not None:
+        if not os.path.exists(dump_dir):
+            os.makedirs(dump_dir)
+
     is_segmentation = cfg.model.type == "EncoderDecoder"
     run_inference_func = run_inference_segmentation if is_segmentation else run_inference_classification
     datadtype = cfg.data['test']['type']
@@ -264,7 +269,7 @@ if __name__ == "__main__":
     parser.add_argument('--dump_dir', type=str, default=None)
     parser.add_argument('--image_start', type=int, default=0)
     parser.add_argument('--image_end', type=int, default=1)
-    parser.add_argument('--skip_existing', type=bool, default=False)
+    parser.add_argument('--skip_existing', action='store_true', default=False)
     parser.add_argument('--device', type=str, default="cpu")
     parser.add_argument('--secure_config_path', type=str,
                         default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/deeplabv3/deeplabv3_r50-d8_512x512_40k_voc12aug_avg_pool_secure_aspp.py")

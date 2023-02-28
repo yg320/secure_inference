@@ -241,6 +241,10 @@ def main():
     model.CLASSES = datasets[0].CLASSES
     # passing checkpoint meta for saving best checkpoint
     meta.update(cfg.checkpoint_config.meta)
+
+    if 'distortion_extraction' in cfg.data:
+        del cfg.data['distortion_extraction']
+
     train_segmentor(
         model,
         datasets,
