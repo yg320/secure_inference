@@ -37,7 +37,7 @@ for i_space in tqdm(range(12)):
 
 r = np.concatenate([m[::-1, ::-1], m[::-1][:,1:]], axis=1)
 r = np.concatenate([r, r[::-1][1:]], axis=0)
-plt.imshow(r, vmin=0.7, vmax=0.9, cmap="Blues")
+plt.imshow(r, vmin=0.0, vmax=0.1, cmap="Blues")
 plt.xticks(np.arange(0, 23, 2))
 plt.yticks(np.arange(0, 23, 2))
 plt.gca().set_yticklabels(np.arange(-11, 12, 2), fontsize=13)

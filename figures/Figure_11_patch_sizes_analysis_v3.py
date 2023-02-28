@@ -25,7 +25,9 @@ values = values[index]
 
 block_names = [f'{x[0]}x{x[1]}' for x in top_blocks]
 assert block_names[0] == '0x1'
+assert block_names[1] == '1x1'
 block_names[0] = "Identity"
+block_names[1] = "1x1"
 block_names.append("Other")
 values = list(values)
 values.append(sum(r_9) - sum(values))
@@ -38,11 +40,12 @@ plt.gca().set_yticklabels([str(x) + "K" for x in range( 9)], fontsize=14)
 
 for bar in bars:
     bar.set_edgecolor("black")
-    bar.set_linewidth(1.5)
+    bar.set_linewidth(1.)
 
-plt.xlabel("Block Size", fontsize=16, labelpad=-5)
+plt.xlabel("Patch Size", fontsize=16, labelpad=-5)
 plt.ylabel("# Channels", fontsize=16, labelpad=12)
 plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.5)
+[i.set_linewidth(1.5) for i in plt.gca().spines.values()]
 
 plt.subplots_adjust(bottom=0.21, top=0.97, left=0.12, right=0.99)
 plt.savefig("/home/yakir/Figure_11.png")
