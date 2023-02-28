@@ -5,14 +5,9 @@ from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_h
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, \
     TRUNC_BITS
-from research.bReLU import SecureOptimizedBlockReLU
-from research.secure_inference_3pc.modules.base import Decompose
-from research.secure_inference_3pc.const import  NUM_SPLIT_CONV_IN_CHANNEL, NUM_SPLIT_CONV_OUT_CHANNEL
+from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU, post_brelu
 from research.secure_inference_3pc.parties.server.numba_methods import private_compare_numba_server, post_compare_numba, \
     mult_server_numba
-
-import numpy as np
-
 
 
 class SecureConv2DServer(SecureModule):
@@ -29,104 +24,8 @@ class SecureConv2DServer(SecureModule):
         self.padding = padding
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
-        self.is_dummy = False
 
-        self.num_split_in_channels = NUM_SPLIT_CONV_IN_CHANNEL
-        self.num_split_out_channels = NUM_SPLIT_CONV_OUT_CHANNEL
-
-        self.out_channels, self.in_channels = self.W_plaintext.shape[:2]
-
-        self.in_channel_group_size = self.in_channels // self.num_split_in_channels
-        self.out_channel_group_size = self.out_channels // self.num_split_out_channels
-
-        self.in_channel_s = [self.in_channel_group_size * i for i in range(self.num_split_in_channels)]
-        self.in_channel_e = self.in_channel_s[1:] + [None]
-
-        self.out_channel_s = [self.out_channel_group_size * i for i in range(self.num_split_out_channels)]
-        self.out_channel_e = self.out_channel_s[1:] + [None]
-
-    def split_conv(self, E_share, F_share, W_share, X_share):
-
-        E_share_splits = [E_share[:, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)]
-        F_share_splits = [[F_share[s_out:e_out, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)]
-                          for s_out, e_out in zip(self.out_channel_s, self.out_channel_e)]
-        X_share_splits = [X_share[:, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)]
-        W_share_splits = [[W_share[s_out:e_out, s_in:e_in] for s_in, e_in in zip(self.in_channel_s, self.in_channel_e)]
-                          for s_out, e_out in zip(self.out_channel_s, self.out_channel_e)]
-
-        for i in range(self.num_split_in_channels):
-            self.network_assets.sender_01.put(E_share_splits[i])
-            for j in range(self.num_split_out_channels):
-                self.network_assets.sender_01.put(F_share_splits[j][i])
-
-        outs_all = []
-        for i in range(self.num_split_in_channels):
-            E_share_server = self.network_assets.receiver_01.get()
-            E = E_share_server + E_share_splits[i]
-            outs = []
-            for j in range(self.num_split_out_channels):
-                F_share_server = self.network_assets.receiver_01.get()
-                F = F_share_server + F_share_splits[j][i]
-                cur_W_share = W_share_splits[j][i] - F
-                outs.append(self.conv2d_handler.conv2d(X_share_splits[i],
-                                                       F,
-                                                       E,
-                                                       cur_W_share,
-                                                       padding=self.padding,
-                                                       stride=self.stride,
-                                                       dilation=self.dilation,
-                                                       groups=self.groups))
-            outs_all.append(np.concatenate(outs, axis=1))
-        outs_all = np.stack(outs_all).sum(axis=0)
-        return outs_all
-        # div = self.num_split_weights
-        # mid = W_share.shape[0] // div
-        # self.network_assets.sender_01.put(E_share)
-        # E_share_client = self.network_assets.receiver_01.get()
-        # E = backend.add(E_share_client, E_share, out=E_share)
-        #
-        # for i in range(div):
-        #
-        #     start = i * mid
-        #     end = (i + 1) * mid if i < div else None
-        #     self.network_assets.sender_01.put(F_share[start:end])
-        #
-        # outs = []
-        # for i in range(div):
-        #
-        #     start = i * mid
-        #     end = (i + 1) * mid if i < div else None
-        #
-        #     F_share_client = self.network_assets.receiver_01.get()
-        #
-        #     F = F_share_client + F_share[start:end]
-        #
-        #     W_share_cur = W_share[start:end] - F
-        #
-        #
-        #     outs.append(self.conv2d_handler.conv2d(E,
-        #                                            W_share_cur,
-        #                                            X_share,
-        #                                            F,
-        #                                            padding=self.padding,
-        #                                            stride=self.stride,
-        #                                            dilation=self.dilation,
-        #                                            groups=self.groups))
-        # out = np.concatenate(outs, axis=1)
-        # return out
-
-    # @timer(name='server_conv2d')
     def forward(self, X_share):
-        if self.is_dummy:
-            X_share_client = self.network_assets.receiver_01.get()
-            X = X_share_client + X_share
-            out = self.conv2d_handler.conv2d(X, self.W_plaintext, None, None, self.padding, self.stride, self.dilation,
-                                             self.groups)
-            out = backend.right_shift(out, TRUNC_BITS, out=out)
-            if self.bias is not None:
-                out = backend.add(out, self.bias, out=out)
-            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out.shape, dtype=SIGNED_DTYPE)
-            return out - mu_0
 
         assert self.W_plaintext.shape[2] == self.W_plaintext.shape[3]
         assert (self.W_plaintext.shape[1] == X_share.shape[1]) or self.groups > 1
@@ -143,27 +42,20 @@ class SecureConv2DServer(SecureModule):
         E_share = backend.subtract(X_share, A_share, out=A_share)
         F_share = backend.subtract(W_share, B_share, out=B_share)
 
-        if self.num_split_out_channels == 1 and self.num_split_in_channels == 1:
+        self.network_assets.sender_01.put(E_share)
+        self.network_assets.sender_01.put(F_share)
 
-            self.network_assets.sender_01.put(E_share)
-            self.network_assets.sender_01.put(F_share)
+        E_share_client = self.network_assets.receiver_01.get()
+        F_share_client = self.network_assets.receiver_01.get()
 
-            E_share_client = self.network_assets.receiver_01.get()
-            F_share_client = self.network_assets.receiver_01.get()
+        E = backend.add(E_share_client, E_share, out=E_share)
+        F = backend.add(F_share_client, F_share, out=F_share)
 
-            E = backend.add(E_share_client, E_share, out=E_share)
-            F = backend.add(F_share_client, F_share, out=F_share)
+        W_share = backend.subtract(W_share, F, out=W_share)
 
-            W_share = backend.subtract(W_share, F, out=W_share)
+        out = self.conv2d_handler.conv2d(E, W_share, X_share, F, self.padding, self.stride, self.dilation, self.groups)
 
-            out = self.conv2d_handler.conv2d(E, W_share, X_share, F, self.padding, self.stride, self.dilation,
-                                             self.groups)
-
-        else:
-            out = self.split_conv(E_share, F_share, W_share, X_share)
-
-        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape,
-                                                                     dtype=SIGNED_DTYPE)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=out.shape, dtype=SIGNED_DTYPE)
 
         out = backend.add(out, C_share, out=out)
         out = backend.right_shift(out, TRUNC_BITS, out=out)
@@ -182,16 +74,9 @@ class PrivateCompareServer(SecureModule):
     def __init__(self, **kwargs):
         super(PrivateCompareServer, self).__init__(**kwargs)
 
-
     def forward(self, x_bits_1, r, beta):
         s = self.prf_handler[CLIENT, SERVER].integers(low=1, high=67, size=x_bits_1.shape, dtype=backend.int8)
         d_bits_1 = private_compare_numba_server(s, r, x_bits_1, beta, COMPARISON_NUM_BITS_IGNORED)
-
-        # r[backend.astype(beta, backend.bool)] += 1
-        # bits = self.decompose(r)
-        # c_bits_1 = get_c_party_1(x_bits_1, bits, beta)
-        # s = backend.multiply(s, c_bits_1, out=s)
-        # d_bits_1 = module_67(s)
 
         d_bits_1 = self.prf_handler[CLIENT, SERVER].permutation(d_bits_1, axis=-1)
 
@@ -227,87 +112,6 @@ class ShareConvertServer(SecureModule):
         eta_p_1 = self.network_assets.receiver_12.get()
 
         return post_compare_numba(a_1, eta_pp, delta_1, beta_1, mu_0, eta_p_1)
-        # mu_1 = backend.multiply(mu_0, -1, out=mu_0)
-        # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
-        # t00 = backend.multiply(eta_pp, eta_p_1, out=eta_pp)
-        # t11 = self.add_mode_L_minus_one(t00, t00)
-        # eta_1 = self.sub_mode_L_minus_one(eta_p_1, t11)
-        # t00 = self.add_mode_L_minus_one(delta_1, eta_1)
-        # theta_1 = self.add_mode_L_minus_one(beta_1, t00)
-        # y_1 = self.sub_mode_L_minus_one(a_1, theta_1)
-        # y_1 = self.add_mode_L_minus_one(y_1, mu_1)
-        # return y_1
-
-
-from torch.nn import Module
-
-
-class DepthToSpace(Module):
-
-    def __init__(self, block_size):
-        super().__init__()
-        self.block_size = block_size
-
-    def forward(self, x):
-        N, C, H, W, _ = x.shape
-        x = x.reshape(N, C, H, W, self.block_size[0], self.block_size[1])
-        x = backend.permute(x, (0, 1, 2, 4, 3, 5))
-        x = x.reshape(N, C, H * self.block_size[0], W * self.block_size[1])
-        return x
-
-
-class SecurePostBReLUMultServer(SecureModule):
-    def __init__(self, **kwargs):
-        super(SecurePostBReLUMultServer, self).__init__(**kwargs)
-
-    def post(self, activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes,
-             active_block_sizes_to_channels):
-        relu_map = backend.ones_like(activation)
-        for i, block_size in enumerate(active_block_sizes):
-            orig_shape = (1, active_block_sizes_to_channels[i].shape[0], pad_handlers[i].out_shape[0] // block_size[0],
-                          pad_handlers[i].out_shape[1] // block_size[1], 1)
-            sign_tensor = sign_tensors[int(cumsum_shapes[i]):int(cumsum_shapes[i + 1])].reshape(orig_shape)
-            tensor = backend.repeat(sign_tensor, block_size[0] * block_size[1])
-            cur_channels = active_block_sizes_to_channels[i]
-            relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(active_block_sizes[i])(tensor))
-        return relu_map
-
-    def forward(self, activation, sign_tensors, cumsum_shapes, pad_handlers, is_identity_channels, active_block_sizes,
-                active_block_sizes_to_channels):
-        non_identity_activation = activation[:, ~is_identity_channels]
-
-        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1,
-                                                                     size=non_identity_activation.shape,
-                                                                     dtype=SIGNED_DTYPE)
-        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape,
-                                                                     dtype=SIGNED_DTYPE)
-        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1,
-                                                                     size=non_identity_activation.shape,
-                                                                     dtype=SIGNED_DTYPE)
-        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=activation.shape,
-                                                         dtype=activation.dtype)
-
-        E_share = backend.subtract(non_identity_activation, A_share, out=A_share)
-        F_share = backend.subtract(sign_tensors, B_share, out=B_share)
-
-        self.network_assets.sender_01.put(E_share)
-        E_share_client = self.network_assets.receiver_01.get()
-        self.network_assets.sender_01.put(F_share)
-        F_share_client = self.network_assets.receiver_01.get()
-
-        E = backend.add(E_share_client, E_share, out=E_share)
-        F = backend.add(F_share_client, F_share, out=F_share)
-
-        F = self.post(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:,
-            ~is_identity_channels]
-        sign_tensors = self.post(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes,
-                                 active_block_sizes_to_channels)[:, ~is_identity_channels]
-
-        out = - E * F + non_identity_activation * F + sign_tensors * E + C_share
-        activation[:, ~is_identity_channels] = out
-        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
-        activation = activation + mu_1
-        return activation
 
 
 class SecureMultiplicationServer(SecureModule):
@@ -315,12 +119,9 @@ class SecureMultiplicationServer(SecureModule):
         super(SecureMultiplicationServer, self).__init__(**kwargs)
 
     def forward(self, X_share, Y_share):
-        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape,
-                                                                     dtype=SIGNED_DTYPE)
-        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape,
-                                                                     dtype=SIGNED_DTYPE)
-        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape,
-                                                                     dtype=SIGNED_DTYPE)
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
         mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=X_share.dtype)
 
         E_share = backend.subtract(X_share, A_share, out=A_share)
@@ -332,12 +133,6 @@ class SecureMultiplicationServer(SecureModule):
         F_share_client = self.network_assets.receiver_01.get()
 
         out = mult_server_numba(X_share, Y_share, C_share, mu_1, E_share, E_share_client, F_share, F_share_client)
-
-        # E = backend.add(E_share_client, E_share, out=E_share)
-        # F = backend.add(F_share_client, F_share, out=F_share)
-        # out = - E * F + X_share * F + Y_share * E + C_share
-        # mu_1 = backend.multiply(mu_1, -1, out=mu_1)
-        # out = out + mu_1
 
         return out
 
@@ -412,27 +207,52 @@ class SecureReLUServer(SecureModule):
 
         self.DReLU = SecureDReLUServer(**kwargs)
         self.mult = SecureMultiplicationServer(**kwargs)
-        self.dummy_relu = dummy_relu
 
     def forward(self, X_share):
-        # return X_share
-        if self.dummy_relu:
-            share_client = self.network_assets.receiver_01.get()
-            recon = share_client + X_share
-            value = recon * (backend.astype(recon > 0, recon.dtype))
-            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=value.shape, dtype=SIGNED_DTYPE)
-            return value - mu_0
-        else:
 
-            shape = X_share.shape
-            mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
-            backend.multiply(mu_1, -1, out=mu_1)
+        shape = X_share.shape
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
+        backend.multiply(mu_1, -1, out=mu_1)
 
-            X_share = X_share.reshape(-1)
-            MSB_0 = self.DReLU(X_share)
-            ret = self.mult(X_share, MSB_0).reshape(shape)
-            backend.add(ret, mu_1, out=ret)
-            return ret
+        X_share = X_share.reshape(-1)
+        MSB_0 = self.DReLU(X_share)
+        ret = self.mult(X_share, MSB_0).reshape(shape)
+        backend.add(ret, mu_1, out=ret)
+        return ret
+
+
+class SecurePostBReLUMultServer(SecureModule):
+    def __init__(self, **kwargs):
+        super(SecurePostBReLUMultServer, self).__init__(**kwargs)
+
+    def forward(self, activation, sign_tensors, cumsum_shapes, pad_handlers, is_identity_channels, active_block_sizes,
+                active_block_sizes_to_channels):
+        non_identity_activation = activation[:, ~is_identity_channels]
+
+        A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        B_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=sign_tensors.shape, dtype=SIGNED_DTYPE)
+        C_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
+        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL, size=activation.shape, dtype=activation.dtype)
+
+        E_share = backend.subtract(non_identity_activation, A_share, out=A_share)
+        F_share = backend.subtract(sign_tensors, B_share, out=B_share)
+
+        self.network_assets.sender_01.put(E_share)
+        E_share_client = self.network_assets.receiver_01.get()
+        self.network_assets.sender_01.put(F_share)
+        F_share_client = self.network_assets.receiver_01.get()
+
+        E = backend.add(E_share_client, E_share, out=E_share)
+        F = backend.add(F_share_client, F_share, out=F_share)
+
+        F = post_brelu(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        sign_tensors = post_brelu(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+
+        out = - E * F + non_identity_activation * F + sign_tensors * E + C_share
+        activation[:, ~is_identity_channels] = out
+        mu_1 = backend.multiply(mu_1, -1, out=mu_1)
+        activation = activation + mu_1
+        return activation
 
 
 class SecureBlockReLUServer(SecureModule, SecureOptimizedBlockReLU):
@@ -441,12 +261,10 @@ class SecureBlockReLUServer(SecureModule, SecureOptimizedBlockReLU):
         SecureOptimizedBlockReLU.__init__(self, block_sizes)
         self.DReLU = SecureDReLUServer(**kwargs)
         self.mult = SecureMultiplicationServer(**kwargs)
-        self.dummy_relu = dummy_relu
         self.post_bReLU = SecurePostBReLUMultServer(**kwargs)
 
     def forward(self, activation):
-        if self.dummy_relu:
-            return activation
+
         return SecureOptimizedBlockReLU.forward(self, activation)
 
 

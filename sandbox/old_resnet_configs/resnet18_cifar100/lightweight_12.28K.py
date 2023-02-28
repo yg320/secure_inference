@@ -25,7 +25,6 @@ runner = dict(type='EpochBasedRunner', max_epochs=120)
 
 
 
-relu_spec_file = "/home/yakir/deepreduce_comparison/distortions/lightweight/block_sizes/14.33K.pickle"
+relu_spec_file = "/home/yakir/deepreduce_comparison_v2/distortions/lightweight/block_sizes/12.28K.pickle"
 load_from = "/home/yakir/PycharmProjects/secure_inference/work_dirs/lightweight/epoch_200.pth"
-
 

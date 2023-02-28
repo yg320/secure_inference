@@ -8,6 +8,13 @@ NUMBA_UINT_DTYPE = uint64 if NUM_BITS == 64 else uint32
 @njit((int8[:, :])(int8[:, :], NUMBA_INT_DTYPE[:], int8[:, :], int8[:], uint8), parallel=True, nogil=True,
       cache=True)
 def private_compare_numba(s, r, x_bits_0, beta, ignore_bits):
+
+    # r[backend.astype(beta, backend.bool)] += 1
+    # bits = self.decompose(r)
+    # c_bits_0 = get_c_party_0(x_bits_0, bits, beta)
+    # s = backend.multiply(s, c_bits_0, out=s)
+    # d_bits_0 = module_67(s)
+
     for i in prange(x_bits_0.shape[0]):
         r[i] = r[i] + beta[i]
 
@@ -27,6 +34,21 @@ def private_compare_numba(s, r, x_bits_0, beta, ignore_bits):
 @njit((NUMBA_INT_DTYPE[:])(NUMBA_INT_DTYPE[:], int8[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:],
                            NUMBA_INT_DTYPE[:], NUMBA_INT_DTYPE[:]), parallel=True, nogil=True, cache=True)
 def post_compare_numba(a_0, eta_pp, delta_0, alpha, beta_0, mu_0, eta_p_0):
+    # eta_pp = backend.astype(eta_pp, SIGNED_DTYPE)
+    # t0 = eta_pp * eta_p_0
+    # t1 = self.add_mode_L_minus_one(t0, t0)
+    # t2 = self.sub_mode_L_minus_one(eta_pp, t1)
+    # eta_0 = self.add_mode_L_minus_one(eta_p_0, t2)
+    #
+    # t0 = self.add_mode_L_minus_one(delta_0, eta_0)
+    # t1 = self.sub_mode_L_minus_one(t0, backend.ones_like(t0))
+    # t2 = self.sub_mode_L_minus_one(t1, alpha)
+    # theta_0 = self.add_mode_L_minus_one(beta_0, t2)
+    #
+    # y_0 = self.sub_mode_L_minus_one(a_0, theta_0)
+    # y_0 = self.add_mode_L_minus_one(y_0, mu_0)
+    #
+    # return y_0
     out = a_0
     for i in prange(a_0.shape[0], ):
 
@@ -117,6 +139,11 @@ def mult_client_non_flatten(x, y, c, m, e0, e1, f0, f1):
 
 
 def mult_client_numba(x, y, c, m, e0, e1, f0, f1):
+    # E = E_share_server + E_share
+    # F = F_share_server + F_share
+    #
+    # out = X_share * F + Y_share * E + C_share
+    # out = out + mu_0
     if x.ndim == 1:
         return mult_client_flatten(x, y, c, m, e0, e1, f0, f1)
     else:

@@ -6,7 +6,7 @@ _base_ = [
 model = dict(
     type='ImageClassifier',
     backbone=dict(
-        type='ResNet_CIFAR_V2_heavyweight',
+        type='ResNet_CIFAR_V2',
         depth=18,
         num_stages=4,
         out_indices=(3, ),
@@ -25,8 +25,7 @@ runner = dict(type='EpochBasedRunner', max_epochs=120)
 
 
 
-relu_spec_file = "/home/yakir/deepreduce_comparison/distortions/baseline/block_sizes/196.61K.pickle"
+relu_spec_file = "/home/yakir/deepreduce_comparison_v2/distortions/baseline/block_sizes/49.15K.pickle"
 load_from = "/home/yakir/PycharmProjects/secure_inference/work_dirs/baseline/epoch_200.pth"
-
 
 

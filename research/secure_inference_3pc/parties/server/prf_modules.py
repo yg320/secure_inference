@@ -6,7 +6,7 @@ from research.secure_inference_3pc.const import COMPARISON_NUM_BITS_IGNORED
 
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE
-from research.bReLU import SecureOptimizedBlockReLU
+from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 import numpy as np
 
@@ -95,7 +95,6 @@ class PRFFetcherPostBReLUMult(PRFFetcherModule):
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL, size=activation_shape, dtype=SIGNED_DTYPE)
 
         return activation_shape
-
 
 
 class PRFFetcherSelectShare(PRFFetcherModule):

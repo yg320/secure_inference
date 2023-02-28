@@ -6,7 +6,7 @@ from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import SecureModule
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, P
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
-from research.bReLU import SecureOptimizedBlockReLU
+from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
 
 

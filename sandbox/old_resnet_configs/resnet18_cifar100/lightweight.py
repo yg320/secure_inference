@@ -8,7 +8,7 @@ _base_ = [
 model = dict(
     type='ImageClassifier',
     backbone=dict(
-        type='ResNet_CIFAR_V2',
+        type='ResNet_CIFAR_V2_lightweight',
         depth=18,
         num_stages=4,
         out_indices=(3, ),
@@ -17,10 +17,9 @@ model = dict(
     head=dict(
         type='LinearClsHead',
         num_classes=100,
-        in_channels=512,
+        in_channels=256,
         loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
     ))
 
-optimizer = dict(type='SGD', lr=0.1, momentum=0.9, weight_decay=0.0004)
-lr_config = dict(policy='step', step=[50, 100, 150], gamma=0.2)
-
+optimizer = dict(type='SGD', lr=0.1, momentum=0.9, weight_decay=0.0005)
+lr_config = dict(policy='step', step=[60, 120, 160], gamma=0.2)

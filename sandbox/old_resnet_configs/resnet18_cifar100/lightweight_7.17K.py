@@ -19,5 +19,11 @@ model = dict(
         loss=dict(type='CrossEntropyLoss', loss_weight=1.0),
     ))
 
-optimizer = dict(type='SGD', lr=0.1, momentum=0.9, weight_decay=0.0004)
-lr_config = dict(policy='step', step=[50, 100, 150], gamma=0.2)
+optimizer = dict(type='SGD', lr=0.005, momentum=0.9, weight_decay=0.0004)
+lr_config = dict(policy='step', step=[30, 60, 90], gamma=0.25, min_lr=0.0001, warmup='linear', warmup_ratio=0.01, warmup_iters=5, warmup_by_epoch=True)
+runner = dict(type='EpochBasedRunner', max_epochs=120)
+
+
+relu_spec_file = "/home/yakir/deepreduce_comparison_v2/distortions/lightweight/block_sizes/7.17K.pickle"
+load_from = "/home/yakir/PycharmProjects/secure_inference/work_dirs/lightweight/epoch_200.pth"
+
