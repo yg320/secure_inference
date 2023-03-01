@@ -18,12 +18,12 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
-        self.is_dummy = False
+        self.dummy = False
 
     def forward(self, shape):
         out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
 
-        if self.is_dummy:
+        if self.dummy:
             return DummyShapeTensor(out_shape)
 
         # return DummyShapeTensor(out_shape)
@@ -113,9 +113,12 @@ class PRFFetcherDReLU(PRFFetcherModule):
         self.share_convert = PRFFetcherShareConvert(**kwargs)
         self.msb = PRFFetcherMSB(**kwargs)
 
+        self.dummy = False
+
     def forward(self, shape):
-        self.share_convert(shape)
-        self.msb(shape)
+        if not self.dummy:
+            self.share_convert(shape)
+            self.msb(shape)
 
         return shape
 

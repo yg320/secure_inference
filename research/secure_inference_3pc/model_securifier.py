@@ -174,7 +174,7 @@ class MyAvgPoolFetcher(nn.Module):
 
     # TODO: is this the best way to do this?)
     def forward(self, x):
-        return DummyShapeTensor((x[0], x[1], x[2] // 2, x[3] // 2))
+        return DummyShapeTensor((x[0], x[1], (x[2] + 1) // 2, (x[3] + 1) // 2))
 
 
 class MyAvgPool(nn.Module):
@@ -268,7 +268,7 @@ def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_se
                                        network_assets=network_assets, is_prf_fetcher=True, device=device)
 
     prf_fetcher_model = get_model(
-        config=checkpoint_path,
+        config=cfg,
         gpu_id=None,
         checkpoint_path=None
     )
@@ -281,7 +281,7 @@ def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_se
             prf_prefetch=True
         )
     elif cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type == "AvgPoolResNetSeg":
-        max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNetSeg' else max_pool
+        max_pool_layer = MyAvgPoolFetcher if cfg.model.backbone.type == 'AvgPoolResNetSeg' else max_pool
 
         securify_resnet_deeplab(prf_fetcher_model,
                                 max_pool_layer,

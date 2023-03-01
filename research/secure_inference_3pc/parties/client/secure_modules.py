@@ -7,6 +7,7 @@ from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER,
 from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU, post_brelu
 from research.secure_inference_3pc.parties.client.numba_methods import private_compare_numba, post_compare_numba, \
     mult_client_numba
+from research.secure_inference_3pc.conv2d.utils import get_output_shape
 
 
 class SecureConv2DClient(SecureModule):
@@ -21,7 +22,16 @@ class SecureConv2DClient(SecureModule):
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
+        self.dummy = False
+
     def forward(self, X_share):
+
+        if self.dummy:
+            self.network_assets.sender_01.put(X_share)
+            out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out_shape, dtype=SIGNED_DTYPE)
+            return mu_0
+
         assert self.W_shape[2] == self.W_shape[3]
         assert (self.W_shape[1] == X_share.shape[1]) or self.groups > 1
 
@@ -175,15 +185,24 @@ class SecureDReLUClient(SecureModule):
         self.share_convert = ShareConvertClient(**kwargs)
         self.msb = SecureMSBClient(**kwargs)
 
+        self.dummy = False
+
     def forward(self, X_share):
         # SecureDReLUClient.counter += 1
         # np.save("/home/yakir/Data2/secure_activation_statistics/client/{}.npy".format(SecureDReLUClient.counter), X_share)
-        mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
 
-        X0_converted = self.share_convert(X_share)
-        MSB_0 = self.msb(X0_converted)
+        if self.dummy:
+            self.network_assets.sender_01.put(X_share)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape,
+                                                             dtype=SIGNED_DTYPE)
+            return mu_0
+        else:
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
 
-        return -MSB_0 + mu_0
+            X0_converted = self.share_convert(X_share)
+            MSB_0 = self.msb(X0_converted)
+
+            return -MSB_0 + mu_0
 
 
 class SecureReLUClient(SecureModule):

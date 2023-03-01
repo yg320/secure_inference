@@ -24,7 +24,14 @@ class SecureConv2DCryptoProvider(SecureModule):
 
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
+        self.dummy = False
+
     def forward(self, X_share):
+
+        if self.dummy:
+            out_shape = get_output_shape(X_share.shape, self.W_shape, self.padding, self.dilation, self.stride)
+            return np.zeros(out_shape, dtype=SIGNED_DTYPE)
+
         A_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
         B_share_0 = self.prf_handler[CLIENT, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=self.W_shape, dtype=SIGNED_DTYPE)
         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL, size=X_share.shape, dtype=SIGNED_DTYPE)
@@ -151,11 +158,15 @@ class SecureDReLUCryptoProvider(SecureModule):
 
         self.share_convert = ShareConvertCryptoProvider(**kwargs)
         self.msb = SecureMSBCryptoProvider(**kwargs)
+        self.dummy = False
 
     def forward(self, X_share):
-        self.share_convert(X_share.shape)
-        self.msb(X_share.shape)
-        return X_share
+        if self.dummy:
+            return X_share
+        else:
+            self.share_convert(X_share.shape)
+            self.msb(X_share.shape)
+            return X_share
 
 
 class SecureReLUCryptoProvider(SecureModule):

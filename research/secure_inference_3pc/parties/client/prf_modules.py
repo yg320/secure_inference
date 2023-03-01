@@ -20,10 +20,10 @@ class PRFFetcherConv2D(PRFFetcherModule):
         self.stride = stride
         self.dilation = dilation
         self.padding = padding
-        self.is_dummy = False
+        self.dummy = False
 
     def forward(self, shape):
-        if self.is_dummy:
+        if self.dummy:
             out_shape = get_output_shape(shape, self.W_shape, self.padding, self.dilation, self.stride)
             self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=out_shape, dtype=SIGNED_DTYPE)
             return DummyShapeTensor(out_shape)
@@ -120,12 +120,14 @@ class PRFFetcherDReLU(PRFFetcherModule):
 
         self.share_convert = PRFFetcherShareConvert(**kwargs)
         self.msb = PRFFetcherMSB(**kwargs)
+        self.dummy = False
 
     def forward(self, shape):
         self.prf_handler[CLIENT, SERVER].integers_fetch(MIN_VAL, MAX_VAL + 1, size=shape, dtype=SIGNED_DTYPE)
 
-        self.share_convert(shape)
-        self.msb(shape)
+        if not self.dummy:
+            self.share_convert(shape)
+            self.msb(shape)
 
         return shape
 

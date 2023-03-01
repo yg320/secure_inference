@@ -106,7 +106,7 @@ class SecureOptimizedBlockReLU(Module):
         if np.all(self.block_sizes == [0, 1]):
             return activation
         mean_tensors, cumsum_shapes,  pad_handlers = self.prep(activation)
-        mean_tensors = (mean_tensors >> NUM_OF_LSB_TO_IGNORE).astype(np.int16).astype(np.int64) << COMPARISON_NUM_BITS_IGNORED
+        mean_tensors = (mean_tensors >> NUM_OF_LSB_TO_IGNORE) << COMPARISON_NUM_BITS_IGNORED
         sign_tensors = self.DReLU(mean_tensors)
 
         return self.post_bReLU(activation,

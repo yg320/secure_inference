@@ -8,7 +8,9 @@ from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER,
 from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU, post_brelu
 from research.secure_inference_3pc.parties.server.numba_methods import private_compare_numba_server, post_compare_numba, \
     mult_server_numba
+from research.secure_inference_3pc.conv2d.utils import get_output_shape
 
+import numpy as np
 
 class SecureConv2DServer(SecureModule):
     def __init__(self, W, bias, stride, dilation, padding, groups, **kwargs):
@@ -25,7 +27,22 @@ class SecureConv2DServer(SecureModule):
         self.groups = groups
         self.conv2d_handler = conv2d_handler_factory.create(self.device)
 
+        self.dummy = False
+
     def forward(self, X_share):
+
+        if self.dummy:
+            share_client = self.network_assets.receiver_01.get()
+            recon = share_client + X_share
+            # out_shape = get_output_shape(X_share.shape, self.W_plaintext.shape, self.padding, self.dilation, self.stride)
+            # out = np.zeros(shape=out_shape, dtype=SIGNED_DTYPE)
+            out = self.conv2d_handler.conv2d(recon, self.W_plaintext, None, None, self.padding, self.stride, self.dilation, self.groups)
+            out = backend.right_shift(out, TRUNC_BITS, out=out)
+            if self.bias is not None:
+                out = backend.add(out, self.bias, out=out)
+
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=out.shape, dtype=SIGNED_DTYPE)
+            return out - mu_0
 
         assert self.W_plaintext.shape[2] == self.W_plaintext.shape[3]
         assert (self.W_plaintext.shape[1] == X_share.shape[1]) or self.groups > 1
@@ -184,20 +201,28 @@ class SecureDReLUServer(SecureModule):
         self.share_convert = ShareConvertServer(**kwargs)
         self.msb = SecureMSBServer(**kwargs)
 
+        self.dummy = False
+
     def forward(self, X_share):
         # SecureDReLUServer.counter += 1
         # np.save("/home/yakir/Data2/secure_activation_statistics/server/{}.npy".format(SecureDReLUServer.counter), X_share)
+        if self.dummy:
+            share_client = self.network_assets.receiver_01.get()
+            recon = share_client + X_share
+            value = backend.astype(recon > 0, recon.dtype)
+            mu_0 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=value.shape, dtype=SIGNED_DTYPE)
+            return value - mu_0
+        else:
+            mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
+            backend.multiply(mu_1, -1, out=mu_1)
 
-        mu_1 = self.prf_handler[CLIENT, SERVER].integers(MIN_VAL, MAX_VAL + 1, size=X_share.shape, dtype=SIGNED_DTYPE)
-        backend.multiply(mu_1, -1, out=mu_1)
+            X1_converted = self.share_convert(X_share)
+            MSB_1 = self.msb(X1_converted)
 
-        X1_converted = self.share_convert(X_share)
-        MSB_1 = self.msb(X1_converted)
-
-        ret = backend.multiply(MSB_1, -1, out=MSB_1)
-        ret = backend.add(ret, mu_1, out=ret)
-        ret = backend.add(ret, 1, out=ret)
-        return ret
+            ret = backend.multiply(MSB_1, -1, out=MSB_1)
+            ret = backend.add(ret, mu_1, out=ret)
+            ret = backend.add(ret, 1, out=ret)
+            return ret
 
 
 class SecureReLUServer(SecureModule):
