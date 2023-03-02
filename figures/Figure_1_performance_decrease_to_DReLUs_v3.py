@@ -7,7 +7,10 @@ from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 
 plt.figure(figsize=(10, 6))
 # plt.subplot(121)
-
+green = "#56ae57"
+red = "#db5856"
+purple = "tab:purple"
+blue = "#3399e6"
 ticks_font_size = 20
 label_font_size = 24
 
@@ -19,8 +22,8 @@ lw = 3
 dReLUs_relative_to_baseline = 100 * np.array([0.03, 0.06, 0.09, 0.12, 0.15, 0.18])
 performance_relative_to_baseline_ImageNet = 100 * np.array([65.59, 70.36, 72.23, 73.30, 74.03, 74.40]) / ImageNet_baseline
 performance_relative_to_baseline_ADE20K = 100 * np.array([33.23, 34.73, 35.53, 35.77, 36.01, 36.31]) / ADE20K_baseline
-performance_relative_to_baseline_VOC = 100 * np.array([72.23, 74.27, 75.89, 76.26]) / VOC2012_baseline
-performance_relative_to_baseline_CIFAR100 = 100 * np.array([62.90, 70.90, 74.62, 74.53, 76.18, 76.86]) / CIFAR100_baseline
+performance_relative_to_baseline_VOC = 100 * np.array([72.23, 74.27, 75.89, 76.26, 76.86, 77.48]) / VOC2012_baseline
+# performance_relative_to_baseline_CIFAR100 = 100 * np.array([62.90, 70.90, 74.62, 74.53, 76.18, 76.86]) / CIFAR100_baseline
 performance_relative_to_baseline_CIFAR100 = 100 * np.array([65.63, 70.90, 74.62, 74.53, 76.18, 76.86]) / CIFAR100_baseline
 # plt.subplot(211)
 
@@ -33,17 +36,25 @@ performance_relative_to_baseline_CIFAR100 = 100 * np.array([65.63, 70.90, 74.62,
 # plt.plot(100*np.array([14.33, 16.71, 24.57, 28.67, 33.42, 49.15, 50.13, 57.34, 114.69, 197])/557,
 #          100*np.array([61.11, 62.90, 68.39, 69.73, 70.90, 74.73, 74.62, 74.52, 76.94, 77.84])/78.27, '.-', color="tab:red", lw=lw, markersize=25, label="ResNet18, COCO100 - Ours")
 #
+
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ImageNet, '.-', color=blue, lw=lw, markersize=10, label="ImageNet")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color=green, lw=lw, markersize=10, label="ADE_20K")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label="VOC2012")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=10, label="CIFAR100")
+
 plt.plot(100*np.array([7.17, 12.28, 14.33, 24.57, 28.67, 49.15, 57.34, 114.69, 197,  229.38, 557])/557,
-         100*np.array([62.3, 64.97, 65.36, 68.41, 68.68, 69.5,  72.68, 74.72,  75.5,  76.22, 74.46])/CIFAR100_baseline, '.--', color="tab:red", lw=lw, markersize=10, label="CIFAR100 - DeepReDuce")
+         100*np.array([62.3, 64.97, 65.36, 68.41, 68.68, 69.5,  72.68, 74.72,  75.5,  76.22, 74.46])/CIFAR100_baseline, '.:', color="#d3494e", lw=lw, markersize=10, label="CIFAR100 - DeepReDuce")
 
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ImageNet, '.-', color="#3399e6", lw=lw, markersize=10, label="ImageNet")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color="#69b3a2", lw=lw, markersize=10, label="ADE_20K")
-plt.plot(dReLUs_relative_to_baseline[:4], performance_relative_to_baseline_VOC, '.-', color="tab:purple", lw=lw, markersize=10, label="VOC2012")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color="tab:red", lw=lw, markersize=10, label="CIFAR100")
+plt.plot(100*np.array([7.17, 12.28, 14.33, 24.57, 28.67, 49.15, 57.34, 114.69, 197,  229.38, 557])/557,
+         100*np.array([62.3, 64.97, 65.36, 68.41, 68.68, 69.5,  72.68, 74.72,  75.5,  76.22, 74.46])/CIFAR100_baseline, '.:', color="#d3494e", lw=lw, markersize=25)
 
+plt.plot(dReLUs_relative_to_baseline[1:2], performance_relative_to_baseline_ImageNet[1:2], '.-', color=blue, lw=lw, markersize=20)
+plt.plot(dReLUs_relative_to_baseline[1:2], performance_relative_to_baseline_ADE20K[1:2], '.-', color=green, lw=lw, markersize=20)
+plt.plot(dReLUs_relative_to_baseline[1:2], performance_relative_to_baseline_VOC[1:2], '.-', color=purple, lw=lw, markersize=20)
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=20)
 
-plt.xlabel("Percentage of DReLU", fontsize=label_font_size, labelpad=20)
-plt.ylabel("Baseline Relative Performance", fontsize=label_font_size, labelpad=20)
+plt.xlabel("Percentage of DReLU Used", fontsize=label_font_size, labelpad=20)
+plt.ylabel("Perf. Relative to Baseline", fontsize=label_font_size, labelpad=20)
 
 # assert False, "Add percentage in ticks"
 plt.gca().xaxis.set_major_locator(MultipleLocator(5))
@@ -52,11 +63,11 @@ plt.gca().xaxis.set_minor_locator(MultipleLocator(1))
 plt.gca().yaxis.set_minor_locator(MultipleLocator(1))
 plt.gca().tick_params(axis='both', which='major', labelsize=11)
 
-plt.xlim([2.5, 18])
+plt.xlim([2.5, 18.5])
 plt.ylim([80, 108])
-plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.5)
-plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.2)
-plt.legend(loc="lower right", prop={'size': 14})
+plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.9)
+plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.5)
+plt.legend(loc="lower right", prop={'size': 16})
 # plt.savefig("/home/yakir/Figure_1.png")
 
 plt.gca().set_yticklabels([None,   "80%", "85%", "90%", "95%", "100%", "105%", "110%"], fontsize=ticks_font_size)
@@ -65,7 +76,6 @@ plt.subplots_adjust(left=0.16, right=0.97, top=0.96, bottom=0.17, wspace=0.1)
 [i.set_linewidth(2.) for i in plt.gca().spines.values()]
 
 plt.savefig("/home/yakir/Figure_1.png")
-
 #
 #
 # # 63.1900,
