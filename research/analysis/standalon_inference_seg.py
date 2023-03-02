@@ -36,7 +36,7 @@ if RELU_SPEC_FILE is not None:
     arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
 results = []
-for sample_id in range(200):
+for sample_id in range(2000):
     img = dataset[sample_id]['img'][0].data.unsqueeze(0)
     img_meta = dataset[sample_id]['img_metas'][0].data
     seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
@@ -74,6 +74,6 @@ for sample_id in range(200):
             reduce_zero_label=dataset.reduce_zero_label)
     )
     print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
-# pickle.dump(obj=results, file=open("/home/yakir/results_voc.pickle", "wb"))
+pickle.dump(obj=results, file=open("/home/yakir/results_ade.pickle", "wb"))
 # print("not secure", dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
 # print("secure", dataset.evaluate(results_secure, logger='silent', **{'metric': ['mIoU']})['mIoU'])
