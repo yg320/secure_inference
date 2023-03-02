@@ -231,16 +231,16 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
         if skip_existing and os.path.exists(os.path.join(dump_dir, f"{sample_id}.npy")):
             continue
         img, gt, img_meta = get_sample_data(datadtype, dataset, sample_id)
-
-        t0 = time.time()
-        if model.prf_fetcher:
-            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
-
         # Handshake
         network_assets.sender_01.put(np.array(img.shape))
         network_assets.sender_02.put(np.array(img.shape))
         network_assets.receiver_01.get()
         network_assets.receiver_02.get()
+
+        t0 = time.time()
+        if model.prf_fetcher:
+            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+
         cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
         t1 = time.time()
         total_time += (t1 - t0)
