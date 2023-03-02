@@ -25,5 +25,5 @@ total_area_pred_label = sum(pre_eval_results[2])
 total_area_label = sum(pre_eval_results[3])
 iou_secure = total_area_intersect / total_area_union
 print(np.nanmean(iou_secure.numpy()))
-
+print(len(files))
 # 72
