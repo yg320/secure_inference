@@ -3,6 +3,12 @@ import numpy as np
 import glob
 
 
+def eval(results):
+    results = tuple(zip(*results))
+    total_area_intersect = sum(results[0])
+    total_area_union = sum(results[1])
+    iou = total_area_intersect / total_area_union
+    return iou.mean()
 
 files = glob.glob("/home/yakir/evaluation/0.06/ade20k_lsb_0_msb_0_t_12/*")
 results_secure = [tuple(np.load(x, allow_pickle=True)) for x in files]
