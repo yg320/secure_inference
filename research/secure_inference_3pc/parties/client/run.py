@@ -243,7 +243,8 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
 
         cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
         t1 = time.time()
-        total_time += (t1 - t0)
+        cur_time = (t1 - t0)
+        total_time += cur_time
 
         if dump_dir is not None:
             np.save(os.path.join(dump_dir, f"{sample_id}.npy"), cur_result)
