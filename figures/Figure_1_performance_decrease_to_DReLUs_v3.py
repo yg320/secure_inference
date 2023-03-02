@@ -37,8 +37,8 @@ performance_relative_to_baseline_CIFAR100 = 100 * np.array([65.63, 70.90, 74.62,
 #          100*np.array([61.11, 62.90, 68.39, 69.73, 70.90, 74.73, 74.62, 74.52, 76.94, 77.84])/78.27, '.-', color="tab:red", lw=lw, markersize=25, label="ResNet18, COCO100 - Ours")
 #
 
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color=green, lw=lw, markersize=10, label="ADE_20K - Seg.")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label="VOC2012 - Seg.")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color=green, lw=lw, markersize=10, label="ADE20K - Seg.")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label=  "VOC2012 - Seg.")
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ImageNet, '.-', color=blue, lw=lw, markersize=10, label="ImageNet - Cls.")
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=10, label="CIFAR100 - Cls.")
 
