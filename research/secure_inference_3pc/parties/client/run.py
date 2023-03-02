@@ -226,7 +226,8 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
     model.eval()
 
     results = []
-    total_time = 0
+    total_time_0 = 0
+    total_time_1 = 0
     for sample_id in tqdm(range(image_start, image_end)):
         if skip_existing and os.path.exists(os.path.join(dump_dir, f"{sample_id}.npy")):
             continue
@@ -244,8 +245,10 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
         cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
         t1 = time.time()
         cur_time = (t1 - t0)
-        print(cur_time)
-        total_time += cur_time
+        # print(cur_time)
+        total_time_1 += cur_time
+        if sample_id > 0:
+            total_time_0 += cur_time
 
         if dump_dir is not None:
             np.save(os.path.join(dump_dir, f"{sample_id}.npy"), cur_result)
@@ -256,7 +259,8 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
                 print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
             else:
                 print(sample_id, np.mean(results))
-    print("Total time:", total_time/(image_end - image_start))
+    print("Total time:", total_time_0/(image_end - image_start - 1))
+    print("Total time:", total_time_1/(image_end - image_start))
     network_assets.sender_01.put(np.array([0]))
     network_assets.sender_02.put(np.array([0]))
 
@@ -335,8 +339,7 @@ if __name__ == "__main__":
 
     network_assets.done()
 
-    print("Num of bytes sent 0 ",
-          network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)
+    print("Num of bytes sent 0 ", (network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent) / 4)
 
 # sudo apt-get update
 # curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh

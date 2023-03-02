@@ -157,4 +157,4 @@ if __name__ == "__main__":
     network_assets.done()
 
     print("Num of bytes sent 2 ",
-          network_assets.sender_12.num_of_bytes_sent + network_assets.sender_02.num_of_bytes_sent)
+          (network_assets.sender_12.num_of_bytes_sent + network_assets.sender_02.num_of_bytes_sent) / 4)
