@@ -291,7 +291,7 @@ def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_se
 
                                 switch_pool_relu=cfg.model.backbone.type == "MyResNetV1cSeg")
 
-    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", "ResNet_CIFAR_V2"]:
+    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", "ResNet_CIFAR_V2", "ResNet_CIFAR_V2_lightweight"]:
         max_pool_layer = MyAvgPoolFetcher if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
 
         securify_resnet(
