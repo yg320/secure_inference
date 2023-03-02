@@ -1,4 +1,4 @@
-RELU_SPEC_FILE=/home/ubuntu/specs/voc/0.09.pickle
+RELU_SPEC_FILE=/home/ubuntu/specs/voc/0.12.pickle
 SECURE_CONFIG_PATH=/home/ubuntu/secure_inference/research/configs/segmentation/deeplabv3/deeplabv3_r50-d8_512x512_40k_voc12aug_avg_pool_secure_aspp.py
 #SECURE_CONFIG_PATH=/home/ubuntu/secure_inference/research/configs/segmentation/deeplabv3/deeplabv3_r50-d8_512x512_40k_voc12aug_max_pool_secure_aspp.py
 
