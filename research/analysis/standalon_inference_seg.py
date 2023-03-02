@@ -36,7 +36,7 @@ if RELU_SPEC_FILE is not None:
     arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
 results = []
-for sample_id in range(100):
+for sample_id in range(200):
     img = dataset[sample_id]['img'][0].data.unsqueeze(0)
     img_meta = dataset[sample_id]['img_metas'][0].data
     seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
