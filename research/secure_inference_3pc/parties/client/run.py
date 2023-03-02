@@ -10,7 +10,7 @@ from research.secure_inference_3pc.model_securifier import get_secure_model, ini
 from research.secure_inference_3pc.const import CLIENT, SERVER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, DUMMY_RELU, PRF_PREFETCH
 from mmseg.ops import resize
 from research.secure_inference_3pc.timer import Timer
-
+import time
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
 from research.secure_inference_3pc.parties.client.prf_modules import PRFFetcherConv2D, PRFFetcherReLU, \
@@ -183,11 +183,11 @@ def get_sample_data(dataset_type, dataset, sample_id):
             }
             gt = np.zeros((512, 673), dtype=np.uint8)
         elif 'CIFAR100' in dataset_type:
-            img = np.zeros((3, 32, 32), dtype=np.float32)
+            img = np.zeros((1, 3, 32, 32), dtype=np.float32)
             gt = 0
             img_meta = None
         elif 'ImageNet' in dataset_type:
-            img = np.zeros((3, 224, 224), dtype=np.float32)
+            img = np.zeros((1, 3, 224, 224), dtype=np.float32)
             gt = 0
             img_meta = None
         else:
@@ -226,32 +226,35 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
     model.eval()
 
     results = []
-
+    total_time = 0
     for sample_id in tqdm(range(image_start, image_end)):
         if skip_existing and os.path.exists(os.path.join(dump_dir, f"{sample_id}.npy")):
             continue
         img, gt, img_meta = get_sample_data(datadtype, dataset, sample_id)
-        with Timer(name="Inference", avg=True):
-            if model.prf_fetcher:
-                model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
-            # Handshake
-            network_assets.sender_01.put(np.array(img.shape))
-            network_assets.sender_02.put(np.array(img.shape))
-            network_assets.receiver_01.get()
-            network_assets.receiver_02.get()
-            cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
+        t0 = time.time()
+        if model.prf_fetcher:
+            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+
+        # Handshake
+        network_assets.sender_01.put(np.array(img.shape))
+        network_assets.sender_02.put(np.array(img.shape))
+        network_assets.receiver_01.get()
+        network_assets.receiver_02.get()
+        cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
+        t1 = time.time()
+        total_time += (t1 - t0)
 
         if dump_dir is not None:
             np.save(os.path.join(dump_dir, f"{sample_id}.npy"), cur_result)
 
         results.append(cur_result)
-
-        if is_segmentation:
-            print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
-        else:
-            print(sample_id, np.mean(results))
-
+        if not dummy:
+            if is_segmentation:
+                print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+            else:
+                print(sample_id, np.mean(results))
+    print("Total time:", total_time/(image_end - image_start))
     network_assets.sender_01.put(np.array([0]))
     network_assets.sender_02.put(np.array([0]))
 
