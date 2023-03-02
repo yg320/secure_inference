@@ -23,7 +23,7 @@ params = param_factory(cfg)
 dataset = build_data(cfg, mode="test")
 
 # TODO: use shared class with distortion
-device = "0"
+device = "1"
 model = get_model(
     config=cfg,
     gpu_id=device,
@@ -43,7 +43,7 @@ for sample_id in range(2000):
     img_meta = dataset[sample_id]['img_metas'][0].data
     seg_map = dataset.get_gt_seg_map_by_idx(sample_id)
 
-    out = model.decode_head(model.backbone(img.to("cuda:0")))
+    out = model.decode_head(model.backbone(img.to(f"cuda:{device}")))
 
     out = resize(
         input=out,
