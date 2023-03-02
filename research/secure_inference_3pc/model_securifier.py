@@ -225,7 +225,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
                                 build_secure_relu,
                                 switch_pool_relu=cfg.model.backbone.type == "MyResNetSeg")
 
-    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", 'ResNet_CIFAR_V2']:
+    elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", 'ResNet_CIFAR_V2', "ResNet_CIFAR_V2_lightweight"]:
         max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool
         securify_resnet(model,
                         max_pool_layer,

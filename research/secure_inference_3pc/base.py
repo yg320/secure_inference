@@ -9,7 +9,7 @@ from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2492
+        self.base_port = 2495
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2
