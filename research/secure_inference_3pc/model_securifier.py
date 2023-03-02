@@ -216,7 +216,7 @@ def get_secure_model(cfg, checkpoint_path, build_secure_conv, build_secure_relu,
         securify_deeplabv3_mobilenetv2(model,
                                        build_secure_conv,
                                        build_secure_relu)
-    if cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type in ["AvgPoolResNetSeg", "MyResNetSeg"]:
+    elif cfg.model.type == "EncoderDecoder" and cfg.model.backbone.type in ["AvgPoolResNetSeg", "MyResNetSeg"]:
         max_pool_layer = MyAvgPool if cfg.model.backbone.type == 'AvgPoolResNetSeg' else max_pool
 
         securify_resnet_deeplab(model,

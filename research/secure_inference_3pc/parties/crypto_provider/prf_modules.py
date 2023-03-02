@@ -147,10 +147,8 @@ class PRFFetcherMaxPool(PRFFetcherModule):
         self.mult = PRFFetcherMultiplication(**kwargs)
 
     def forward(self, shape):
-        assert shape[2] == 112
-        assert shape[3] == 112
-        shape = DummyShapeTensor((shape[0], shape[1], 56, 56))
-        shape_2 = DummyShapeTensor((shape[0] * shape[1] * 56 * 56,))
+        shape = DummyShapeTensor((shape[0], shape[1], (shape[2] + 1) // 2, (shape[3] + 1) // 2))
+        shape_2 = DummyShapeTensor((shape[0] * shape[1] * shape[2] * shape[3],))
 
         for i in range(1, 9):
             self.dReLU(shape_2)

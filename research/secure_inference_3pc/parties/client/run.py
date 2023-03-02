@@ -9,7 +9,7 @@ from research.secure_inference_3pc.base import get_assets, TypeConverter
 from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.const import CLIENT, SERVER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, DUMMY_RELU, PRF_PREFETCH
 from mmseg.ops import resize
-
+from research.secure_inference_3pc.timer import Timer
 
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
@@ -231,15 +231,16 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
         if skip_existing and os.path.exists(os.path.join(dump_dir, f"{sample_id}.npy")):
             continue
         img, gt, img_meta = get_sample_data(datadtype, dataset, sample_id)
-        if model.prf_fetcher:
-            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+        with Timer(name="Inference", avg=True):
+            if model.prf_fetcher:
+                model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
 
-        # Handshake
-        network_assets.sender_01.put(np.array(img.shape))
-        network_assets.sender_02.put(np.array(img.shape))
-        network_assets.receiver_01.get()
-        network_assets.receiver_02.get()
-        cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
+            # Handshake
+            network_assets.sender_01.put(np.array(img.shape))
+            network_assets.sender_02.put(np.array(img.shape))
+            network_assets.receiver_01.get()
+            network_assets.receiver_02.get()
+            cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
 
         if dump_dir is not None:
             np.save(os.path.join(dump_dir, f"{sample_id}.npy"), cur_result)

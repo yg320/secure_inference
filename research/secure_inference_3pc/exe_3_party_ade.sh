@@ -18,7 +18,7 @@ SECURE_CONFIG_PATH=/home/yakir/PycharmProjects/secure_inference/research/configs
 # With spec
 export PYTHONPATH="." ; python research/secure_inference_3pc/parties/server/run.py --model_path $CHECKPOINT --relu_spec_file $RELU_SPEC_FILE --secure_config_path $SECURE_CONFIG_PATH &
 export PYTHONPATH="." ; python research/secure_inference_3pc/parties/crypto_provider/run.py --relu_spec_file $RELU_SPEC_FILE --secure_config_path $SECURE_CONFIG_PATH &
-export PYTHONPATH="." ; python research/secure_inference_3pc/parties/client/run.py --relu_spec_file $RELU_SPEC_FILE --secure_config_path $SECURE_CONFIG_PATH  --image_start 0 --image_end 2000 --dump_dir /home/yakir/evaluation/0.06/ade20k_lsb_5_msb &
+export PYTHONPATH="." ; python research/secure_inference_3pc/parties/client/run.py --relu_spec_file $RELU_SPEC_FILE --secure_config_path $SECURE_CONFIG_PATH  --image_start 0 --image_end 2000 --dump_dir /home/yakir/evaluation/0.06/ade20k_lsb_0_msb_40 &
 #1449
 
 
