@@ -37,13 +37,13 @@ performance_relative_to_baseline_CIFAR100 = 100 * np.array([65.63, 70.90, 74.62,
 #          100*np.array([61.11, 62.90, 68.39, 69.73, 70.90, 74.73, 74.62, 74.52, 76.94, 77.84])/78.27, '.-', color="tab:red", lw=lw, markersize=25, label="ResNet18, COCO100 - Ours")
 #
 
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ImageNet, '.-', color=blue, lw=lw, markersize=10, label="ImageNet")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color=green, lw=lw, markersize=10, label="ADE_20K")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label="VOC2012")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=10, label="CIFAR100")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color=green, lw=lw, markersize=10, label="ADE_20K - Seg.")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label="VOC2012 - Seg.")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ImageNet, '.-', color=blue, lw=lw, markersize=10, label="ImageNet - Cls.")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=10, label="CIFAR100 - Cls.")
 
 plt.plot(100*np.array([7.17, 12.28, 14.33, 24.57, 28.67, 49.15, 57.34, 114.69, 197,  229.38, 557])/557,
-         100*np.array([62.3, 64.97, 65.36, 68.41, 68.68, 69.5,  72.68, 74.72,  75.5,  76.22, 74.46])/CIFAR100_baseline, '.:', color="#d3494e", lw=lw, markersize=10, label="CIFAR100 - DeepReDuce")
+         100*np.array([62.3, 64.97, 65.36, 68.41, 68.68, 69.5,  72.68, 74.72,  75.5,  76.22, 74.46])/CIFAR100_baseline, '.:', color="#d3494e", lw=lw, markersize=10, label="CIFAR100 - Cls. - DeepReDuce")
 
 plt.plot(100*np.array([7.17, 12.28, 14.33, 24.57, 28.67, 49.15, 57.34, 114.69, 197,  229.38, 557])/557,
          100*np.array([62.3, 64.97, 65.36, 68.41, 68.68, 69.5,  72.68, 74.72,  75.5,  76.22, 74.46])/CIFAR100_baseline, '.:', color="#d3494e", lw=lw, markersize=25)
