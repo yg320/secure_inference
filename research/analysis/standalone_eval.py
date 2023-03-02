@@ -26,4 +26,4 @@ total_area_label = sum(pre_eval_results[3])
 iou_secure = total_area_intersect / total_area_union
 print(np.nanmean(iou_secure.numpy()))
 
-72
+# 72
