@@ -16,7 +16,7 @@ total_area_union = sum(pre_eval_results[1])
 total_area_pred_label = sum(pre_eval_results[2])
 total_area_label = sum(pre_eval_results[3])
 iou_not_secure = total_area_intersect / total_area_union
-print(np.nanmean(iou_not_secure.numpy()))
+iou_not_secure = np.nanmean(iou_not_secure.numpy())
 
 pre_eval_results = tuple(zip(*results_secure))
 total_area_intersect = sum(pre_eval_results[0])
@@ -24,6 +24,6 @@ total_area_union = sum(pre_eval_results[1])
 total_area_pred_label = sum(pre_eval_results[2])
 total_area_label = sum(pre_eval_results[3])
 iou_secure = total_area_intersect / total_area_union
-print(np.nanmean(iou_secure.numpy()))
-print(len(files))
+iou_secure = np.nanmean(iou_secure.numpy())
+print(iou_not_secure, iou_secure, iou_secure/iou_not_secure, len(files))
 # 72
