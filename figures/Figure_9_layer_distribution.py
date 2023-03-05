@@ -10,6 +10,10 @@ x = pickle.load(open(spec, 'rb'))
 import numpy as np
 import mmcv
 from research.distortion.parameters.factory import param_factory
+green = "#56ae57"
+red = "#db5856"
+purple = "tab:purple"
+blue = "#3399e6"
 
 plt.figure()
 plt.subplot(211)
@@ -21,10 +25,13 @@ reduction = []
 for layer_name in x:
     reduction.append(get_block_spec_num_relus({layer_name: x[layer_name]}, params) / get_block_spec_num_relus({layer_name: np.ones_like(x[layer_name])}, params))
 
-bars = plt.bar(range(len(reduction)), reduction, color="#3399e6")
+bars = plt.bar(range(len(reduction)), reduction, color=blue)
 for bar in bars:
     bar.set_edgecolor("black")
     bar.set_linewidth(1.2)
+
+plt.figure()
+
 spec = "/home/yakir/specs/cls_specs/4x4.pickle"
 config = "/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py"
 

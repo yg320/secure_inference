@@ -40,12 +40,12 @@ plt.gca().set_yticklabels([str(x) + "K" for x in range( 9)], fontsize=14)
 
 for bar in bars:
     bar.set_edgecolor("black")
-    bar.set_linewidth(1.)
+    bar.set_linewidth(1.5)
 
 plt.xlabel("Patch Size", fontsize=16, labelpad=-5)
 plt.ylabel("# Channels", fontsize=16, labelpad=12)
-plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.5)
-[i.set_linewidth(1.5) for i in plt.gca().spines.values()]
+plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.8)
+[i.set_linewidth(1.7) for i in plt.gca().spines.values()]
 
 plt.subplots_adjust(bottom=0.21, top=0.97, left=0.12, right=0.99)
 plt.savefig("/home/yakir/Figure_11.png")

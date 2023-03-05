@@ -2,20 +2,12 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 
-plt.figure(figsize=(5, 5))
-plt.subplot(111)
-plt.xticks([])
-plt.yticks([])
-plt.tight_layout()
-plt.text(0.15, 0.5, r'Image Size Analysis', fontsize=25)
-plt.savefig("/home/yakir/Figure_9.png")
-
 
 import matplotlib.pyplot as plt
 import numpy as np
 
 # data from https://allisonhorst.github.io/palmerpenguins/
-
+plt.figure()
 species = (
     str(32),
     str(64),
@@ -38,13 +30,14 @@ width = 0.5
 bars = plt.bar(species, relu_ratio, width,  color="#3399e6")
 for bar in bars:
     bar.set_edgecolor("black")
-    bar.set_linewidth(1.5)
+    bar.set_linewidth(1.8)
 plt.yticks(np.arange(0, 1.1, 0.1))
+[i.set_linewidth(1.8) for i in plt.gca().spines.values()]
 
-plt.gca().tick_params(axis='both', which='major', labelsize=12)
-plt.xlabel("Image Size", fontsize=14)
-plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.5)
-plt.gca().set_ylabel("ReLU Communication Cost Ratio", fontsize=14, labelpad=12)
+plt.gca().tick_params(axis='both', which='major', labelsize=16)
+plt.xlabel("Image Size", fontsize=18)
+plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.8)
+plt.gca().set_ylabel("Ratio of ReLUs in Comm. Cost", fontsize=18, labelpad=18)
 plt.tight_layout()
 plt.savefig("/home/yakir/Figure_10.png")
 

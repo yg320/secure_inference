@@ -11,7 +11,7 @@ def evaluate(results):
     print(iou)
     return np.nanmean(iou)
 
-files = glob.glob("/home/yakir/evaluation/0.06/ade20k_lsb_0_msb_0_t_12/*")
+files = glob.glob("/home/yakir/evaluation/0.06/ade20k_lsb_0_msb_32_t_12/*")
 results_secure = [tuple(np.load(x, allow_pickle=True)) for x in files]
 sample_ids = [int(x.split("/")[-1].split(".")[0]) for x in files]
 results_non_secure = pickle.load(open("/home/yakir/results_ade.pickle", "rb"))

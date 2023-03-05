@@ -1,25 +1,11 @@
 ====================================== First ====================================
 - Figures lines thicker
-- Say something about ReLU6 not part of baseline
+- Copy models and everything
 - Make clear that baseline is Without approx. ReLU and with Max pool
-- Further discuss DeepReDuce disadvantages
-- Send irit the thing
-- Run Secure Inference
-    * DeepReDuce
-    * ResNet - classification
-    * MobNet - segmentation
-- Measure AWS time
-- Ablation Training:
-    * 1x1 ResNet
-    * 1x1 MobileNet
-    * 4x4 Shuffled ResNet
-- Pascal
-    * Finish Distortion Extraction
-    * Train
-- Continue with Deep Reduce comparison
+
 - Add a note about the price of running secure inference instead of normal inference. Maybe explain that our method appeals to scenario when a model server wants to expand its business to client that require privacy
 
-- CrypTFlow inference on AWS and add to figure (Only without inference) - Avoid that!
+
 - Add a Pipeline figure to the paper
 - Add random number to logits
 - Expand related work
@@ -30,9 +16,11 @@
         + SecureNN
         + SecureMPC
     * A paragraph instead of a sentence
-- Imporve inference code
+
 
 ====================================== Probably Not. ====================================
+- Imporve inference code
+- CrypTFlow inference on AWS and add to figure (Only without inference) - Avoid that!
 - Benchmark of our convolution layer compared with the library of C++ that everybody uses
 - Security paragraph
 - Add training details
@@ -484,5 +472,6 @@ export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh res
 
 
 
-export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/4x4_algo_shuffled --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/4x4_algo_shuffled.pickle
-export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune.py 4 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/1x1 ; export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune.py 4 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir /storage/yakir/secure_inference/benchmark/segmentation/mobilenet_ade/experiments/1x1
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune_2x128.py 2 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/4x4_algo_shuffled_2x128 --relu-spec-file benchmark/classification/resnet50_coco/distortion/block_speck/4x4_algo_shuffled.pickle
+export PYTHONPATH=. ; bash ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_finetune_2x128.py 2 --load-from benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --work-dir benchmark/classification/resnet50_coco/experiments/1x1 ;
+export PYTHONPATH=. ; bash ./research/mmlab_tools/segmentation/dist_train.sh research/configs/segmentation/mobilenet_v2/deeplabev2_mobilenet_ade20k_finetune_2x8.py 2 --load-from mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --work-dir /storage/yakir/secure_inference/benchmark/segmentation/mobilenet_ade/experiments/1x1

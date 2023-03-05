@@ -9,7 +9,7 @@ from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2503
+        self.base_port = 2504
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2
@@ -17,21 +17,21 @@ class Addresses:
         self.port_12 = 10 * self.base_port + 4
         self.port_21 = 10 * self.base_port + 5
 
-        # self.ip_client = "localhost"
-        # self.ip_server = "localhost"
-        # self.ip_cryptoprovider = "localhost"
+        self.ip_client = "localhost"
+        self.ip_server = "localhost"
+        self.ip_cryptoprovider = "localhost"
+
+        self.ip_client_private = "localhost"
+        self.ip_server_private = "localhost"
+        self.ip_cryptoprovider_private = "localhost"
+
+        # self.ip_client = "34.244.0.5"
+        # self.ip_server = "34.253.241.167"
+        # self.ip_cryptoprovider = "54.229.171.149"
         #
-        # self.ip_client_private = "localhost"
-        # self.ip_server_private = "localhost"
-        # self.ip_cryptoprovider_private = "localhost"
-
-        self.ip_client = "34.244.0.5"
-        self.ip_server = "34.253.241.167"
-        self.ip_cryptoprovider = "54.229.171.149"
-
-        self.ip_client_private = "172.31.10.131"
-        self.ip_server_private = "172.31.0.139"
-        self.ip_cryptoprovider_private = "172.31.4.206"
+        # self.ip_client_private = "172.31.10.131"
+        # self.ip_server_private = "172.31.0.139"
+        # self.ip_cryptoprovider_private = "172.31.4.206"
 
 
 class NetworkAssets:

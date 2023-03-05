@@ -15,7 +15,9 @@ import glob
 import torch
 CONFIG_PATH = "/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k_relu.py"
 MODEL_PATH = "/home/yakir/assets/mobilenet_ade/models/ratio_0.06.pth"
+MODEL_PATH = "/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth"
 RELU_SPEC_FILE = '/home/yakir/assets/mobilenet_ade/block_spec/0.06.pickle'
+RELU_SPEC_FILE = None
 
 cfg = mmcv.Config.fromfile(CONFIG_PATH)
 params = param_factory(cfg)
@@ -36,7 +38,7 @@ if RELU_SPEC_FILE is not None:
     arch_utils.set_bReLU_layers(model, layer_name_to_block_sizes)
 
 results = []
-for sample_id in range(2000):
+for sample_id in range(5):
     torch.cuda.empty_cache()
 
     img = dataset[sample_id]['img'][0].data.unsqueeze(0)
@@ -76,6 +78,4 @@ for sample_id in range(2000):
             reduce_zero_label=dataset.reduce_zero_label)
     )
     print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
-pickle.dump(obj=results, file=open("/home/yakir/results_ade.pickle", "wb"))
-# print("not secure", dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
-# print("secure", dataset.evaluate(results_secure, logger='silent', **{'metric': ['mIoU']})['mIoU'])
+# pickle.dump(obj=results, file=open("/home/yakir/results_ade.pickle", "wb"))
