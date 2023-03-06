@@ -18,6 +18,7 @@ class DepthToSpace(Module):
         x = x.reshape(N, C, H * self.block_size[0], W * self.block_size[1])
         return x
 
+
 def post_brelu(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes,
          active_block_sizes_to_channels):
     relu_map = backend.ones_like(activation)
@@ -29,7 +30,6 @@ def post_brelu(activation, sign_tensors, cumsum_shapes, pad_handlers, active_blo
         cur_channels = active_block_sizes_to_channels[i]
         relu_map[:, cur_channels] = pad_handlers[i].unpad(DepthToSpace(active_block_sizes[i])(tensor))
     return relu_map
-
 
 
 class SpaceToDepth(Module):
@@ -98,7 +98,6 @@ class SecureOptimizedBlockReLU(Module):
         cumsum_shapes = [0] + list(np.cumsum([mean_tensor.shape[0] for mean_tensor in mean_tensors]))
         mean_tensors = backend.concatenate(mean_tensors)
         return mean_tensors, cumsum_shapes, pad_handlers
-
 
 
     def forward(self, activation):

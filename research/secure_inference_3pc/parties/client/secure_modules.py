@@ -8,6 +8,7 @@ from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU
 from research.secure_inference_3pc.parties.client.numba_methods import private_compare_numba, post_compare_numba, \
     mult_client_numba
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
+from research.secure_inference_3pc.conv2d.numba_conv2d import Conv2DHandler as NumbaConv2DHandler
 
 
 class SecureConv2DClient(SecureModule):
@@ -20,7 +21,7 @@ class SecureConv2DClient(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
-        self.conv2d_handler = conv2d_handler_factory.create(self.device)
+        self.conv2d_handler = NumbaConv2DHandler()
 
         self.dummy = False
 

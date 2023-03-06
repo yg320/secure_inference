@@ -226,8 +226,8 @@ class PRFFetcherSecureModelClassification(SecureModule):
         super(PRFFetcherSecureModelClassification, self).__init__(**kwargs)
         self.model = model
 
-    def forward(self, img):
-        shape = DummyShapeTensor(img.shape)
+    def forward(self, shape):
+        shape = DummyShapeTensor(shape)
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, dtype=SIGNED_DTYPE, size=shape)
         out = self.model.backbone(shape)[0]
         out = self.model.neck(out)

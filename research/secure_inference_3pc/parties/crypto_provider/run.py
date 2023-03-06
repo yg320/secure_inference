@@ -147,7 +147,7 @@ if __name__ == "__main__":
         network_assets.sender_02.put(image_size)
 
         if model.prf_fetcher:
-            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=image_size, dtype=SIGNED_DTYPE))
+            model.prf_fetcher.prf_handler.fetch_image(image_shape=image_size)
 
         out = model(image_size)
 

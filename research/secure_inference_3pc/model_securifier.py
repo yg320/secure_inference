@@ -1,12 +1,10 @@
 import torch
-from research.secure_inference_3pc.const import SIGNED_DTYPE
 import pickle
 from research.distortion.arch_utils.factory import arch_utils_factory
 from functools import partial
 from research.distortion.utils import get_model
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.modules.base import DummyShapeTensor
-from research.secure_inference_3pc.timer import timer
 import numpy as np
 import torch.nn as nn
 
@@ -30,12 +28,6 @@ def convert_decoder(decoder, build_secure_conv, build_secure_relu, prf_prefetch)
     def foo(x):
         return (x.sum(axis=(2, 3), keepdims=True) // (x.shape[2] * x.shape[3])).astype(
             x.dtype)  # TODO: is this the best way to do this?)
-
-    # decoder.image_pool[0] = SecureGlobalAveragePooling2dWithResize()
-    # if prf_prefetch:
-    #     decoder.image_pool[0] = torch.nn.Identity()
-    # else:
-    #     decoder.image_pool[0] = SecureGlobalAveragePooling2dWithResize()
 
     # TODO: replace with SecureGlobalAveragePooling2d
     if prf_prefetch:
@@ -290,7 +282,6 @@ def init_prf_fetcher(cfg, checkpoint_path, max_pool, build_secure_conv, build_se
                                 prf_prefetch=True,
 
                                 switch_pool_relu=cfg.model.backbone.type == "MyResNetSeg")
-
 
     elif cfg.model.type == "ImageClassifier" and cfg.model.backbone.type in ['AvgPoolResNet', "MyResNet", "ResNet_CIFAR_V2", "ResNet_CIFAR_V2_lightweight"]:
         max_pool_layer = MyAvgPoolFetcher if cfg.model.backbone.type == 'AvgPoolResNet' else max_pool

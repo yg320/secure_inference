@@ -1,7 +1,6 @@
 import threading
 
-from research.secure_inference_3pc.communication.numpy_socket.numpysocket.numpysocket import TorchSocket, NumpySocket
-from research.secure_inference_3pc.timer import timer, Timer
+from research.secure_inference_3pc.communication.numpysocket import NumpySocket
 import time
 from threading import Thread
 import torch
@@ -11,12 +10,7 @@ import socket
 
 NUMPY_ARR_QUEUE_SIZE = 10
 
-from research.secure_inference_3pc.const import IS_TORCH_BACKEND
-
-if IS_TORCH_BACKEND:
-    empty_arr = torch.Tensor([])
-else:
-    empty_arr = np.array([], dtype=np.int8)
+empty_arr = np.array([], dtype=np.int8)
 
 class Receiver(Thread):
     def __init__(self, ip, port, device):
@@ -32,8 +26,7 @@ class Receiver(Thread):
     def run(self):
         host = "localhost" if self.ip == "localhost" else socket.gethostbyaddr(self.ip)[0]
 
-        SocketClass = TorchSocket if IS_TORCH_BACKEND else NumpySocket
-        with SocketClass() as s:
+        with NumpySocket() as s:
             s.bind((host, self.port))
             s.listen()
             conn, addr = s.accept()
@@ -43,11 +36,9 @@ class Receiver(Thread):
                 conn.sendall(empty_arr)
                 if len(frame) == 0:
                     return
-                if IS_TORCH_BACKEND:
-                    frame = frame.to(self.device)  # NUMPY_CONVERSION
+
                 self.numpy_arr_queue.put(frame)
 
-    # @timer(name="Receiver.get")
     def get(self):
         arr = self.numpy_arr_queue.get()
         return arr
@@ -68,8 +59,8 @@ class Sender(Thread):
 
         total_sleep_time = 0
         host = "localhost" if self.ip == "localhost" else socket.gethostbyaddr(self.ip)[0]
-        SocketClass = TorchSocket if IS_TORCH_BACKEND else NumpySocket
-        with SocketClass() as s:
+
+        with NumpySocket() as s:
 
             connected = False
             while not connected:
@@ -90,7 +81,6 @@ class Sender(Thread):
                 else:
 
                     arr_size_bytes = data.size * data.itemsize
-                # assert arr_size_bytes >= 64
                 self.num_of_bytes_sent += arr_size_bytes
 
                 if self.simulated_bandwidth:
@@ -103,14 +93,12 @@ class Sender(Thread):
                     s.recv()
                     Sender.lock.release()
                 else:
-                    # with Timer(name="s.sendall(data)"):
                     s.sendall(data)
                     s.recv()
 
     def put(self, arr):
         # TODO: why is this copy needed (related to the monster threading bug)
         if arr is not None:
-            if not IS_TORCH_BACKEND:
-                arr = arr.copy()
+            arr = arr.copy()
         self.numpy_arr_queue.put(arr)
 

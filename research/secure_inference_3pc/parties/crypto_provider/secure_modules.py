@@ -10,6 +10,7 @@ from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.modules.base import Decompose
 from research.secure_inference_3pc.parties.crypto_provider.numba_methods import numba_private_compare, processing_numba
 import numpy as np
+from research.secure_inference_3pc.conv2d.numba_conv2d import Conv2DHandler as NumbaConv2DHandler
 
 
 class SecureConv2DCryptoProvider(SecureModule):
@@ -22,7 +23,7 @@ class SecureConv2DCryptoProvider(SecureModule):
         self.padding = padding
         self.groups = groups
 
-        self.conv2d_handler = conv2d_handler_factory.create(self.device)
+        self.conv2d_handler = NumbaConv2DHandler()
 
         self.dummy = False
 

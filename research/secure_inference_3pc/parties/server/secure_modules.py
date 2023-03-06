@@ -1,13 +1,14 @@
 from research.secure_inference_3pc.backend import backend
 from research.secure_inference_3pc.const import COMPARISON_NUM_BITS_IGNORED
 from research.secure_inference_3pc.modules.base import SecureModule
-from research.secure_inference_3pc.conv2d.conv2d_handler_factory import conv2d_handler_factory
 from research.secure_inference_3pc.modules.maxpool import SecureMaxPool
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, \
     TRUNC_BITS
 from research.secure_inference_3pc.modules.bReLU import SecureOptimizedBlockReLU, post_brelu
 from research.secure_inference_3pc.parties.server.numba_methods import private_compare_numba_server, post_compare_numba, \
     mult_server_numba
+from research.secure_inference_3pc.conv2d.numba_conv2d import Conv2DHandler as NumbaConv2DHandler
+
 from research.secure_inference_3pc.conv2d.utils import get_output_shape
 
 import numpy as np
@@ -25,7 +26,7 @@ class SecureConv2DServer(SecureModule):
         self.dilation = dilation
         self.padding = padding
         self.groups = groups
-        self.conv2d_handler = conv2d_handler_factory.create(self.device)
+        self.conv2d_handler = NumbaConv2DHandler()
 
         self.dummy = False
 

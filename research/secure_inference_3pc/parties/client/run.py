@@ -9,7 +9,6 @@ from research.secure_inference_3pc.base import get_assets, TypeConverter
 from research.secure_inference_3pc.model_securifier import get_secure_model, init_prf_fetcher
 from research.secure_inference_3pc.const import CLIENT, SERVER, MIN_VAL, MAX_VAL, SIGNED_DTYPE, DUMMY_RELU, PRF_PREFETCH
 from mmseg.ops import resize
-from research.secure_inference_3pc.timer import Timer
 import time
 import torch.nn.functional as F
 from mmseg.core import intersect_and_union
@@ -139,9 +138,6 @@ def run_inference_classification(img, gt, dataset, img_meta=None, is_dummy=False
     out = model(img)
     if not is_dummy:
         return gt == out
-        # results_gt.append(gt)
-        # results_pred.append(out)
-        # print((backend.array(results_gt) == backend.array(results_pred)).mean())
 
 
 def run_inference_segmentation(img, gt, dataset, img_meta=None, is_dummy=False):
@@ -240,7 +236,7 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
 
         t0 = time.time()
         if model.prf_fetcher:
-            model.prf_fetcher.prf_handler.fetch_image(image=backend.zeros(shape=img.shape, dtype=SIGNED_DTYPE))
+            model.prf_fetcher.prf_handler.fetch_image(image_shape=img.shape)
 
         cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
         t1 = time.time()

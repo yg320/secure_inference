@@ -1,9 +1,6 @@
-from research.secure_inference_3pc.const import TRUNC, NUM_BITS
+from research.secure_inference_3pc.const import NUM_BITS
 import torch
-import numpy as np
 from research.secure_inference_3pc.backend import backend
-from research.secure_inference_3pc.timer import timer, Timer
-from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 
 class SecureModule(torch.nn.Module):
@@ -17,28 +14,14 @@ class SecureModule(torch.nn.Module):
 
     def add_mode_L_minus_one(self, a, b):
         ret = a + b
-        # ret[backend.unsigned_gt(a, ret)] += 1
-        if IS_TORCH_BACKEND:
-            ret += backend.unsigned_gt(a, ret).to(ret.dtype)
-        else:
-            ret[backend.unsigned_gt(a, ret)] += 1
+        ret[backend.unsigned_gt(a, ret)] += 1
         ret[ret == - 1] = 0  # If ret were uint64, then the condition would be ret == 2**64 - 1
         return ret
 
     def sub_mode_L_minus_one(self, a, b):
         ret = a - b
-        if IS_TORCH_BACKEND:
-            ret -= backend.unsigned_gt(b, a).to(ret.dtype)
-        else:
-            ret[backend.unsigned_gt(b, a)] -= 1
+        ret[backend.unsigned_gt(b, a)] -= 1
         return ret
-
-    # def forward(self):
-    #     if self.is_prf_fetcher:
-    #         self.forward_prf_fetcher()
-    #     else:
-    #         self.forward()
-    #
 
 
 class PRFFetcherModule(SecureModule):
@@ -49,7 +32,6 @@ class PRFFetcherModule(SecureModule):
 
 
 class Decompose(SecureModule):
-    # buffer = backend.zeros(shape=(200000, 20), dtype=backend.int8)
     def __init__(self, num_bits_ignored, dtype, **kwargs):
         super(Decompose, self).__init__(**kwargs)
         self.num_bits_ignored = num_bits_ignored
@@ -61,23 +43,10 @@ class Decompose(SecureModule):
         orig_shape = list(value.shape)
         value = value.reshape(-1, 1)
         value_bits = backend.zeros(shape=(value.shape[0], NUM_BITS - self.num_bits_ignored), dtype=backend.int8)
-        # value_bits = Decompose.buffer[:value.shape[0]]
         value_bits = backend.right_shift(value, self.powers, out=value_bits)
         value_bits = backend.bitwise_and(value_bits, 1, out=value_bits)
         ret = value_bits.reshape(orig_shape + [NUM_BITS - self.num_bits_ignored])
         return ret
-
-    # @timer("Decompose")
-    # def forward(self, value):
-    #     orig_shape = list(value.shape)
-    #     value = value.reshape(-1, 1)
-    #     r_shift = value >> self.powers
-    #     if IS_TORCH_BACKEND:
-    #         value_bits = backend.bitwise_and(r_shift, 1)
-    #         ret = value_bits.reshape(orig_shape + [self.num_of_compare_bits - self.ignore_msb_bits])
-    #     else:
-    #         ret = backend.bitwise_and(r_shift, 1, out=r_shift).astype(np.int8)  # TODO: backend.int8(1) instead of 1
-    #     return ret
 
 
 class DummyShapeTensor(tuple):
