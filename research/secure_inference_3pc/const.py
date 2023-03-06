@@ -12,7 +12,6 @@ NUM_OF_LSB_TO_IGNORE = 0
 
 TRUNC_BITS = 12
 TRUNC = 2 ** TRUNC_BITS
-IS_TORCH_BACKEND = False  # I don't think that setting "true" here will work
 
 DUMMY_RELU = False
 PRF_PREFETCH = True  # (!!!!!!!!)

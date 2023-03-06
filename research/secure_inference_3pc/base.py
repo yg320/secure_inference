@@ -4,12 +4,11 @@ from research.secure_inference_3pc.communication.utils import Sender, Receiver
 from research.secure_inference_3pc.prf import MultiPartyPRFHandler
 from research.secure_inference_3pc.const import CLIENT, SERVER, CRYPTO_PROVIDER
 from research.secure_inference_3pc.const import TRUNC, TORCH_DTYPE
-from research.secure_inference_3pc.const import IS_TORCH_BACKEND
 
 
 class Addresses:
     def __init__(self):
-        self.base_port = 2508
+        self.base_port = 2576
         self.port_01 = 10 * self.base_port + 0
         self.port_10 = 10 * self.base_port + 1
         self.port_02 = 10 * self.base_port + 2
@@ -204,22 +203,13 @@ class TypeConverter:
     @staticmethod
     def f2i(data):
         if type(data) in [torch.Tensor, torch.nn.Parameter]:
-            if IS_TORCH_BACKEND:
-                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype))
-            else:
-                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()  # NUMPY_CONVERSION
+            return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()  # NUMPY_CONVERSION
 
         else:
-            if IS_TORCH_BACKEND:
-                return ((data * TypeConverter.trunc).round().to(TypeConverter.int_dtype))
-            else:
-                return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()  # NUMPY_CONVERSION
+            return ((torch.from_numpy(data) * TypeConverter.trunc).round().to(TypeConverter.int_dtype)).numpy()  # NUMPY_CONVERSION
     @staticmethod
     def i2f(data):
-        if IS_TORCH_BACKEND:
-            return (data.to(TypeConverter.float_dtype) / TypeConverter.trunc)
-        else:
-            return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc  # NUMPY_CONVERSION
+        return torch.from_numpy(data).to(TypeConverter.float_dtype) / TypeConverter.trunc  # NUMPY_CONVERSION
 
 
 # def get_c_party_0(x_bits, multiplexer_bits, beta):
