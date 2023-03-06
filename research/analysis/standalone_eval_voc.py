@@ -4,7 +4,7 @@ import glob
 
 
 
-files = glob.glob("/home/yakir/voc_lsb_0_msb_32_t_12/*")
+files = glob.glob("/home/yakir/voc_lsb_0_msb_44_t_12/*")
 results_secure = [tuple(np.load(x, allow_pickle=True)) for x in files]
 sample_ids = [int(x.split("/")[-1].split(".")[0]) for x in files]
 results_non_secure = pickle.load(open("/home/yakir/results_voc.pickle", "rb"))
