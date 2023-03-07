@@ -252,7 +252,7 @@ class SecurePostBReLUMultServer(SecureModule):
         super(SecurePostBReLUMultServer, self).__init__(**kwargs)
 
     def forward(self, activation, sign_tensors, cumsum_shapes, pad_handlers, is_identity_channels, active_block_sizes,
-                active_block_sizes_to_channels):
+                active_block_sizes_to_channels, stacked_active_block_sizes_to_channels, offsets, channel_map):
         non_identity_activation = activation[:, ~is_identity_channels]
 
         A_share = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
@@ -271,8 +271,8 @@ class SecurePostBReLUMultServer(SecureModule):
         E = backend.add(E_share_client, E_share, out=E_share)
         F = backend.add(F_share_client, F_share, out=F_share)
 
-        F = post_brelu(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
-        sign_tensors = post_brelu(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        F = post_brelu(activation, F, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels, stacked_active_block_sizes_to_channels, offsets, is_identity_channels, channel_map)
+        sign_tensors = post_brelu(activation, sign_tensors, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels, stacked_active_block_sizes_to_channels, offsets, is_identity_channels, channel_map)
 
         out = - E * F + non_identity_activation * F + sign_tensors * E + C_share
         activation[:, ~is_identity_channels] = out

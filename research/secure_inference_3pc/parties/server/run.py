@@ -117,9 +117,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--device', type=str, default="cpu")
-    parser.add_argument('--model_path', type=str, default=None)
+    parser.add_argument('--model_path', type=str, default="/home/yakir/assets/resnet_imagenet/models/ratio_0.15.pth")
     parser.add_argument('--secure_config_path', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py")
-    parser.add_argument('--relu_spec_file', type=str, default=None)
+    parser.add_argument('--relu_spec_file', type=str, default="/home/yakir/assets/resnet_imagenet/block_spec/0.15.pickle")
     args = parser.parse_args()
 
 
@@ -186,5 +186,4 @@ if __name__ == "__main__":
 
     # print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)
     # print("Num of bytes sent 1 -> 0", network_assets.sender_01.num_of_bytes_sent)
-    print("Num of bytes sent 1 ",
-          (network_assets.sender_12.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent) / 4)
+    print("Num of bytes sent 1 ", network_assets.sender_12.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)

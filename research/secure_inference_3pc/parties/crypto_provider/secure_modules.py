@@ -191,7 +191,7 @@ class SecurePostBReLUMultCryptoProvider(SecureModule):
         super(SecurePostBReLUMultCryptoProvider, self).__init__(**kwargs)
 
     def forward(self, activation, sign_tensors, cumsum_shapes, pad_handlers, is_identity_channels, active_block_sizes,
-                active_block_sizes_to_channels):
+                active_block_sizes_to_channels, stacked_active_block_sizes_to_channels, offsets, channel_map):
         non_identity_activation = activation[:, ~is_identity_channels]
 
         A_share_1 = self.prf_handler[SERVER, CRYPTO_PROVIDER].integers(MIN_VAL, MAX_VAL + 1, size=non_identity_activation.shape, dtype=SIGNED_DTYPE)
@@ -203,7 +203,7 @@ class SecurePostBReLUMultCryptoProvider(SecureModule):
         A = A_share_0 + A_share_1
         B = B_share_0 + B_share_1
 
-        B = post_brelu(activation, B, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels)[:, ~is_identity_channels]
+        B = post_brelu(activation, B, cumsum_shapes, pad_handlers, active_block_sizes, active_block_sizes_to_channels, stacked_active_block_sizes_to_channels, offsets, is_identity_channels, channel_map)
 
         C_share_0 = A * B - C_share_1
 
