@@ -1,4 +1,4 @@
-RELU_SPEC_FILE=/home/ubuntu/specs/imagenet/0.12.pickle
+RELU_SPEC_FILE=/home/ubuntu/specs/imagenet/0.09.pickle
 SECURE_CONFIG_PATH=/home/ubuntu/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py
 #SECURE_CONFIG_PATH=/home/ubuntu/secure_inference/research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_maxpool.py
 
