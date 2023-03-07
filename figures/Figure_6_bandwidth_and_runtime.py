@@ -14,21 +14,15 @@ results_imnet_baseline = 76.55
 results_ade20_baseline = 34.08
 results_voc12_baseline = 77.68
 
+runtime_cifar_baseline = 2.8574
+runtime_imnet_baseline = 31.6239
+runtime_ade20_baseline = 379.4955
+runtime_voc12_baseline = 671.46
 
-
-runtime_cifar_baseline = 2.885
-runtime_imnet_baseline = 31.88
-runtime_ade20_baseline = 381.4
-runtime_voc12_baseline = 670.6
-
-runtime_cifar_16 = np.array([1.517,	1.670,	1.656,	1.679,	1.692,	1.644])
-runtime_cifar_64 = np.array([1.529,	1.675,	1.757,	1.696,	1.655,	1.761])
-runtime_imnet_16 = np.array([5.773,	6.170,	6.449,	6.452,	6.749,	6.797])
-runtime_imnet_64 = np.array([6.278,	7.136,	7.393,	8.144,	8.799,	9.437])
-runtime_ade20_32 = np.array([35.39,	39.87,	43.42,	46.83,	52.11,	56.39])
-runtime_ade20_64 = np.array([38.29,	46.76,	56.30,	65.11,	73.31,	82.07])
-runtime_voc12_32 = np.array([91.25,	101.1,	108.0,	118.4,	129.5,	134.2])
-runtime_voc12_64 = np.array([98.51,	116.4,	137.7,	156.8,	181.6,	202.3])
+runtime_cifar_16 = np.array([0.771,	1.5084,	1.572,	1.645,	1.479,	1.613])
+runtime_imnet_16 = np.array([5.528,	5.8332,	6.098,	6.206,	6.533,	6.680])
+runtime_ade20_20 = np.array([32.78,	35.997,	38.29,	41.05,	44.32,	46.78])
+runtime_voc12_20 = np.array([84.64,	92.536,	100.4,	106.1,	111.8,	117.2])
 
 perf_imnet = 100 * np.array([65.59, 70.36, 72.23, 73.30, 74.03, 74.40]) / results_imnet_baseline
 perf_ade20 = 100 * np.array([33.23, 34.73, 35.53, 35.77, 36.01, 36.31]) / results_ade20_baseline
@@ -37,27 +31,24 @@ perf_cifar = 100 * np.array([65.63, 70.90, 74.62, 74.53, 76.18, 76.86]) / result
 
 runtime_boost_imnet = runtime_imnet_baseline / runtime_imnet_16
 runtime_boost_cifar = runtime_cifar_baseline / runtime_cifar_16
-runtime_boost_ade20 = runtime_ade20_baseline / runtime_ade20_32
-runtime_boost_voc12 = runtime_voc12_baseline / runtime_voc12_32
+runtime_boost_ade20 = runtime_ade20_baseline / runtime_ade20_20
+runtime_boost_voc12 = runtime_voc12_baseline / runtime_voc12_20
 
-bandwidth_cifar_baseline = 1357235088 * (4/11) / 1000000000
-bandwidth_imnet_baseline = 17478334016 * (4/11) / 1000000000
+bandwidth_cifar_baseline = 493540032 / 1000000000
+bandwidth_imnet_baseline = 6355757824 / 1000000000
 bandwidth_ade20_baseline = 64005736576 / 1000000000
 bandwidth_voc12_baseline = 106205953664 / 1000000000
-bandwidth_cifar_16 = np.array([566001920, 578446528, 589733760, 601267480, 612290712, 623566328]) * (4/11) / 1000000000
-bandwidth_cifar_64 = np.array([579236240, 604916752, 629439888, 654208720, 678467856, 702979376]) * (4/11)  / 1000000000
-bandwidth_imnet_16 = np.array([2341120540, 2544648634, 2741103970, 2934551686, 3126430912, 3318121840]) * (4/11)  / 1000000000
-bandwidth_imnet_64 = np.array([2569422460, 3001253266, 3426011314, 3847761742, 4267943680, 4687915408]) * (4/11)  / 1000000000
-bandwidth_ade20_32 = np.array([6341935552, 7542829312, 8724150656, 9879281600, 11035320000, 12158112960]) / 1000000000
-bandwidth_ade20_64 = np.array([7004879488, 8858244736, 10692626048, 12500557952, 14310337152, 16085475456]) / 1000000000
-bandwidth_voc12_32 = np.array([12305108608, 14874560576, 17276690368, 19699197824, 22078597056, 24376760064]) / 1000000000
-bandwidth_voc12_64 = np.array([13765095040, 17783405696, 21574989952, 25407395456, 29186553984, 32841516672]) / 1000000000
+
+bandwidth_cifar_16 = np.array([52001120,	210344192,	214448640,	218642720,	222651168,	226751392])   / 1000000000
+bandwidth_imnet_16 = np.array([851316560,	925326776,	996765080,	1067109704,	1136883968,	1206581792])   / 1000000000
+bandwidth_ade20_20 = np.array([6093331576,	7049548528,	7985972384,	8896302968,	9807188568,	10685352024]) / 1000000000
+bandwidth_voc12_20 = np.array([11757613696,	13783743656,	15664828024,	17558623712,	19413113208,	21202476336]) / 1000000000
 
 
 bandwidth_boost_imnet = bandwidth_imnet_baseline / bandwidth_imnet_16
 bandwidth_boost_cifar = bandwidth_cifar_baseline / bandwidth_cifar_16
-bandwidth_boost_ade20 = bandwidth_ade20_baseline / bandwidth_ade20_32
-bandwidth_boost_voc12 = bandwidth_voc12_baseline / bandwidth_voc12_32
+bandwidth_boost_ade20 = bandwidth_ade20_baseline / bandwidth_ade20_20
+bandwidth_boost_voc12 = bandwidth_voc12_baseline / bandwidth_voc12_20
 
 ticks_font_size = 16
 axis_label_font_size = 20
@@ -73,11 +64,11 @@ plt.plot(perf_cifar, bandwidth_boost_cifar, ".-", color=red, lw=plot_lw, markers
 plt.plot(perf_ade20[1:2], bandwidth_boost_ade20[1:2], ".-", color=green, lw=plot_lw, markersize=25)
 plt.plot(perf_voc12[1:2], bandwidth_boost_voc12[1:2], ".-", color=purple, lw=plot_lw, markersize=25)
 plt.plot(perf_imnet[1:2], bandwidth_boost_imnet[1:2], ".-", color=blue, lw=plot_lw, markersize=25)
-plt.plot(perf_cifar[1:2], bandwidth_boost_cifar[1:2], ".-", color=red, lw=plot_lw, markersize=25)
+plt.plot(perf_cifar, bandwidth_boost_cifar, ".-", color=red, lw=plot_lw, markersize=25)
 
 peft = [perf_ade20[1], perf_voc12[1], perf_imnet[1], perf_cifar[1]]
 bandwidth_boost = [bandwidth_boost_ade20[1], bandwidth_boost_voc12[1], bandwidth_boost_imnet[1], bandwidth_boost_cifar[1]]
-bandwidth = [bandwidth_ade20_32[1], bandwidth_voc12_32[1], bandwidth_imnet_16[1], bandwidth_cifar_16[1]]
+bandwidth = [bandwidth_ade20_20[1], bandwidth_voc12_20[1], bandwidth_imnet_16[1], bandwidth_cifar_16[1]]
 bandwidth = [str(round(x, 2)) for x in bandwidth]
 ax = plt.gca()
 for i in range(4):
@@ -89,9 +80,9 @@ ax = plt.gca()
 
 ax.set_ylabel('Factor in Bandwidth', fontsize=axis_label_font_size, labelpad=7)
 [i.set_linewidth(2) for i in ax.spines.values()]
-ax.set_ylim([1, 11.0])
+ax.set_ylim([1, 12.0])
 ax.set_xlim([90, 108])
-ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10"], fontsize=ticks_font_size)
+ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10", "x12"], fontsize=ticks_font_size)
 ax.set_xticklabels([None] + [str(x) + "%" for x in np.arange(92, 107, 2)], fontsize=ticks_font_size)
 ax.set_xlabel('Performance Relative to Baseline', fontsize=axis_label_font_size, labelpad=22)
 plt.minorticks_on()
@@ -112,12 +103,12 @@ plt.plot(perf_cifar, runtime_boost_cifar, ".-", color=red, lw=plot_lw, markersiz
 plt.plot(perf_ade20[1:2], runtime_boost_ade20[1:2], ".-", color=green, lw=plot_lw, markersize=25)
 plt.plot(perf_voc12[1:2], runtime_boost_voc12[1:2], ".-", color=purple, lw=plot_lw, markersize=25)
 plt.plot(perf_imnet[1:2], runtime_boost_imnet[1:2], ".-", color=blue, lw=plot_lw, markersize=25)
-plt.plot(perf_cifar[1:2], runtime_boost_cifar[1:2], ".-", color=red, lw=plot_lw, markersize=25)
+plt.plot(perf_cifar, runtime_boost_cifar, ".-", color=red, lw=plot_lw, markersize=25)
 
 peft = [perf_ade20[1], perf_voc12[1], perf_imnet[1], perf_cifar[1]]
 
 runtime_boost = [runtime_boost_ade20[1], runtime_boost_voc12[1], runtime_boost_imnet[1], runtime_boost_cifar[1]]
-runtime = [runtime_ade20_32[1], runtime_voc12_32[1], runtime_imnet_16[1], runtime_cifar_16[1]]
+runtime = [runtime_ade20_20[1], runtime_voc12_20[1], runtime_imnet_16[1], runtime_cifar_16[1]]
 runtime = [str(round(x, 2)) for x in runtime]
 ax = plt.gca()
 for i in range(4):
@@ -138,9 +129,9 @@ ax = plt.gca()
 
 ax.set_ylabel('Factor in Runtime', fontsize=axis_label_font_size, labelpad=7)
 [i.set_linewidth(2) for i in ax.spines.values()]
-ax.set_ylim([1, 11.0])
+ax.set_ylim([1, 12.0])
 ax.set_xlim([90, 108])
-ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10"], fontsize=ticks_font_size)
+ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10", "x12"], fontsize=ticks_font_size)
 ax.set_xticklabels([None] + [str(x) + "%" for x in np.arange(92, 107, 2)], fontsize=ticks_font_size)
 ax.set_xlabel('Performance Relative to Baseline', fontsize=axis_label_font_size, labelpad=22)
 plt.minorticks_on()
