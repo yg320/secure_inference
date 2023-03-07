@@ -214,8 +214,8 @@ class PRFFetcherSecureModelSegmentation(SecureModule):
         super(PRFFetcherSecureModelSegmentation, self).__init__(**kwargs)
         self.model = model
 
-    def forward(self, img):
-        shape = DummyShapeTensor(img.shape)
+    def forward(self, shape):
+        shape = DummyShapeTensor(shape)
 
         self.prf_handler[CLIENT, SERVER].integers_fetch(low=MIN_VAL, high=MAX_VAL, size=shape, dtype=SIGNED_DTYPE)
         out_0 = self.model.decode_head(self.model.backbone(shape))
