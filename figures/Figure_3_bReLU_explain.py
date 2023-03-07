@@ -38,7 +38,7 @@ if bReLU_2x3[4:6, 3:].mean() < 0:
 
 height, width = activation.shape
 box_color = "#3399e6" #"g"
-fig = plt.figure(figsize=(5, 3))
+fig = plt.figure(figsize=(5, 2.8))
 images = [activation, bReLU_2x3]
 for i in range(2):
     j = 0
@@ -46,9 +46,9 @@ for i in range(2):
     ax = fig.add_subplot(1, 2, i+1, aspect='equal')
 
     if i == 0 and j == 0:
-        plt.title("Input activation", fontsize=12)
+        plt.title("Input activation", fontsize=13)
     if i == 1 and j == 0:
-        plt.title("Output activation 2x3", fontsize=12)
+        plt.title("Output activation 2x3", fontsize=13)
 
 
     image = images[i]
@@ -116,5 +116,5 @@ for i in range(2):
                     rect = patches.Rectangle((-0.5 + lll, -0.5 + mmm), 1, 1, linewidth=5, edgecolor=box_color, facecolor='none')
                 ax.add_patch(rect)
 
-plt.tight_layout()
+plt.subplots_adjust(wspace=0.04,  left=0.01, right=0.99, top=0.95, bottom=0.01)
 plt.savefig("/home/yakir/Figure_3.png")
