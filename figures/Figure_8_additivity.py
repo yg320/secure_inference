@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 import pickle
 import numpy as np
 
-plt.figure()
+plt.figure(figsize=(6.4,3.5))
 content = pickle.load(open("/home/yakir/distortion_additivity.pickle", "rb"))
 plt.scatter(content["additive_noises"][:3000], content["noises"][:3000], facecolors=matplotlib.colors.to_rgba('#3399e6', 0.7), edgecolors=matplotlib.colors.to_rgba("black", 0.4))
 plt.ylim(7, 56)

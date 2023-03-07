@@ -33,14 +33,14 @@ if stats:
                 Z_approx = (tmp_Z & 2 ** (64 - 1 - msb_ignore)) == 0
                 mat[lsb_ignore, msb_ignore] = 1 - (Z_approx == Z).mean()
 
-    plt.figure(figsize=(6, 4))
+    plt.figure(figsize=(6, 3))
     plt.plot(mat[0, :], color="#3399e6", lw=4, label="MSBs")
     plt.plot(mat[:, 0], color="#56ae57", lw=4, label="LSBs")
     plt.xlabel("Number of Bits Ignored", fontsize=16, labelpad=8)
-    plt.ylabel("Probability of DReLU Error", fontsize=16, labelpad=12)
+    plt.ylabel("DReLU Error Probability", fontsize=16, labelpad=12)
     plt.gca().tick_params(axis='both', which='major', labelsize=14)
     plt.legend(prop={'size': 14})
-    plt.ylim([0, 0.01])
+    plt.ylim([0, 0.005])
 
     plt.gca().xaxis.set_major_locator(MultipleLocator(10))
     plt.gca().yaxis.set_major_locator(MultipleLocator(0.001))
@@ -50,7 +50,7 @@ if stats:
     plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.6)
     plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.3)
 
-    plt.subplots_adjust(left=0.18, right=0.98, top=0.96, bottom=0.16)
+    plt.subplots_adjust(left=0.2, right=0.98, top=0.92, bottom=0.23)
     [i.set_linewidth(1.5) for i in plt.gca().spines.values()]
 
     plt.savefig("/home/yakir/Figure_4.png")

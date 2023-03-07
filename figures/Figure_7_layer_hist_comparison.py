@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 import pickle
 from research.distortion.utils import get_block_spec_num_relus
 spec = '/home/yakir/deepreduce_comparison_v3/distortions/baseline/block_sizes/49.15K.pickle'
-config = "/home/yakir/PycharmProjects/secure_inference/work_dirs/baseline_49.15K/baseline_49.15K.py"
+config = "/home/yakir/PycharmProjects/secure_inference/work_dirs/benchmark/baseline_49.15K/baseline_49.15K.py"
 x = pickle.load(open(spec, 'rb'))
 import numpy as np
 import mmcv
@@ -15,7 +15,7 @@ red = "#db5856"
 purple = "tab:purple"
 blue = "#3399e6"
 
-plt.figure()
+plt.figure(figsize=(6.4,3.8))
 
 cfg = mmcv.Config.fromfile(config)
 params = param_factory(cfg)
@@ -61,9 +61,9 @@ plt.gca().set_yticklabels([None, "2", "4", "6", "8", "10", "12", "14", "16"], fo
 plt.legend(prop={'size': 16})
 plt.xlabel("Layer", fontsize=18, labelpad=7)
 plt.ylabel("Number of DReLUs (in K)", fontsize=18, labelpad=10)
-plt.tight_layout()
 [i.set_linewidth(1.5) for i in plt.gca().spines.values()]
 plt.gca().yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.8)
+plt.subplots_adjust(left=0.12, right=0.99, top=0.99, bottom=0.17)
 
 plt.savefig("/home/yakir/Figure_7.png")
 # # plt.semilogy()

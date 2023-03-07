@@ -41,7 +41,7 @@ activations = activations > 0
 # r = np.concatenate([r, r[::-1][1:]], axis=0)
 # np.save("/home/yakir/Data2/tmp_relus_processed.npy", r)
 r = np.load("/home/yakir/Data2/tmp_relus_processed.npy")
-plt.figure()
+plt.figure(figsize=(6.4, 4))
 CROP = 20
 plt.imshow(r[CROP:-CROP,CROP:-CROP], vmin=0.7, vmax=0.9, cmap="Blues")
 plt.xticks(np.arange(0, r.shape[0] - 2*CROP, 2))

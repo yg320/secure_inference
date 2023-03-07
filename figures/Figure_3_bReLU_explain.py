@@ -38,7 +38,7 @@ if bReLU_2x3[4:6, 3:].mean() < 0:
 
 height, width = activation.shape
 box_color = "#3399e6" #"g"
-fig = plt.figure(figsize=(5, 2.8))
+fig = plt.figure(figsize=(4.5, 2.5))
 images = [activation, bReLU_2x3]
 for i in range(2):
     j = 0
@@ -48,13 +48,13 @@ for i in range(2):
     if i == 0 and j == 0:
         plt.title("Input activation", fontsize=13)
     if i == 1 and j == 0:
-        plt.title("Output activation 2x3", fontsize=13)
+        plt.title("Output activation", fontsize=13)
 
 
     image = images[i]
     for x in range(width):
         for y in range(height):
-            ax.annotate(str(image[x][y]), xy=(y, x), ha='center', va='center', fontsize=10)
+            ax.annotate(str(image[x][y]), xy=(y, x), ha='center', va='center', fontsize=11)
 
     offset = .5
     ax.set_xlim(-offset, width - offset)
