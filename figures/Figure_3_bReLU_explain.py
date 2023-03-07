@@ -66,6 +66,21 @@ for i in range(2):
     plt.xticks([])
     plt.yticks([])
 
+    if i == 0 and j == 0:
+        rect = patches.Rectangle((-0.5, -0.5), 3, 2, linewidth=5, edgecolor="tab:red", facecolor='none')
+        ax.add_patch(rect)
+        rect = patches.Rectangle((-0.5, 1.5), 3, 2, linewidth=5, edgecolor="tab:red", facecolor='none')
+        ax.add_patch(rect)
+        rect = patches.Rectangle((-0.5, 3.5), 3, 2, linewidth=5, edgecolor="tab:red", facecolor='none')
+        ax.add_patch(rect)
+
+        rect = patches.Rectangle((2.5, -0.5), 3, 2, linewidth=5, edgecolor="tab:red", facecolor='none')
+        ax.add_patch(rect)
+        rect = patches.Rectangle((2.5, 1.5), 3, 2, linewidth=5, edgecolor="tab:red", facecolor='none')
+        ax.add_patch(rect)
+        rect = patches.Rectangle((2.5, 3.5), 3, 2, linewidth=5, edgecolor="tab:red", facecolor='none')
+        ax.add_patch(rect)
+
     if i == 1 and j == 0:
         rect = patches.Rectangle((-0.5, -0.5), 3, 2, linewidth=5, edgecolor=box_color, facecolor=matplotlib.colors.to_rgba(box_color, 0.2))
         ax.add_patch(rect)
