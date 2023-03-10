@@ -5,7 +5,7 @@ import numpy as np
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 
 
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(10, 5.5))
 # plt.subplot(121)
 green = "#56ae57"
 red = "#db5856"
@@ -23,10 +23,10 @@ dReLUs_relative_to_baseline = 100 * np.array([0.03, 0.06, 0.09, 0.12, 0.15, 0.18
 performance_relative_to_baseline_ImageNet = 100 * np.array([65.59, 70.36, 72.23, 73.30, 74.03, 74.40]) / ImageNet_baseline
 performance_relative_to_baseline_ADE20K = 100 * np.array([33.23, 34.73, 35.53, 35.77, 36.01, 36.31]) / ADE20K_baseline
 performance_relative_to_baseline_VOC = 100 * np.array([72.23, 74.27, 75.89, 76.26, 76.86, 77.48]) / VOC2012_baseline
-performance_relative_to_baseline_CIFAR100 = 100 * np.array([65.63, 70.90, 74.62, 74.53, 76.18, 76.86]) / CIFAR100_baseline
+performance_relative_to_baseline_CIFAR100 = 100 * np.array([65.52, 71.16, 74.85, 74.64, 76.19, 76.88]) / CIFAR100_baseline
 
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ADE20K, '.-', color=green, lw=lw, markersize=10, label="ADE20K - Seg. - Ours")
-plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label=  "VOC2012 - Seg. - Ours")
+plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_VOC, '.-', color=purple, lw=lw, markersize=10, label=  "VOC12 - Seg. - Ours")
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_ImageNet, '.-', color=blue, lw=lw, markersize=10, label="ImageNet - Cls. - Ours")
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=10, label="CIFAR100 - Cls. - Ours")
 
@@ -41,7 +41,7 @@ plt.plot(dReLUs_relative_to_baseline[1:2], performance_relative_to_baseline_ADE2
 plt.plot(dReLUs_relative_to_baseline[1:2], performance_relative_to_baseline_VOC[1:2], '.-', color=purple, lw=lw, markersize=20)
 plt.plot(dReLUs_relative_to_baseline, performance_relative_to_baseline_CIFAR100, '.-', color=red, lw=lw, markersize=20)
 
-plt.xlabel("Percentage of DReLU Used", fontsize=label_font_size, labelpad=20)
+plt.xlabel("Percentage of DReLU Used", fontsize=label_font_size, labelpad=17.5)
 plt.ylabel("Perf. Relative to Baseline", fontsize=label_font_size, labelpad=20)
 
 # assert False, "Add percentage in ticks"
@@ -52,15 +52,15 @@ plt.gca().yaxis.set_minor_locator(MultipleLocator(1))
 plt.gca().tick_params(axis='both', which='major', labelsize=11)
 
 plt.xlim([2.5, 18.5])
-plt.ylim([80, 108])
+plt.ylim([82, 107])
 plt.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.9)
 plt.grid(visible=True, which='minor', color='#999999', linestyle='-', alpha=0.5)
 plt.legend(loc="lower right", prop={'size': 16})
 # plt.savefig("/home/yakir/Figure_1.png")
 
-plt.gca().set_yticklabels([None,   "80%", "85%", "90%", "95%", "100%", "105%", "110%"], fontsize=ticks_font_size)
+plt.gca().set_yticklabels([None,  "85%", "90%", "95%", "100%", "105%", "110%"], fontsize=ticks_font_size)
 plt.gca().set_xticklabels([None, "5%", "10%", "15%", "20%",  "25%", "30%","35%",None], fontsize=ticks_font_size)
-plt.subplots_adjust(left=0.16, right=0.97, top=0.96, bottom=0.17, wspace=0.1)
+plt.subplots_adjust(left=0.16, right=0.98, top=0.98, bottom=0.18, wspace=0.1)
 [i.set_linewidth(2.5) for i in plt.gca().spines.values()]
 
 plt.savefig("/home/yakir/Figure_1.png")

@@ -3,7 +3,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
 import numpy as np
-
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 green = "#56ae57"
 red = "#db5856"
 purple = "tab:purple"
@@ -27,7 +27,7 @@ runtime_voc12_20 = np.array([84.64,	92.536,	100.4,	106.1,	111.8,	117.2])
 perf_imnet = 100 * np.array([65.59, 70.36, 72.23, 73.30, 74.03, 74.40]) / results_imnet_baseline
 perf_ade20 = 100 * np.array([33.23, 34.73, 35.53, 35.77, 36.01, 36.31]) / results_ade20_baseline
 perf_voc12 = 100 * np.array([72.23, 74.27, 75.89, 76.26, 76.86, 77.48]) / results_voc12_baseline
-perf_cifar = 100 * np.array([65.63, 70.90, 74.62, 74.53, 76.18, 76.86]) / results_cifar_baseline
+perf_cifar = 100 * np.array([65.52, 71.16, 74.85, 74.64, 76.19, 76.88]) / results_cifar_baseline
 
 runtime_boost_imnet = runtime_imnet_baseline / runtime_imnet_16
 runtime_boost_cifar = runtime_cifar_baseline / runtime_cifar_16
@@ -55,7 +55,7 @@ axis_label_font_size = 20
 plot_lw = 5
 plot_markersize = 15
 
-plt.figure(figsize=(8, 12))
+plt.figure(figsize=(8, 6))
 plt.subplot(211)
 plt.plot(perf_ade20, bandwidth_boost_ade20, ".-", color=green, lw=plot_lw, markersize=plot_markersize, label="ADE20K - Seg.")
 plt.plot(perf_voc12, bandwidth_boost_voc12, ".-", color=purple, lw=plot_lw, markersize=plot_markersize, label="VOC12 - Seg.")
@@ -78,20 +78,23 @@ for i in range(4):
 
 ax = plt.gca()
 
-ax.set_ylabel('Factor in Bandwidth', fontsize=axis_label_font_size, labelpad=7)
+ax.set_ylabel('Comm. Factor', fontsize=axis_label_font_size, labelpad=7)
 [i.set_linewidth(2) for i in ax.spines.values()]
 ax.set_ylim([1, 12.0])
 ax.set_xlim([90, 108])
-ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10", "x12"], fontsize=ticks_font_size)
+ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10"], fontsize=ticks_font_size)
 ax.set_xticklabels([None] + [str(x) + "%" for x in np.arange(92, 107, 2)], fontsize=ticks_font_size)
-ax.set_xlabel('Performance Relative to Baseline', fontsize=axis_label_font_size, labelpad=22)
+# ax.set_xlabel('Performance Relative to Baseline', fontsize=axis_label_font_size, labelpad=22)
 plt.minorticks_on()
+plt.gca().yaxis.set_minor_locator(MultipleLocator(1))
+plt.gca().xaxis.set_minor_locator(MultipleLocator(1))
+
 ax.grid(visible=True, which='major', color='#666666', linestyle='--', alpha=1, lw=1, axis='y')
 ax.grid(visible=True, which='minor', color='#999999', linestyle='--', alpha=0.5, lw=1, axis='y')
 ax.grid(visible=True, which='minor', color='#999999', linestyle='--', alpha=0.5, lw=1, axis='x')
 ax.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.8, lw=2, axis='x')
-plt.legend(prop={'size': 16}, loc='lower right')
-
+# plt.legend(prop={'size': 16}, loc='lower right')
+ax.set_xticklabels([])
 
 plt.subplot(212)
 
@@ -127,14 +130,17 @@ ax = plt.gca()
 #         ax.annotate(str(segmentation_runtime[i]) + "s", (segmentation_results_24_bits[i]+0.25, segmentation_runtime_lan_24_bits[i]+0.25), fontsize=14, weight='bold')
 #
 
-ax.set_ylabel('Factor in Runtime', fontsize=axis_label_font_size, labelpad=7)
+ax.set_ylabel('Runtime Factor', fontsize=axis_label_font_size, labelpad=7)
 [i.set_linewidth(2) for i in ax.spines.values()]
 ax.set_ylim([1, 12.0])
 ax.set_xlim([90, 108])
-ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10", "x12"], fontsize=ticks_font_size)
+ax.set_yticklabels([None, "x2", "x4", "x6", "x8", "x10"], fontsize=ticks_font_size)
 ax.set_xticklabels([None] + [str(x) + "%" for x in np.arange(92, 107, 2)], fontsize=ticks_font_size)
 ax.set_xlabel('Performance Relative to Baseline', fontsize=axis_label_font_size, labelpad=22)
 plt.minorticks_on()
+plt.gca().yaxis.set_minor_locator(MultipleLocator(1))
+plt.gca().xaxis.set_minor_locator(MultipleLocator(1))
+
 ax.grid(visible=True, which='major', color='#666666', linestyle='--', alpha=1, lw=1, axis='y')
 ax.grid(visible=True, which='minor', color='#999999', linestyle='--', alpha=0.5, lw=1, axis='y')
 ax.grid(visible=True, which='minor', color='#999999', linestyle='--', alpha=0.5, lw=1, axis='x')
@@ -142,6 +148,6 @@ ax.grid(visible=True, which='major', color='#666666', linestyle='-', alpha=0.8, 
 plt.legend(prop={'size': 16}, loc='lower right')
 
 
-plt.subplots_adjust(left=0.12, right=0.96, top=0.97, bottom=0.1, hspace=0.15)
+plt.subplots_adjust(left=0.12, right=0.98, top=0.99, bottom=0.15, hspace=0.08)
 
 plt.savefig("/home/yakir/Figure_bandwidth_and_runtime.png")

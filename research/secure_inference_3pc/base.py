@@ -16,21 +16,21 @@ class Addresses:
         self.port_12 = 10 * self.base_port + 4
         self.port_21 = 10 * self.base_port + 5
 
-        # self.ip_client = "localhost"
-        # self.ip_server = "localhost"
-        # self.ip_cryptoprovider = "localhost"
+        self.ip_client = "localhost"
+        self.ip_server = "localhost"
+        self.ip_cryptoprovider = "localhost"
+
+        self.ip_client_private = "localhost"
+        self.ip_server_private = "localhost"
+        self.ip_cryptoprovider_private = "localhost"
+
+        # self.ip_client = "3.249.163.229"
+        # self.ip_server = "34.240.80.194"
+        # self.ip_cryptoprovider = "34.250.21.207"
         #
-        # self.ip_client_private = "localhost"
-        # self.ip_server_private = "localhost"
-        # self.ip_cryptoprovider_private = "localhost"
-
-        self.ip_client = "3.249.163.229"
-        self.ip_server = "34.240.80.194"
-        self.ip_cryptoprovider = "34.250.21.207"
-
-        self.ip_client_private = "172.31.22.204"
-        self.ip_server_private = "172.31.26.32"
-        self.ip_cryptoprovider_private = "172.31.17.32"
+        # self.ip_client_private = "172.31.22.204"
+        # self.ip_server_private = "172.31.26.32"
+        # self.ip_cryptoprovider_private = "172.31.17.32"
 
 
 class NetworkAssets:

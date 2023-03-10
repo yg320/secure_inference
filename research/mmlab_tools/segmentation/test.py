@@ -21,6 +21,7 @@ from mmseg.utils import build_ddp, build_dp, get_device, setup_multi_processes
 
 from research.distortion.arch_utils.factory import arch_utils_factory
 import pickle
+from research.mmlab_extension.segmentation.resnet_seg import AvgPoolResNetSeg  # TODO: why is this needed?
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -31,6 +32,8 @@ def parse_args():
         '--work-dir',
         help=('if specified, the evaluation metric results will be dumped'
               'into the directory as json'))
+    parser.add_argument(
+        '--relu-spec-file', help='the relu spec file', default=None)
     parser.add_argument(
         '--aug-test', action='store_true', help='Use Flip and Multi scale aug')
     parser.add_argument('--out', help='output result file in pickle format')
@@ -152,7 +155,8 @@ def main():
 
     if args.gpu_id is not None:
         cfg.gpu_ids = [args.gpu_id]
-
+    if args.relu_spec_file is not None:
+        cfg.relu_spec_file = args.relu_spec_file
     # init distributed env first, since logger depends on the dist info.
     if args.launcher == 'none':
         cfg.gpu_ids = [args.gpu_id]
@@ -212,6 +216,8 @@ def main():
         'shuffle': False,  # Not shuffle by default
         **cfg.data.get('test_dataloader', {})
     }
+    if 'distortion_extraction' in test_loader_cfg:
+        del test_loader_cfg['distortion_extraction']
     # build the dataloader
     data_loader = build_dataloader(dataset, **test_loader_cfg)
 
