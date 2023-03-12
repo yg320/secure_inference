@@ -20,11 +20,14 @@ from mmcls.utils import (auto_select_device, get_root_logger,
 
 from research.distortion.arch_utils.factory import arch_utils_factory
 import pickle
-
+from research.mmlab_extension.classification.resnet_cifar_v2 import ResNet_CIFAR_V2  # TODO: why is this needed?
+from research.mmlab_extension.classification.resnet import MyResNet  # TODO: why is this needed?
 def parse_args():
     parser = argparse.ArgumentParser(description='mmcls test model')
     parser.add_argument('config', help='test config file path')
     parser.add_argument('checkpoint', help='checkpoint file')
+    parser.add_argument(
+        '--relu-spec-file', help='the relu spec file', default=None)
     parser.add_argument('--out', help='output result file')
     out_options = ['class_scores', 'pred_score', 'pred_label', 'pred_class']
     parser.add_argument(
@@ -112,7 +115,8 @@ def main():
     cfg = mmcv.Config.fromfile(args.config)
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
-
+    if args.relu_spec_file is not None:
+        cfg.relu_spec_file = args.relu_spec_file
     # set multi-process settings
     setup_multi_processes(cfg)
 
@@ -137,7 +141,8 @@ def main():
     else:
         distributed = True
         init_dist(args.launcher, **cfg.dist_params)
-
+    if 'distortion_extraction' in cfg.data:
+        del cfg.data['distortion_extraction']
     dataset = build_dataset(cfg.data.test, default_args=dict(test_mode=True))
 
     # build the dataloader
@@ -163,6 +168,7 @@ def main():
         **cfg.data.get('test_dataloader', {}),
     }
     # the extra round_up data will be removed during gpu/cpu collect
+
     data_loader = build_dataloader(dataset, **test_loader_cfg)
 
     # build the model and load checkpoint

@@ -222,8 +222,7 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
     model.eval()
 
     results = []
-    total_time_0 = 0
-    total_time_1 = 0
+
     for sample_id in tqdm(range(image_start, image_end)):
         if skip_existing and os.path.exists(os.path.join(dump_dir, f"{sample_id}.npy")):
             continue
@@ -234,17 +233,11 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
         network_assets.receiver_01.get()
         network_assets.receiver_02.get()
 
-        t0 = time.time()
         if model.prf_fetcher:
             model.prf_fetcher.prf_handler.fetch_image(image_shape=img.shape)
 
         cur_result = run_inference_func(img, gt, dataset, img_meta=img_meta, is_dummy=dummy)
-        t1 = time.time()
-        cur_time = (t1 - t0)
-        # print(cur_time)
-        total_time_1 += cur_time
-        if sample_id > 0:
-            total_time_0 += cur_time
+
 
         if dump_dir is not None:
             np.save(os.path.join(dump_dir, f"{sample_id}.npy"), cur_result)
@@ -255,8 +248,7 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
                 print(sample_id, dataset.evaluate(results, logger='silent', **{'metric': ['mIoU']})['mIoU'])
             else:
                 print(sample_id, np.mean(results))
-    print("Total time:", total_time_0/(image_end - image_start - 1))
-    print("Total time:", total_time_1/(image_end - image_start))
+
     network_assets.sender_01.put(np.array([0]))
     network_assets.sender_02.put(np.array([0]))
 
