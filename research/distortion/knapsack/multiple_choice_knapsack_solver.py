@@ -7,7 +7,7 @@ from research.distortion.knapsack.io_buffer import IO_Buffer
 
 class MultipleChoiceKnapsackSolver:
     @staticmethod
-    def run_multiple_choice_knapsack(Ws, Ps, num_rows, num_columns, device=0):
+    def run_multiple_choice_knapsack(Ws, Ps, num_rows, num_columns, device=0, buffer_dir=None):
         Ws = torch.from_numpy(Ws)
         Ps = torch.from_numpy(Ps)
 
@@ -18,7 +18,7 @@ class MultipleChoiceKnapsackSolver:
         buffer = torch.zeros(size=(num_columns,), dtype=torch.float64)
         boolean_index_buffer = torch.zeros(size=(num_columns,), dtype=torch.bool)
 
-        dp_arg = IO_Buffer(num_columns, buffer_size=1, device=device)
+        dp_arg = IO_Buffer(num_columns, buffer_size=1, device=device, buffer_dir=buffer_dir)
         dp = - float("Inf") * torch.ones(size=(num_columns + 1,), dtype=torch.float64)
 
         init_row = dp_arg[0].clone()

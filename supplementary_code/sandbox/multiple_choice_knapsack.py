@@ -371,7 +371,7 @@ def get_cost(block_size, activation_dim, cost_type, division=1):
 #     # dp_0 = dp_0.cpu().numpy()
 #
 #     dp_arg, dp = main_dp_torch_memory(Ws, Ps, num_channels, max_cost)
-#     np.save(file="/home/john_doe/dp.npy", arr=dp.cpu().numpy())
+#     np.save(file="/home/abcdefg/dp.npy", arr=dp.cpu().numpy())
 #     # print('hey')
 #     #
 #     # dp_arg_1 = dp_arg_1.buffer.cpu().numpy()

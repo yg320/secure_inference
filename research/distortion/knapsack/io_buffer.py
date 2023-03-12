@@ -4,9 +4,11 @@ import torch
 
 
 class IO_Buffer:
-    def __init__(self, word_size, load=False, buffer_size=10, device=0):
+    def __init__(self, word_size, load=False, buffer_size=10, device=0, buffer_dir=None):
         self.buffer_size = buffer_size
-        self.buffer_dir = f"/home/yakir/Data2/buffer_dir/device_{device}"
+        self.buffer_dir = buffer_dir
+        if self.buffer_dir is None:
+            self.buffer_dir = f"/tmp/buffer_dir/device_{device}"
 
         self.word_size = word_size
         self.buffer_init_value = 255

@@ -6,7 +6,9 @@ import numpy as np
 from io import BytesIO
 import torch
 
-from research.secure_inference_3pc.timer import Timer
+# A great deal of the code here is based on https://github.com/sabjorn/NumpySocket
+
+
 class NumpySocket(socket.socket):
     def sendall(self, frame):
         if not isinstance(frame, np.ndarray):

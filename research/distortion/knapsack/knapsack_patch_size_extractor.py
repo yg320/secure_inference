@@ -14,12 +14,13 @@ from research.distortion.knapsack.multiple_choice_knapsack_solver import Multipl
 
 
 class MultipleChoiceKnapsackPatchSizeExtractor:
-    def __init__(self, params, channel_distortion_path, ratio=None, max_cost=None, device=0):
+    def __init__(self, params, channel_distortion_path, ratio=None, max_cost=None, device=0, buffer_dir=None):
 
         assert max_cost is None or ratio is None
         self.params = params
         self.ratio = ratio
         self.channel_distortion_path = channel_distortion_path
+        self.buffer_dir = buffer_dir
 
         self.channel_order_to_layer, self.channel_order_to_channel, self.channel_order_to_dim = \
             get_channel_order_statistics(self.params)
@@ -102,7 +103,7 @@ class MultipleChoiceKnapsackPatchSizeExtractor:
         Ps, Ws, block_size_tracker = self.prepare_matrices()
 
         dp_arg, dp = MultipleChoiceKnapsackSolver.run_multiple_choice_knapsack(Ws, Ps, self.num_channels, self.max_cost,
-                                                                               self.device)
+                                                                               self.device, self.buffer_dir)
 
         block_size_spec = self.convert_dp_arg_to_block_size_spec(dp_arg, Ws, block_size_tracker)
 
@@ -142,6 +143,7 @@ if __name__ == "__main__":
     parser.add_argument('--ratio', type=float, default=None)
     parser.add_argument('--max_cost', type=int, default=34816)
     parser.add_argument('--device', type=int, default=1)
+    parser.add_argument('--buffer_dir', type=str, default=None)
 
     args = parser.parse_args()
 
@@ -153,7 +155,8 @@ if __name__ == "__main__":
         channel_distortion_path=args.channel_distortion_path,
         ratio=args.ratio,
         max_cost=args.max_cost,
-        device=args.device)
+        device=args.device,
+        buffer_dir=args.buffer_dir)
 
     block_size_spec = mck.get_optimal_block_sizes()
 
