@@ -36,5 +36,3 @@ class DistortionCollector:
                 distortions = distortions[:, :-1]
 
             np.save(os.path.join(distortion_collected_path, f"{layer_name}.npy"), -distortions)
-
-# DistortionCollector("/storage/yakir/secure_inference/benchmark/segmentation/").collect()

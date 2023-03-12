@@ -371,7 +371,7 @@ def get_cost(block_size, activation_dim, cost_type, division=1):
 #     # dp_0 = dp_0.cpu().numpy()
 #
 #     dp_arg, dp = main_dp_torch_memory(Ws, Ps, num_channels, max_cost)
-#     np.save(file="/home/yakir/dp.npy", arr=dp.cpu().numpy())
+#     np.save(file="/home/john_doe/dp.npy", arr=dp.cpu().numpy())
 #     # print('hey')
 #     #
 #     # dp_arg_1 = dp_arg_1.buffer.cpu().numpy()
@@ -631,9 +631,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='')
 
-    parser.add_argument('--block_size_spec_file_name', type=str, default="/home/yakir/distortion_200/block_size/12.3K.pickle")
-    parser.add_argument('--channel_distortion_path', type=str, default="/home/yakir/distortion_200/distortion_collected")
-    parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet18_2xb64_cifar100.py")
+    parser.add_argument('--block_size_spec_file_name', type=str)
+    parser.add_argument('--channel_distortion_path', type=str)
+    parser.add_argument('--config', type=str)
     parser.add_argument('--ratio', type=float, default=None)
     parser.add_argument('--cost_type', type=str, default="ReLU")
     parser.add_argument('--division', type=int, default=1)

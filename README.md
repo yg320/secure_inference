@@ -85,16 +85,17 @@
 <summary> Classification, ResNet18, CIFAR100</summary> 
 
 - **OpenMMLab does not provide this model, therefore we train a model from scratch**
-    - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet18_cifar100/baseline.py 2
+    - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet18_cifar100/baseline.py 2 --work-dir {WORK_DIR}/classification/resnet18_cifar100/baseline
 - **Distortion extraction:**
-    - export  PYTHONPATH=. ; python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet18_cifar100/baseline.py --checkpoint {WORK_DIR}/resnet18_cifar100/baseline/epoch_200.pth --output_path {WORK_DIR}/segmentation/resnet18_cifar100/distortion/ --num_samples 2048 --num_gpus 2
+    - export  PYTHONPATH=. ; python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet18_cifar100/baseline.py --checkpoint {WORK_DIR}/classification/resnet18_cifar100/baseline/epoch_200.pth --output_path {WORK_DIR}/segmentation/resnet18_cifar100/distortion/ --num_samples NUM_SAMPLES --num_gpus NUM_GPUS
+    - we used NUM_SAMPLES=2048 over NUM_GPUS=2
 - **Now we are ready to get the knapsack optimal patch-sizes by running:**
     - export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet18_cifar100/baseline.py --block_size_spec_file_name
       {WORK_DIR}/classification/resnet18_cifar100/distortion/block_spec/0.06.pickle --channel_distortion_path
       {WORK_DIR}/classification/resnet18_cifar100/distortion/distortion_collected --ratio 0.06
     - Here we use 6% DReLU budget
 - **Finetuning:**
-    - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet18_cifar100/baseline_0.06.py 2
+    - ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet18_cifar100/baseline_finetune.py 2 --load-from {WORK_DIR}/classification/resnet18_cifar100/baseline/epoch_200.pth --work-dir {WORK_DIR}/classification/resnet18_cifar100/experiments/0.06 --relu-spec-file {WORK_DIR}/classification/resnet18_cifar100/distortion/block_spec/0.06.pickle
   
 </details>
 

@@ -24,11 +24,6 @@ lr_config = dict(policy='step', step=[30, 60, 90], gamma=0.25, min_lr=0.0001, wa
 runner = dict(type='EpochBasedRunner', max_epochs=120)
 
 
-
-relu_spec_file = "/home/yakir/deepreduce_comparison_v3/distortions/baseline/block_sizes/4x4_naive.pickle"
-load_from = "/home/yakir/PycharmProjects/secure_inference/work_dirs/baseline/epoch_200.pth"
-
-
 dist_params = dict(backend='gloo')
 log_level = 'INFO'
 resume_from = None

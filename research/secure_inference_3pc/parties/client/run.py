@@ -258,9 +258,6 @@ def full_inference(cfg, model, image_start, image_end, device, network_assets, d
 
 if __name__ == "__main__":
     party = 0
-    # CHECKPOINT=/home/yakir/assets/resnet_voc/models/iter_20000.pth
-    # RELU_SPEC_FILE=/home/yakir/assets/resnet_voc/block_spec/0.12.pickle
-    # SECURE_CONFIG_PATH=/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/deeplabv3/deeplabv3_r50-d8_512x512_40k_voc12aug_avg_pool_secure_aspp.py
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('--dummy_image', action='store_true', default=False)

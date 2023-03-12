@@ -179,7 +179,6 @@ class SecureMSBClient(SecureModule):
 
 
 class SecureDReLUClient(SecureModule):
-    # counter = 0
     def __init__(self, **kwargs):
         super(SecureDReLUClient, self).__init__(**kwargs)
 
@@ -189,8 +188,6 @@ class SecureDReLUClient(SecureModule):
         self.dummy = False
 
     def forward(self, X_share):
-        # SecureDReLUClient.counter += 1
-        # np.save("/home/yakir/Data2/secure_activation_statistics/client/{}.npy".format(SecureDReLUClient.counter), X_share)
 
         if self.dummy:
             self.network_assets.sender_01.put(X_share)

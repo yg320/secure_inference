@@ -205,8 +205,7 @@ class SecureDReLUServer(SecureModule):
         self.dummy = False
 
     def forward(self, X_share):
-        # SecureDReLUServer.counter += 1
-        # np.save("/home/yakir/Data2/secure_activation_statistics/server/{}.npy".format(SecureDReLUServer.counter), X_share)
+
         if self.dummy:
             share_client = self.network_assets.receiver_01.get()
             recon = share_client + X_share
