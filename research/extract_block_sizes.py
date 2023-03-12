@@ -2,14 +2,11 @@ import os
 import argparse
 import subprocess
 from research.distortion.distortion_collector import DistortionCollector
-# python research/extract_block_sizes.py --config research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k.py --checkpoint mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth --output_path /storage/yakir/secure_inference/benchmark/segmentation --num_samples 48 --num_gpus 4
-# export PYTHONPATH=. ; python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet50_in1k/resnet50_in1k_avg_pool.py --checkpoint benchmark/classification/resnet50_coco/avg_pool/epoch_15.pth --output_path /storage/yakir/secure_inference/benchmark/classification/resnet50_coco/distortion/ --num_samples 512 --num_gpus 4
-# python /home/yakir/PycharmProjects/secure_inference/research/extract_block_sizes.py --config /home/yakir/PycharmProjects/secure_inference/research/configs/classification/resnet/resnet18_2xb64_cifar100_mini.py --checkpoint /home/yakir/PycharmProjects/secure_inference/work_dirs/resnet18_2xb64_cifar100_mini/epoch_200.pth --output_path /home/yakir/distortion_200_mini --num_samples 1024 --num_gpus 2
 parser = argparse.ArgumentParser(description='')
 
-parser.add_argument('--config', type=str, default="/home/yakir/PycharmProjects/secure_inference/research/configs/segmentation/mobilenet_v2/deeplabv3_m-v2-d8_512x512_160k_ade20k_relu.py")
-parser.add_argument('--checkpoint', type=str, default="/home/yakir/PycharmProjects/secure_inference/mmlab_models/segmentation/deeplabv3_m-v2-d8_512x512_160k_ade20k_20200825_223255-63986343.pth")
-parser.add_argument('--output_path', type=str, default="/home/yakir/tmptmptmp2")
+parser.add_argument('--config', type=str)
+parser.add_argument('--checkpoint', type=str)
+parser.add_argument('--output_path', type=str)
 parser.add_argument('--num_samples', type=int, default=4)
 parser.add_argument('--num_gpus', type=int, default=2)
 parser.add_argument('--batch_index_start', type=int, default=None)
