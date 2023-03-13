@@ -20,7 +20,7 @@
 
 ## Training:
 
-**All models and block ReLU specs can be found [here](https://drive.google.com/drive/folders/1HkLH8zaTLRnnQNUwafGguFZaAkN9A_Cb?usp=sharing)**
+**All models and block ReLU specs can be found [here](https://drive.google.com/drive/folders/1HkLH8zaTLRnnQNUwafGguFZaAkN9A_Cb?usp=sharing)**. Datasets can be downloaded based on OpenMMLab instructions.
 <details open>
 <summary>Segmentation, MobileNetV2, ADE20K</summary> 
 
