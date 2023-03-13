@@ -17,11 +17,10 @@
     - conda install numba
     - conda install tqdm
 
-## Training model and relu-spec files can be found here
 
 ## Training:
 
-
+**All models and block ReLU specs can be found [here](https://drive.google.com/drive/folders/1HkLH8zaTLRnnQNUwafGguFZaAkN9A_Cb?usp=sharing)**
 <details open>
 <summary>Segmentation, MobileNetV2, ADE20K</summary> 
 
@@ -109,9 +108,8 @@
 ## Extending Secure Inference
 To extend secure inference to your own architecture
 
-- **Add distortion parameters file to distortion/parameters**
-- **Add the proper line to distortion/parameters/factory.py**
-- **Add the proper file to distortion/arch_utils**
-- **Add the proper line to distortion/arch_utils/factor.py**
-- **distortion extraction line in data**
+- Add distortion parameters file to distortion/parameters
+- Add the proper line to distortion/parameters/factory.py
+- Add the proper file to distortion/arch_utils
+- Add the proper line to distortion/arch_utils/factor.py
 
