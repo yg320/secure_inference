@@ -324,19 +324,3 @@ if __name__ == "__main__":
     network_assets.done()
 
     print("Num of bytes sent 0 ", network_assets.sender_02.num_of_bytes_sent + network_assets.sender_01.num_of_bytes_sent)
-
-# sudo apt-get update
-# curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
-# sudo apt-get install bzip2
-# bash Anaconda3-2019.03-Linux-x86_64.sh
-# exit
-# conda create -n secure-inference python=3.7 -y
-# conda activate secure-inference
-# conda install pytorch=1.6.0 torchvision cudatoolkit=10.1 -c pytorch
-# pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu101/torch1.6.0/index.html
-# pip install mmsegmentation
-# sudo apt-get install ffmpeg libsm6 libxext6  -y
-# conda install numba
-# conda install tqdm
-# https://stackoverflow.com/questions/62436205/connecting-aws-ec2-instance-using-python-socket
-# git clone https://github.com/yg320/secure_inference.git
