@@ -1,3 +1,24 @@
+# Securing Neural Networks with Knapsack Optimization
+Created by [Yakir Gorski](https://arxiv.org/search/cs?searchtype=author&query=Gorski%2C+Y)<sup>1</sup> and [Shai Avidan](http://www.eng.tau.ac.il/~avidan/)<sup>1</sup>. <br>
+<sup>1</sup>Tel Aviv University&nbsp;
+
+![teaser](./doc/teaser.png)
+
+## Introduction:
+Deep learning inference brings together the data and the Convolutional Neural Network (CNN). This is problematic in case the user wants to preserve the privacy of the data and the service provider does not want to reveal the weights of his CNN. Secure Inference allows the two parties to engage in a protocol that preserves their respective privacy concerns, while revealing only the inference result to the user. This is known as Multi-Party Computation (MPC). A major bottleneck of MPC algorithms is communication, as the parties must send data back and forth. The linear component of a CNN (i.e. convolutions) can be done efficiently with minimal communication, but the non-linear part (i.e., ReLU) requires the bulk of communication bandwidth. We propose two ways to accelerate Secure Inference. The first is based on the observation that the ReLU outcome of many convolutions is highly correlated. Therefore, we replace the per pixel ReLU operation by a ReLU operation per patch. Each layer in the network will benefit from a patch of a different size and we devise an algorithm to choose the optimal set of patch sizes through a novel reduction of the problem to a knapsack problem. The second way to accelerate Secure Inference is based on cutting the number of bit comparisons required for a secure ReLU operation. We demonstrate the cumulative effect of these tools in the semi-honest secure 3-party setting for four problems: Classifying ImageNet using ResNet50 backbone, classifying CIFAR100 using ResNet18 backbone, semantic segmentation of ADE20K using MobileNetV2 backbone and semantic segmentation of Pascal VOC 2012 using ResNet50 backbone.
+
+## Citation
+If you find our work useful in your research, please consider citing:
+
+    @misc{gorski2023securing,
+          title={Securing Neural Networks with Knapsack Optimization}, 
+          author={Yakir Gorski and Shai Avidan},
+          year={2023},
+          eprint={2304.10442},
+          archivePrefix={arXiv},
+          primaryClass={cs.CV}
+    }
+
 ## Environment Setup:
 ### We provide a docker file under: docker/Dockerfile
 - **Build the docker image:**
@@ -113,3 +134,5 @@ To extend secure inference to your own architecture
 - Add the proper file to distortion/arch_utils
 - Add the proper line to distortion/arch_utils/factor.py
 
+## License
+This project is licensed under the terms of the MIT license (see the [LICENSE](./LICENSE) file for more details).
