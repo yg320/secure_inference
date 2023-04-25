@@ -1,5 +1,5 @@
 # Securing Neural Networks with Knapsack Optimization
-Created by [Yakir Gorski](https://arxiv.org/search/cs?searchtype=author&query=Gorski%2C+Y)<sup>1</sup> and [Shai Avidan](http://www.eng.tau.ac.il/~avidan/)<sup>1</sup>. <br>
+Created by [Yakir Gorski](https://scholar.google.com/citations?hl=en&user=x9ZVEAgAAAAJ)<sup>1</sup> and [Shai Avidan](http://www.eng.tau.ac.il/~avidan/)<sup>1</sup>. <br>
 <sup>1</sup>Tel Aviv University&nbsp;
 
 ![teaser](./teaser.png)
