@@ -23,6 +23,7 @@ If you find our work useful in your research, please consider citing:
 ### We provide a docker file under: docker/Dockerfile
 - **Build the docker image:**
     - cd docker; docker build -t secure_inference .
+    - Alternatively, download a dockerhub image by running: docker pull yakirgorski/knapsack_secure_inference:latest
 - **To manually build the environment:**
     - sudo apt-get update
     - curl -O https://repo.anaconda.com/archive/Anaconda3-2019.03-Linux-x86_64.sh
