@@ -181,4 +181,4 @@ print(f"[STUDENT] (test_loss, test_top1, test_top5) = ({test_loss}, {test_top1},
 
 
 os.makedirs(outdir, exist_ok=True)
-finetune_student_model(student_model, teacher_model, train_loader, test_loader, outdir, epochs=120)
+finetune_student_model(student_model, teacher_model, train_loader, test_loader, outdir, epochs=160)

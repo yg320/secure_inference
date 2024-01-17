@@ -1,0 +1,10 @@
+#./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet18_cifar100/baseline.py 2 --work-dir ${WORK_DIR}/classification/resnet18_cifar100/baseline
+#export NUM_GPUS=1
+#export NUM_SAMPLES=2048
+#export  PYTHONPATH=. ; python research/extract_block_sizes.py --config research/configs/classification/resnet/resnet18_cifar100/baseline.py --checkpoint ${WORK_DIR}/classification/resnet18_cifar100/baseline/epoch_200.pth --output_path ${WORK_DIR}/classification/resnet18_cifar100/distortion/ --num_samples $NUM_SAMPLES --num_gpus $NUM_GPUS
+for DISTORTION in 0.12 0.15 0.18 0.015 0.03 0.06
+do
+  export PYTHONPATH=. ; python research/distortion/knapsack/knapsack_patch_size_extractor.py --config research/configs/classification/resnet/resnet18_cifar100/baseline.py --block_size_spec_file_name ${WORK_DIR}/classification/resnet18_cifar100/distortion/block_spec/$DISTORTION.pickle --channel_distortion_path ${WORK_DIR}/classification/resnet18_cifar100/distortion/distortion_collected --ratio $DISTORTION --max_cost -1
+  ./research/mmlab_tools/classification/dist_train_cls.sh research/configs/classification/resnet/resnet18_cifar100/baseline_finetune.py 2 --load-from ${WORK_DIR}/classification/resnet18_cifar100/baseline/epoch_200.pth --work-dir ${WORK_DIR}/classification/resnet18_cifar100/experiments_ce_loss/$DISTORTION/ --relu-spec-file ${WORK_DIR}/classification/resnet18_cifar100/distortion/block_spec/$DISTORTION.pickle
+  python train_kd.py --outdir ${WORK_DIR}/classification/resnet18_cifar100/experiments_kd_training/$DISTORTION/kd_finetune --student_path ${WORK_DIR}/classification/resnet18_cifar100/experiments_ce_loss/$DISTORTION/epoch_1.pth --teacher_path /storage/jevnisek/snl/pretrained_models/cifar100/resnet18_in/best_checkpoint.pth.tar --relu_spec_file ${WORK_DIR}/classification/resnet18_cifar100/distortion/block_spec/$DISTORTION.pickle
+done
