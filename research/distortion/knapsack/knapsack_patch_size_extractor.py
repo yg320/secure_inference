@@ -142,10 +142,12 @@ if __name__ == "__main__":
     parser.add_argument('--config', type=str)
     parser.add_argument('--ratio', type=float, default=None)
     parser.add_argument('--max_cost', type=int, default=34816)
-    parser.add_argument('--device', type=int, default=1)
+    parser.add_argument('--device', type=int, default=0)
     parser.add_argument('--buffer_dir', type=str, default=None)
 
     args = parser.parse_args()
+    if args.max_cost == -1:
+        args.max_cost = None
 
     cfg = mmcv.Config.fromfile(args.config)
     params = param_factory(cfg)
